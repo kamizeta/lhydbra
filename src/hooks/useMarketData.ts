@@ -4,7 +4,7 @@ import { mockAssets, type Asset, type AssetType } from '@/lib/mockData';
 
 // Priority symbols to fetch live (max 8 for free plan)
 const PRIORITY_SYMBOLS = [
-  'BTC/USD', 'ETH/USD', 'SOL/USD', 'AAPL', 'NVDA', 'SPY', 'QQQ', 'XAU/USD'
+  'BTC/USD', 'ETH/USD', 'SOL/USD', 'AAPL'
 ];
 
 // Fetch market data: live for priority symbols, mock for the rest
@@ -36,8 +36,8 @@ export function useMarketData() {
 
       return assets;
     },
-    staleTime: 60_000,
-    refetchInterval: 120_000, // 2 minutes to stay safe on rate limits
+    staleTime: 90_000,
+    refetchInterval: 180_000, // 3 minutes to stay safe on rate limits
     retry: 1,
   });
 }
@@ -51,8 +51,7 @@ export function useQuickQuotes(assetTypes?: AssetType[]) {
         ? ALL_SYMBOLS.filter(s => assetTypes.includes(s.type))
         : ALL_SYMBOLS;
 
-      // Take max 8 symbols
-      const symbols = filtered.slice(0, 8).map(s => s.tdSymbol);
+      const symbols = filtered.slice(0, 4).map(s => s.tdSymbol);
       const quotes = await fetchQuotes(symbols);
 
       const assets: Asset[] = [];
@@ -75,8 +74,8 @@ export function useQuickQuotes(assetTypes?: AssetType[]) {
 
       return assets;
     },
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: 90_000,
+    refetchInterval: 180_000,
     retry: 1,
   });
 }
