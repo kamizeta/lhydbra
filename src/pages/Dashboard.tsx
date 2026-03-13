@@ -77,7 +77,7 @@ export default function Dashboard() {
     weeklyRiskLimit: settings.max_weekly_risk,
     currentDrawdown: 3.4,
     maxDrawdownLimit: settings.max_drawdown,
-    openPositions: mockPortfolio.length,
+    openPositions: positions.length,
     maxPositions: settings.max_positions,
   };
 
