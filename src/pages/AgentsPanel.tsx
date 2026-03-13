@@ -66,6 +66,7 @@ export default function AgentsPanel() {
             <><Zap className="h-4 w-4" /> {t.agents.runAllAgents}</>
           )}
         </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
