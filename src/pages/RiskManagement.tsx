@@ -4,24 +4,25 @@ import ProgressBar from "@/components/shared/ProgressBar";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { mockRiskMetrics, mockPortfolio, formatCurrency, formatNumber } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n";
 
 export default function RiskManagement() {
+  const { t } = useI18n();
   const rm = mockRiskMetrics;
 
   const riskRules = [
-    { label: 'Max Risk Per Trade', value: '2%', status: 'ok' as const },
-    { label: 'Max Daily Risk', value: `${rm.dailyRiskLimit}%`, status: rm.dailyRiskUsed > rm.dailyRiskLimit * 0.8 ? 'warning' as const : 'ok' as const },
-    { label: 'Max Weekly Risk', value: `${rm.weeklyRiskLimit}%`, status: rm.weeklyRiskUsed > rm.weeklyRiskLimit * 0.8 ? 'warning' as const : 'ok' as const },
-    { label: 'Max Drawdown', value: `${rm.maxDrawdownLimit}%`, status: 'ok' as const },
-    { label: 'Max Positions', value: `${rm.maxPositions}`, status: rm.openPositions >= rm.maxPositions ? 'blocked' as const : 'ok' as const },
-    { label: 'Max Leverage', value: `${rm.maxLeverage}x`, status: 'ok' as const },
-    { label: 'Max Single Asset', value: '30%', status: 'ok' as const },
-    { label: 'Max Correlation', value: '70%', status: rm.correlationRisk > 60 ? 'warning' as const : 'ok' as const },
-    { label: 'Stop Loss', value: 'Required', status: 'ok' as const },
-    { label: 'Min R/R Ratio', value: '1.5:1', status: 'ok' as const },
+    { label: t.riskMgmt.maxRiskPerTrade, value: '2%', status: 'ok' as const },
+    { label: t.riskMgmt.maxDailyRisk, value: `${rm.dailyRiskLimit}%`, status: rm.dailyRiskUsed > rm.dailyRiskLimit * 0.8 ? 'warning' as const : 'ok' as const },
+    { label: t.riskMgmt.maxWeeklyRisk, value: `${rm.weeklyRiskLimit}%`, status: rm.weeklyRiskUsed > rm.weeklyRiskLimit * 0.8 ? 'warning' as const : 'ok' as const },
+    { label: t.riskMgmt.maxDrawdown, value: `${rm.maxDrawdownLimit}%`, status: 'ok' as const },
+    { label: t.riskMgmt.maxPositions, value: `${rm.maxPositions}`, status: rm.openPositions >= rm.maxPositions ? 'blocked' as const : 'ok' as const },
+    { label: t.riskMgmt.maxLeverage, value: `${rm.maxLeverage}x`, status: 'ok' as const },
+    { label: t.riskMgmt.maxSingleAsset, value: '30%', status: 'ok' as const },
+    { label: t.riskMgmt.maxCorrelation, value: '70%', status: rm.correlationRisk > 60 ? 'warning' as const : 'ok' as const },
+    { label: t.riskMgmt.stopLossRequired, value: t.riskMgmt.required, status: 'ok' as const },
+    { label: t.riskMgmt.minRRRatio, value: '1.5:1', status: 'ok' as const },
   ];
 
-  // Position sizing calculator
   const accountSize = 119250;
   const riskPercent = 1.5;
   const entryPrice = 875;
@@ -30,38 +31,45 @@ export default function RiskManagement() {
   const dollarRisk = accountSize * (riskPercent / 100);
   const positionSize = Math.floor(dollarRisk / riskPerShare);
 
+  const typeLabels: Record<string, string> = {
+    crypto: t.common.crypto,
+    stock: t.common.stocks,
+    etf: t.common.etfs,
+    commodity: t.common.commodities,
+  };
+
   return (
     <div className="p-6 space-y-6 animate-slide-in">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Risk Management</h1>
-        <p className="text-sm text-muted-foreground font-mono">Capital protection • Position sizing • Exposure control</p>
+        <h1 className="text-2xl font-bold text-foreground">{t.riskMgmt.title}</h1>
+        <p className="text-sm text-muted-foreground font-mono">{t.riskMgmt.subtitle}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard label="Daily Risk" value={`${rm.dailyRiskUsed}%`} change={`${formatNumber(rm.dailyRiskLimit - rm.dailyRiskUsed)}% remaining`} changeType="neutral" icon={Shield} />
-        <MetricCard label="Drawdown" value={`${rm.currentDrawdown}%`} change={`Limit: ${rm.maxDrawdownLimit}%`} changeType={rm.currentDrawdown > rm.maxDrawdownLimit * 0.5 ? 'negative' : 'neutral'} icon={AlertTriangle} />
-        <MetricCard label="Exposure" value={`${rm.totalExposure}%`} change={`Limit: ${rm.maxExposureLimit}%`} changeType="neutral" icon={BarChart3} />
-        <MetricCard label="Correlation" value={`${rm.correlationRisk}%`} change={rm.correlationRisk > 60 ? 'Elevated' : 'Normal'} changeType={rm.correlationRisk > 60 ? 'negative' : 'neutral'} icon={Activity} />
+        <MetricCard label={t.riskMgmt.dailyRisk} value={`${rm.dailyRiskUsed}%`} change={`${formatNumber(rm.dailyRiskLimit - rm.dailyRiskUsed)}% ${t.riskMgmt.remaining}`} changeType="neutral" icon={Shield} />
+        <MetricCard label={t.riskMgmt.drawdown} value={`${rm.currentDrawdown}%`} change={`${t.riskMgmt.limit}: ${rm.maxDrawdownLimit}%`} changeType={rm.currentDrawdown > rm.maxDrawdownLimit * 0.5 ? 'negative' : 'neutral'} icon={AlertTriangle} />
+        <MetricCard label={t.riskMgmt.exposure} value={`${rm.totalExposure}%`} change={`${t.riskMgmt.limit}: ${rm.maxExposureLimit}%`} changeType="neutral" icon={BarChart3} />
+        <MetricCard label={t.riskMgmt.correlation} value={`${rm.correlationRisk}%`} change={rm.correlationRisk > 60 ? t.riskMgmt.elevated : t.riskMgmt.normal} changeType={rm.correlationRisk > 60 ? 'negative' : 'neutral'} icon={Activity} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Risk Meters */}
         <div className="terminal-border rounded-lg p-4 space-y-5">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-            <Shield className="h-4 w-4 text-primary" /> Risk Meters
+            <Shield className="h-4 w-4 text-primary" /> {t.riskMgmt.riskMeters}
           </h2>
-          <ProgressBar value={rm.dailyRiskUsed} max={rm.dailyRiskLimit} label="Daily Risk" />
-          <ProgressBar value={rm.weeklyRiskUsed} max={rm.weeklyRiskLimit} label="Weekly Risk" />
-          <ProgressBar value={rm.currentDrawdown} max={rm.maxDrawdownLimit} label="Drawdown" />
-          <ProgressBar value={rm.totalExposure} max={rm.maxExposureLimit} label="Total Exposure" />
-          <ProgressBar value={rm.leverageUsed} max={rm.maxLeverage} label="Leverage" variant="default" />
-          <ProgressBar value={rm.correlationRisk} max={100} label="Correlation Risk" />
+          <ProgressBar value={rm.dailyRiskUsed} max={rm.dailyRiskLimit} label={t.riskMgmt.dailyRisk} />
+          <ProgressBar value={rm.weeklyRiskUsed} max={rm.weeklyRiskLimit} label={t.riskMgmt.weeklyRisk} />
+          <ProgressBar value={rm.currentDrawdown} max={rm.maxDrawdownLimit} label={t.riskMgmt.drawdown} />
+          <ProgressBar value={rm.totalExposure} max={rm.maxExposureLimit} label={t.riskMgmt.totalExposure} />
+          <ProgressBar value={rm.leverageUsed} max={rm.maxLeverage} label={t.riskMgmt.leverage} variant="default" />
+          <ProgressBar value={rm.correlationRisk} max={100} label={t.riskMgmt.correlationRisk} />
         </div>
 
         {/* Rules */}
         <div className="terminal-border rounded-lg p-4">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
-            <Lock className="h-4 w-4 text-primary" /> Risk Rules
+            <Lock className="h-4 w-4 text-primary" /> {t.riskMgmt.riskRules}
           </h2>
           <div className="space-y-2">
             {riskRules.map((rule, i) => (
@@ -84,54 +92,54 @@ export default function RiskManagement() {
         {/* Position Sizing Calculator */}
         <div className="terminal-border rounded-lg p-4">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
-            <BarChart3 className="h-4 w-4 text-primary" /> Position Sizing
+            <BarChart3 className="h-4 w-4 text-primary" /> {t.riskMgmt.positionSizing}
           </h2>
           <div className="space-y-3">
             <div className="rounded-md bg-accent/50 p-3 space-y-2">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Account Size</span>
+                <span className="text-muted-foreground">{t.riskMgmt.accountSize}</span>
                 <span className="font-mono text-foreground">{formatCurrency(accountSize)}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Risk %</span>
+                <span className="text-muted-foreground">{t.riskMgmt.riskPercent}</span>
                 <span className="font-mono text-foreground">{riskPercent}%</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">$ at Risk</span>
+                <span className="text-muted-foreground">{t.riskMgmt.dollarAtRisk}</span>
                 <span className="font-mono text-loss">{formatCurrency(dollarRisk)}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Entry</span>
+                <span className="text-muted-foreground">{t.common.entry}</span>
                 <span className="font-mono text-foreground">{formatCurrency(entryPrice)}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Stop Loss</span>
+                <span className="text-muted-foreground">{t.common.stopLoss}</span>
                 <span className="font-mono text-loss">{formatCurrency(stopLossPrice)}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Risk/Share</span>
+                <span className="text-muted-foreground">{t.riskMgmt.riskPerShare}</span>
                 <span className="font-mono text-foreground">{formatCurrency(riskPerShare)}</span>
               </div>
             </div>
             <div className="rounded-md bg-primary/10 border border-primary/20 p-3">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-foreground">Position Size</span>
-                <span className="text-xl font-bold font-mono text-primary">{positionSize} shares</span>
+                <span className="text-xs font-medium text-foreground">{t.riskMgmt.positionSize}</span>
+                <span className="text-xl font-bold font-mono text-primary">{positionSize} {t.riskMgmt.shares}</span>
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
-                Total value: {formatCurrency(positionSize * entryPrice)}
+                {t.riskMgmt.totalValue}: {formatCurrency(positionSize * entryPrice)}
               </p>
             </div>
           </div>
 
           {/* Exposure by type */}
-          <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mt-6 mb-3">Exposure by Market</h3>
+          <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mt-6 mb-3">{t.riskMgmt.exposureByMarket}</h3>
           {(['crypto', 'stock', 'etf', 'commodity'] as const).map(type => {
             const positions = mockPortfolio.filter(p => p.type === type);
             const alloc = positions.reduce((s, p) => s + p.allocation, 0);
             return (
               <div key={type} className="flex items-center justify-between py-1.5">
-                <span className="text-xs text-muted-foreground capitalize">{type === 'etf' ? 'ETFs' : type}</span>
+                <span className="text-xs text-muted-foreground">{typeLabels[type]}</span>
                 <div className="flex items-center gap-2">
                   <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div

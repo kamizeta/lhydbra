@@ -4,8 +4,10 @@ import { mockStrategies, Strategy, formatCurrency, formatNumber } from "@/lib/mo
 import StatusBadge from "@/components/shared/StatusBadge";
 import MetricCard from "@/components/shared/MetricCard";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n";
 
 export default function Strategies() {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [strategies, setStrategies] = useState(mockStrategies);
 
@@ -18,18 +20,24 @@ export default function Strategies() {
     setStrategies(prev => prev.map(s => s.id === id ? { ...s, active: !s.active } : s));
   };
 
+  const riskLabel = (level: string) => {
+    if (level === 'high') return t.strategies.highRisk;
+    if (level === 'medium') return t.strategies.mediumRisk;
+    return t.strategies.lowRisk;
+  };
+
   return (
     <div className="p-6 space-y-6 animate-slide-in">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Strategy Engine</h1>
-        <p className="text-sm text-muted-foreground font-mono">9 strategies • {activeStrategies.length} active</p>
+        <h1 className="text-2xl font-bold text-foreground">{t.strategies.title}</h1>
+        <p className="text-sm text-muted-foreground font-mono">{strategies.length} {t.strategies.subtitle} • {activeStrategies.length} {t.common.active.toLowerCase()}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard label="Active Strategies" value={`${activeStrategies.length}`} icon={Brain} subtitle={`of ${strategies.length} total`} />
-        <MetricCard label="Capital Allocated" value={formatCurrency(totalCapital)} icon={Target} />
-        <MetricCard label="Total Strategy P&L" value={`+${formatCurrency(totalPnl)}`} changeType="positive" change="All time" icon={TrendingUp} />
-        <MetricCard label="Avg Win Rate" value={`${formatNumber(avgWinRate)}%`} icon={Target} />
+        <MetricCard label={t.strategies.activeStrategies} value={`${activeStrategies.length}`} icon={Brain} subtitle={`${t.strategies.ofTotal} ${strategies.length}`} />
+        <MetricCard label={t.strategies.capitalAllocated} value={formatCurrency(totalCapital)} icon={Target} />
+        <MetricCard label={t.strategies.totalStrategyPnl} value={`+${formatCurrency(totalPnl)}`} changeType="positive" change={t.strategies.allTime} icon={TrendingUp} />
+        <MetricCard label={t.strategies.avgWinRate} value={`${formatNumber(avgWinRate)}%`} icon={Target} />
       </div>
 
       <div className="space-y-3">
@@ -54,10 +62,10 @@ export default function Strategies() {
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-foreground">{strategy.name}</h3>
                     <StatusBadge variant={strategy.active ? 'profit' : 'neutral'} dot>
-                      {strategy.active ? 'Active' : 'Inactive'}
+                      {strategy.active ? t.common.active : t.common.inactive}
                     </StatusBadge>
                     <StatusBadge variant={strategy.riskLevel === 'high' ? 'loss' : strategy.riskLevel === 'medium' ? 'warning' : 'profit'}>
-                      {strategy.riskLevel.toUpperCase()} RISK
+                      {riskLabel(strategy.riskLevel)}
                     </StatusBadge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{strategy.description}</p>
@@ -72,7 +80,7 @@ export default function Strategies() {
                   <div className={cn("text-sm font-mono font-medium", strategy.pnl >= 0 ? "text-profit" : "text-loss")}>
                     {strategy.pnl >= 0 ? '+' : ''}{formatCurrency(strategy.pnl)}
                   </div>
-                  <div className="text-xs text-muted-foreground">{strategy.totalTrades} trades</div>
+                  <div className="text-xs text-muted-foreground">{strategy.totalTrades} {t.common.trades}</div>
                 </div>
                 {expanded === strategy.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
               </div>
@@ -84,7 +92,7 @@ export default function Strategies() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-                      <Target className="h-3 w-3 text-profit" /> Entry Rules
+                      <Target className="h-3 w-3 text-profit" /> {t.strategies.entryRules}
                     </h4>
                     <ul className="space-y-1">
                       {strategy.entryRules.map((rule, i) => (
@@ -96,7 +104,7 @@ export default function Strategies() {
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3 text-loss" /> Exit Rules
+                      <AlertTriangle className="h-3 w-3 text-loss" /> {t.strategies.exitRules}
                     </h4>
                     <ul className="space-y-1">
                       {strategy.exitRules.map((rule, i) => (
@@ -108,7 +116,7 @@ export default function Strategies() {
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-                      <Clock className="h-3 w-3 text-primary" /> Conditions
+                      <Clock className="h-3 w-3 text-primary" /> {t.strategies.conditions}
                     </h4>
                     <ul className="space-y-1">
                       {strategy.idealConditions.map((cond, i) => (
@@ -118,9 +126,9 @@ export default function Strategies() {
                       ))}
                     </ul>
                     <div className="mt-3 space-y-1">
-                      <div className="text-xs text-muted-foreground">Time Horizon: <span className="text-foreground font-mono">{strategy.timeHorizon}</span></div>
-                      <div className="text-xs text-muted-foreground">Max Drawdown: <span className="text-loss font-mono">{strategy.maxDrawdown}%</span></div>
-                      <div className="text-xs text-muted-foreground">Capital: <span className="text-foreground font-mono">{formatCurrency(strategy.capitalAllocated)}</span></div>
+                      <div className="text-xs text-muted-foreground">{t.strategies.timeHorizon}: <span className="text-foreground font-mono">{strategy.timeHorizon}</span></div>
+                      <div className="text-xs text-muted-foreground">{t.strategies.maxDrawdown}: <span className="text-loss font-mono">{strategy.maxDrawdown}%</span></div>
+                      <div className="text-xs text-muted-foreground">{t.strategies.capital}: <span className="text-foreground font-mono">{formatCurrency(strategy.capitalAllocated)}</span></div>
                     </div>
                   </div>
                 </div>
