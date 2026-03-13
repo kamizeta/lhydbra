@@ -13,6 +13,7 @@ import {
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import ProgressBar from "@/components/shared/ProgressBar";
+import OnboardingTutorial from "@/components/OnboardingTutorial";
 import {
   mockPortfolio,
   mockAgentOutputs,
@@ -36,6 +37,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 space-y-6 animate-slide-in">
+      <OnboardingTutorial />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

@@ -5,6 +5,7 @@ import { mockAssets, mockPortfolio, mockAgentOutputs } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import { useAIAgent, type AgentType } from "@/hooks/useAIAgent";
 import StatusBadge from "@/components/shared/StatusBadge";
+import AgentsHelpButton from "@/components/AgentsHelpButton";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 
@@ -47,6 +48,8 @@ export default function AgentsPanel() {
           <h1 className="text-2xl font-bold text-foreground">{t.agents.title}</h1>
           <p className="text-sm text-muted-foreground font-mono">{t.agents.subtitle}</p>
         </div>
+        <div className="flex items-center gap-2">
+          <AgentsHelpButton />
         <button
           onClick={handleRunAll}
           disabled={!!runningAgent}
@@ -63,6 +66,7 @@ export default function AgentsPanel() {
             <><Zap className="h-4 w-4" /> {t.agents.runAllAgents}</>
           )}
         </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
