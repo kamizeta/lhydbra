@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useI18n } from '@/i18n';
+import { supabase } from '@/integrations/supabase/client';
 
 export type AgentType =
   | 'market-analyst'
