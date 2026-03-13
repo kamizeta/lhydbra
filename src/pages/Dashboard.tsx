@@ -140,38 +140,38 @@ export default function Dashboard() {
               <PieChart className="h-4 w-4 text-primary" />
               {t.dashboard.openPositions}
             </h2>
-            <span className="text-xs font-mono text-muted-foreground">{mockPortfolio.length} {t.common.active}</span>
+            <span className="text-xs font-mono text-muted-foreground">{positions.length} {t.common.active}</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
                   <th className="text-left p-3">{t.common.asset}</th>
-                  <th className="text-right p-3">{t.common.price}</th>
-                  <th className="text-right p-3">{t.dashboard.pnl}</th>
-                  <th className="text-right p-3">{t.dashboard.alloc}</th>
+                  <th className="text-center p-3">Dir</th>
+                  <th className="text-right p-3">Qty</th>
+                  <th className="text-right p-3">{t.common.entry}</th>
                   <th className="text-right p-3">{t.common.strategy}</th>
                 </tr>
               </thead>
               <tbody>
-                {mockPortfolio.map((pos) => (
-                  <tr key={pos.symbol} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
+                {positions.length === 0 ? (
+                  <tr><td colSpan={5} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
+                ) : positions.map((pos) => (
+                  <tr key={pos.id} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
                     <td className="p-3">
                       <div className="font-mono font-medium text-foreground">{pos.symbol}</div>
                       <div className="text-xs text-muted-foreground">{pos.name}</div>
                     </td>
-                    <td className="text-right p-3 font-mono text-foreground">{formatCurrency(pos.currentPrice)}</td>
-                    <td className="text-right p-3">
-                      <div className={cn("font-mono font-medium", pos.pnl >= 0 ? "text-profit" : "text-loss")}>
-                        {pos.pnl >= 0 ? '+' : ''}{formatCurrency(pos.pnl)}
-                      </div>
-                      <div className={cn("text-xs font-mono", pos.pnlPercent >= 0 ? "text-profit" : "text-loss")}>
-                        {pos.pnlPercent >= 0 ? '+' : ''}{formatNumber(pos.pnlPercent)}%
-                      </div>
+                    <td className="text-center p-3">
+                      <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
+                        {pos.direction === 'long' ? <TrendingUp className="h-3 w-3 inline" /> : <TrendingDown className="h-3 w-3 inline" />}
+                        {' '}{pos.direction.toUpperCase()}
+                      </StatusBadge>
                     </td>
-                    <td className="text-right p-3 font-mono text-muted-foreground">{formatNumber(pos.allocation)}%</td>
+                    <td className="text-right p-3 font-mono text-foreground">{pos.quantity}</td>
+                    <td className="text-right p-3 font-mono text-foreground">${Number(pos.avg_entry).toFixed(2)}</td>
                     <td className="text-right p-3">
-                      <StatusBadge variant="info">{pos.strategy}</StatusBadge>
+                      <StatusBadge variant="info">{pos.strategy || '—'}</StatusBadge>
                     </td>
                   </tr>
                 ))}
