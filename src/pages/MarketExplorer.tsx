@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Search, Filter, ArrowUpDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Search, Filter, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw } from "lucide-react";
 import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolume, formatMarketCap } from "@/lib/mockData";
+import { useQuickQuotes } from "@/hooks/useMarketData";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,11 @@ export default function MarketExplorer() {
   const [sortKey, setSortKey] = useState<SortKey>('relativeStrength');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  const filtered = mockAssets
+  // Use real data with fallback to mock
+  const { data: liveAssets, isLoading, isError, refetch } = useQuickQuotes();
+  const assets = liveAssets && liveAssets.length > 0 ? liveAssets : mockAssets;
+
+  const filtered = assets
     .filter(a => typeFilter === 'all' || a.type === typeFilter)
     .filter(a => a.symbol.toLowerCase().includes(search.toLowerCase()) || a.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
@@ -54,9 +59,27 @@ export default function MarketExplorer() {
 
   return (
     <div className="p-6 space-y-6 animate-slide-in">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Market Explorer</h1>
-        <p className="text-sm text-muted-foreground font-mono">Crypto • Stocks • ETFs • Commodities</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Market Explorer</h1>
+          <p className="text-sm text-muted-foreground font-mono">Crypto • Stocks • ETFs • Commodities</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isLoading && (
+            <StatusBadge variant="info" dot>
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />Loading live data...
+            </StatusBadge>
+          )}
+          {!isLoading && liveAssets && liveAssets.length > 0 && (
+            <StatusBadge variant="profit" dot>LIVE</StatusBadge>
+          )}
+          {!isLoading && (!liveAssets || liveAssets.length === 0) && (
+            <StatusBadge variant="warning" dot>MOCK DATA</StatusBadge>
+          )}
+          <button onClick={() => refetch()} className="rounded-md bg-secondary p-2 text-muted-foreground hover:text-foreground transition-colors">
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -92,8 +115,8 @@ export default function MarketExplorer() {
       {/* Market stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {(['crypto', 'stock', 'etf', 'commodity'] as AssetType[]).map(type => {
-          const assets = mockAssets.filter(a => a.type === type);
-          const avgChange = assets.reduce((s, a) => s + a.changePercent, 0) / assets.length;
+          const typeAssets = assets.filter(a => a.type === type);
+          const avgChange = typeAssets.length > 0 ? typeAssets.reduce((s, a) => s + a.changePercent, 0) / typeAssets.length : 0;
           return (
             <div key={type} className="terminal-border rounded-lg p-3">
               <p className="text-xs uppercase text-muted-foreground tracking-wider">
@@ -102,7 +125,7 @@ export default function MarketExplorer() {
               <p className={cn("text-lg font-bold font-mono mt-1", avgChange >= 0 ? "text-profit" : "text-loss")}>
                 {avgChange >= 0 ? '+' : ''}{formatNumber(avgChange)}%
               </p>
-              <p className="text-xs text-muted-foreground">{assets.length} assets</p>
+              <p className="text-xs text-muted-foreground">{typeAssets.length} assets</p>
             </div>
           );
         })}

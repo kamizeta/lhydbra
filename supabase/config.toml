@@ -1,1 +1,4 @@
 project_id = "boccgfolfxhkcxflkrqz"
+
+[functions.twelve-data]
+verify_jwt = false
