@@ -206,31 +206,31 @@ export const mockStrategies: Strategy[] = [
 export const mockTradeIdeas: TradeIdea[] = [
   {
     id: '1', symbol: 'NVDA', name: 'NVIDIA', type: 'stock', direction: 'long', strategy: 'Momentum',
-    entry: 875, stopLoss: 830, takeProfit: 960, riskReward: 1.89, positionSize: 12, riskPercent: 1.5,
+    entry: 117, stopLoss: 108, takeProfit: 135, riskReward: 2.0, positionSize: 50, riskPercent: 1.5,
     confidence: 82, status: 'pending', reasoning: 'Strong momentum, AI sector leadership, volume breakout above consolidation.',
     agentAnalysis: 'Market Analyst: Bullish tech sector. Asset Selector: Top RS rank. Risk Manager: Approved at 1.5% risk.',
-    createdAt: '2024-03-15T10:30:00Z',
+    createdAt: '2025-03-13T10:30:00Z',
   },
   {
     id: '2', symbol: 'SOL/USD', name: 'Solana', type: 'crypto', direction: 'long', strategy: 'Breakout',
-    entry: 178, stopLoss: 160, takeProfit: 220, riskReward: 2.33, positionSize: 25, riskPercent: 1.0,
+    entry: 128, stopLoss: 115, takeProfit: 160, riskReward: 2.46, positionSize: 25, riskPercent: 1.0,
     confidence: 75, status: 'pending', reasoning: 'Breaking above key resistance with volume. DeFi activity surging.',
     agentAnalysis: 'Market Analyst: Crypto bullish regime. Asset Selector: High RS. Risk Manager: Approved with reduced size.',
-    createdAt: '2024-03-15T09:15:00Z',
+    createdAt: '2025-03-13T09:15:00Z',
   },
   {
     id: '3', symbol: 'XAU/USD', name: 'Gold', type: 'commodity', direction: 'long', strategy: 'Defensive',
-    entry: 2348, stopLoss: 2310, takeProfit: 2420, riskReward: 1.89, positionSize: 3, riskPercent: 0.8,
-    confidence: 70, status: 'approved', reasoning: 'Geopolitical uncertainty, central bank buying, inflation hedge.',
+    entry: 2985, stopLoss: 2940, takeProfit: 3100, riskReward: 2.56, positionSize: 3, riskPercent: 0.8,
+    confidence: 78, status: 'approved', reasoning: 'Geopolitical uncertainty, central bank buying, inflation hedge. Near all-time highs.',
     agentAnalysis: 'Market Analyst: Risk-off signals. Asset Selector: Safe haven demand. Risk Manager: Low risk approved.',
-    createdAt: '2024-03-14T14:00:00Z',
+    createdAt: '2025-03-12T14:00:00Z',
   },
   {
     id: '4', symbol: 'TSLA', name: 'Tesla', type: 'stock', direction: 'short', strategy: 'Mean Reversion',
-    entry: 246, stopLoss: 262, takeProfit: 218, riskReward: 1.75, positionSize: 8, riskPercent: 1.2,
+    entry: 253, stopLoss: 268, takeProfit: 225, riskReward: 1.87, positionSize: 8, riskPercent: 1.2,
     confidence: 65, status: 'rejected', reasoning: 'Overextended bounce, weak fundamentals, competition pressure.',
     agentAnalysis: 'Risk Manager: REJECTED - Correlation too high with existing positions. Reduce exposure first.',
-    createdAt: '2024-03-14T11:45:00Z',
+    createdAt: '2025-03-12T11:45:00Z',
   },
 ];
 
