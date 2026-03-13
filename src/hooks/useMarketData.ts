@@ -51,8 +51,7 @@ export function useQuickQuotes(assetTypes?: AssetType[]) {
         ? ALL_SYMBOLS.filter(s => assetTypes.includes(s.type))
         : ALL_SYMBOLS;
 
-      // Take max 8 symbols
-      const symbols = filtered.slice(0, 8).map(s => s.tdSymbol);
+      const symbols = filtered.slice(0, 4).map(s => s.tdSymbol);
       const quotes = await fetchQuotes(symbols);
 
       const assets: Asset[] = [];
