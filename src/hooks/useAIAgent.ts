@@ -147,6 +147,11 @@ export function useAIAgent() {
         ...prev,
         [agent]: { ...prev[agent], isStreaming: false },
       }));
+
+      // After order-preparator finishes, parse and save trade signals
+      if (agent === 'order-preparator' && fullContent && !fullContent.startsWith('Error')) {
+        parseAndSaveSignals(fullContent);
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Unknown error';
       toast({ title: `Agent Error: ${agent}`, description: message, variant: 'destructive' });
