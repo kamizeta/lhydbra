@@ -59,9 +59,27 @@ export default function MarketExplorer() {
 
   return (
     <div className="p-6 space-y-6 animate-slide-in">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Market Explorer</h1>
-        <p className="text-sm text-muted-foreground font-mono">Crypto • Stocks • ETFs • Commodities</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Market Explorer</h1>
+          <p className="text-sm text-muted-foreground font-mono">Crypto • Stocks • ETFs • Commodities</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isLoading && (
+            <StatusBadge variant="info" dot>
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />Loading live data...
+            </StatusBadge>
+          )}
+          {!isLoading && liveAssets && liveAssets.length > 0 && (
+            <StatusBadge variant="profit" dot>LIVE</StatusBadge>
+          )}
+          {!isLoading && (!liveAssets || liveAssets.length === 0) && (
+            <StatusBadge variant="warning" dot>MOCK DATA</StatusBadge>
+          )}
+          <button onClick={() => refetch()} className="rounded-md bg-secondary p-2 text-muted-foreground hover:text-foreground transition-colors">
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
