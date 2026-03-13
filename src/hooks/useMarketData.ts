@@ -1,60 +1,48 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchQuotes, fetchRSI, fetchMACD, ALL_SYMBOLS, quoteToAsset, type TwelveDataQuote } from '@/lib/twelveData';
-import type { Asset, AssetType } from '@/lib/mockData';
+import { fetchQuotes, ALL_SYMBOLS, quoteToAsset, type TwelveDataQuote } from '@/lib/twelveData';
+import { mockAssets, type Asset, type AssetType } from '@/lib/mockData';
 
-// Fetch all market data with quotes + indicators
+// Priority symbols to fetch live (max 8 for free plan)
+const PRIORITY_SYMBOLS = [
+  'BTC/USD', 'ETH/USD', 'SOL/USD', 'AAPL', 'NVDA', 'SPY', 'QQQ', 'XAU/USD'
+];
+
+// Fetch market data: live for priority symbols, mock for the rest
 export function useMarketData() {
   return useQuery({
     queryKey: ['market-data'],
     queryFn: async (): Promise<Asset[]> => {
-      const symbols = ALL_SYMBOLS.map(s => s.tdSymbol);
+      // Only fetch priority symbols to stay within 8 credits/min
+      const quotes = await fetchQuotes(PRIORITY_SYMBOLS);
 
-      // Fetch quotes in batches
-      const quotes = await fetchQuotes(symbols);
-
-      // For each symbol, try to get RSI and MACD (best effort, don't fail if rate limited)
       const assets: Asset[] = [];
+      const liveSymbols = new Set<string>();
 
+      // Add live data for fetched symbols
       for (const symbolInfo of ALL_SYMBOLS) {
         const quote = quotes[symbolInfo.tdSymbol] as TwelveDataQuote | undefined;
-        if (!quote || !quote.close) continue;
-
-        let rsiValue: number | undefined;
-        let macdValue: { macd: number; signal: number } | undefined;
-
-        try {
-          const rsiData = await fetchRSI(symbolInfo.tdSymbol);
-          if (rsiData?.values?.[0]?.rsi) {
-            rsiValue = parseFloat(rsiData.values[0].rsi);
-          }
-        } catch {
-          // Rate limited or error, use default
+        if (quote && quote.close) {
+          assets.push(quoteToAsset(quote, symbolInfo));
+          liveSymbols.add(symbolInfo.symbol);
         }
+      }
 
-        try {
-          const macdData = await fetchMACD(symbolInfo.tdSymbol);
-          if (macdData?.values?.[0]) {
-            macdValue = {
-              macd: parseFloat(macdData.values[0].macd),
-              signal: parseFloat(macdData.values[0].macd_signal),
-            };
-          }
-        } catch {
-          // Rate limited or error, use default
+      // Fill remaining with mock data
+      for (const mock of mockAssets) {
+        if (!liveSymbols.has(mock.symbol)) {
+          assets.push(mock);
         }
-
-        assets.push(quoteToAsset(quote, symbolInfo, rsiValue, macdValue));
       }
 
       return assets;
     },
-    staleTime: 60_000, // 1 minute
-    refetchInterval: 60_000, // Auto-refresh every minute
-    retry: 2,
+    staleTime: 60_000,
+    refetchInterval: 120_000, // 2 minutes to stay safe on rate limits
+    retry: 1,
   });
 }
 
-// Fetch quotes only (faster, no indicators)
+// Quick quotes - same approach, single batch only
 export function useQuickQuotes(assetTypes?: AssetType[]) {
   return useQuery({
     queryKey: ['quick-quotes', assetTypes],
@@ -63,19 +51,32 @@ export function useQuickQuotes(assetTypes?: AssetType[]) {
         ? ALL_SYMBOLS.filter(s => assetTypes.includes(s.type))
         : ALL_SYMBOLS;
 
-      const symbols = filtered.map(s => s.tdSymbol);
+      // Take max 8 symbols
+      const symbols = filtered.slice(0, 8).map(s => s.tdSymbol);
       const quotes = await fetchQuotes(symbols);
 
-      return filtered
-        .map(symbolInfo => {
-          const quote = quotes[symbolInfo.tdSymbol] as TwelveDataQuote | undefined;
-          if (!quote || !quote.close) return null;
-          return quoteToAsset(quote, symbolInfo);
-        })
-        .filter(Boolean) as Asset[];
+      const assets: Asset[] = [];
+      const liveSymbols = new Set<string>();
+
+      for (const symbolInfo of filtered) {
+        const quote = quotes[symbolInfo.tdSymbol] as TwelveDataQuote | undefined;
+        if (quote && quote.close) {
+          assets.push(quoteToAsset(quote, symbolInfo));
+          liveSymbols.add(symbolInfo.symbol);
+        }
+      }
+
+      // Fill with mock data
+      for (const mock of mockAssets) {
+        if (!liveSymbols.has(mock.symbol) && (!assetTypes || assetTypes.includes(mock.type))) {
+          assets.push(mock);
+        }
+      }
+
+      return assets;
     },
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    retry: 2,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    retry: 1,
   });
 }
