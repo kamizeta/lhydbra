@@ -60,7 +60,7 @@ export default function AuthPage() {
       <div className="relative z-10 w-full max-w-md px-6">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src={lhydbraLogo} alt="LHYDBRA" className="h-60 w-60 mx-auto mb-4" />
+          <img src={lhydbraLogo} alt="LHYDBRA" style={{ height: '240px', width: '240px' }} className="mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-foreground tracking-[0.25em]">LHYDBRA</h1>
           <p className="text-sm text-terminal-gold font-mono mt-2 tracking-wider">Intelligence. Balance. Evolution.</p>
         </div>
