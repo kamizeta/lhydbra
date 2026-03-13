@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useI18n } from '@/i18n';
+import { supabase } from '@/integrations/supabase/client';
 
 export type AgentType =
   | 'market-analyst'
@@ -24,6 +25,32 @@ export function useAIAgent() {
   const [results, setResults] = useState<Record<AgentType, AgentResult>>({} as Record<AgentType, AgentResult>);
   const [runningAgent, setRunningAgent] = useState<AgentType | null>(null);
   const { language } = useI18n();
+
+  const parseAndSaveSignals = useCallback(async (orderOutput: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-trade-signals`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ orderPreparatorOutput: orderOutput, language }),
+      });
+
+      if (resp.ok) {
+        const result = await resp.json();
+        if (result.count > 0) {
+          toast({ title: `✅ ${result.count} trade signals saved`, description: 'Check Trade Ideas page' });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse trade signals:', e);
+    }
+  }, [language]);
 
   const runAgent = useCallback(async (
     agent: AgentType,
@@ -120,6 +147,11 @@ export function useAIAgent() {
         ...prev,
         [agent]: { ...prev[agent], isStreaming: false },
       }));
+
+      // After order-preparator finishes, parse and save trade signals
+      if (agent === 'order-preparator' && fullContent && !fullContent.startsWith('Error')) {
+        parseAndSaveSignals(fullContent);
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Unknown error';
       toast({ title: `Agent Error: ${agent}`, description: message, variant: 'destructive' });
@@ -130,7 +162,7 @@ export function useAIAgent() {
     } finally {
       setRunningAgent(null);
     }
-  }, [language]);
+  }, [language, parseAndSaveSignals]);
 
   const runAllAgents = useCallback(async (
     marketData?: unknown,
