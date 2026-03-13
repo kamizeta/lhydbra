@@ -14,14 +14,11 @@ import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import ProgressBar from "@/components/shared/ProgressBar";
 import OnboardingTutorial from "@/components/OnboardingTutorial";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import {
   mockPortfolio,
   mockAgentOutputs,
   mockTradeIdeas,
-  mockRiskMetrics,
-  portfolioValue,
-  portfolioChange,
-  portfolioChangePercent,
   formatCurrency,
   formatNumber,
 } from "@/lib/mockData";
@@ -30,10 +27,28 @@ import { useI18n } from "@/i18n";
 
 export default function Dashboard() {
   const { t, language } = useI18n();
+  const { settings, loading: settingsLoading } = useUserSettings();
   const pendingIdeas = mockTradeIdeas.filter(t => t.status === 'pending');
   const warnings = mockAgentOutputs.filter(a => a.severity === 'warning' || a.severity === 'critical');
 
   const dateLocale = language === 'es' ? 'es-ES' : language === 'pt' ? 'pt-BR' : language === 'fr' ? 'fr-FR' : 'en-US';
+
+  // Compute portfolio value from current capital
+  const portfolioValue = settings.current_capital;
+  const dailyPnl = portfolioValue * 0.0157; // placeholder until real PnL tracking
+  const dailyPnlPercent = 1.57;
+
+  // Risk metrics from real settings
+  const riskMetrics = {
+    dailyRiskUsed: 2.8, // TODO: calculate from real positions
+    dailyRiskLimit: settings.max_daily_risk,
+    weeklyRiskUsed: 6.2,
+    weeklyRiskLimit: settings.max_weekly_risk,
+    currentDrawdown: 3.4,
+    maxDrawdownLimit: settings.max_drawdown,
+    openPositions: mockPortfolio.length,
+    maxPositions: settings.max_positions,
+  };
 
   return (
     <div className="p-6 space-y-6 animate-slide-in">
@@ -57,32 +72,32 @@ export default function Dashboard() {
         <MetricCard
           label={t.dashboard.portfolioValue}
           value={formatCurrency(portfolioValue)}
-          change={`+${formatCurrency(portfolioChange)} (+${formatNumber(portfolioChangePercent)}%)`}
-          changeType="positive"
+          change={`Capital inicial: ${formatCurrency(settings.initial_capital)}`}
+          changeType="neutral"
           icon={DollarSign}
         />
         <MetricCard
           label={t.dashboard.dailyPnl}
-          value={`+${formatCurrency(1842.30)}`}
-          change={`+1.57% ${t.dashboard.today}`}
+          value={`+${formatCurrency(dailyPnl)}`}
+          change={`+${dailyPnlPercent}% ${t.dashboard.today}`}
           changeType="positive"
           icon={TrendingUp}
         />
         <MetricCard
           label={t.dashboard.riskUsed}
-          value={`${mockRiskMetrics.dailyRiskUsed}%`}
-          change={`${mockRiskMetrics.dailyRiskLimit}% ${t.dashboard.ofDailyLimit}`}
+          value={`${riskMetrics.dailyRiskUsed}%`}
+          change={`${riskMetrics.dailyRiskLimit}% ${t.dashboard.ofDailyLimit}`}
           changeType="neutral"
           icon={Shield}
-          subtitle={`${t.dashboard.drawdown}: ${mockRiskMetrics.currentDrawdown}%`}
+          subtitle={`${t.dashboard.drawdown}: ${riskMetrics.currentDrawdown}%`}
         />
         <MetricCard
           label={t.dashboard.activePositions}
-          value={`${mockRiskMetrics.openPositions}`}
+          value={`${riskMetrics.openPositions}`}
           change={`${pendingIdeas.length} ${t.dashboard.pendingIdeas}`}
           changeType="neutral"
           icon={Activity}
-          subtitle={`${t.dashboard.max}: ${mockRiskMetrics.maxPositions}`}
+          subtitle={`${t.dashboard.max}: ${riskMetrics.maxPositions}`}
         />
       </div>
 
@@ -142,10 +157,26 @@ export default function Dashboard() {
               <Shield className="h-4 w-4 text-primary" />
               {t.dashboard.riskOverview}
             </h2>
-            <ProgressBar value={mockRiskMetrics.dailyRiskUsed} max={mockRiskMetrics.dailyRiskLimit} label={t.dashboard.dailyRisk} />
-            <ProgressBar value={mockRiskMetrics.weeklyRiskUsed} max={mockRiskMetrics.weeklyRiskLimit} label={t.dashboard.weeklyRisk} />
-            <ProgressBar value={mockRiskMetrics.currentDrawdown} max={mockRiskMetrics.maxDrawdownLimit} label={t.dashboard.drawdown} />
-            <ProgressBar value={mockRiskMetrics.totalExposure} max={mockRiskMetrics.maxExposureLimit} label={t.dashboard.exposure} />
+            <ProgressBar value={riskMetrics.dailyRiskUsed} max={riskMetrics.dailyRiskLimit} label={t.dashboard.dailyRisk} />
+            <ProgressBar value={riskMetrics.weeklyRiskUsed} max={riskMetrics.weeklyRiskLimit} label={t.dashboard.weeklyRisk} />
+            <ProgressBar value={riskMetrics.currentDrawdown} max={riskMetrics.maxDrawdownLimit} label={t.dashboard.drawdown} />
+          </div>
+
+          {/* Capital Summary */}
+          <div className="terminal-border rounded-lg p-4 space-y-3">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Capital & Riesgo
+            </h2>
+            <div className="space-y-2 text-xs font-mono">
+              <div className="flex justify-between"><span className="text-muted-foreground">Capital Inicial</span><span className="text-foreground">{formatCurrency(settings.initial_capital)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Capital Actual</span><span className="text-foreground">{formatCurrency(settings.current_capital)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Riesgo/Trade</span><span className="text-warning">{settings.risk_per_trade}%</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">$ en Riesgo</span><span className="text-loss">{formatCurrency(settings.current_capital * settings.risk_per_trade / 100)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Max Drawdown</span><span className="text-foreground">{settings.max_drawdown}%</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Max Posiciones</span><span className="text-foreground">{settings.max_positions}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">R/R Mínimo</span><span className="text-foreground">{settings.min_rr_ratio}:1</span></div>
+            </div>
           </div>
 
           {/* Alerts */}

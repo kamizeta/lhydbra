@@ -2,34 +2,52 @@ import { Shield, AlertTriangle, Lock, Unlock, BarChart3, Activity } from "lucide
 import MetricCard from "@/components/shared/MetricCard";
 import ProgressBar from "@/components/shared/ProgressBar";
 import StatusBadge from "@/components/shared/StatusBadge";
-import { mockRiskMetrics, mockPortfolio, formatCurrency, formatNumber } from "@/lib/mockData";
+import { useUserSettings } from "@/hooks/useUserSettings";
+import { mockPortfolio, formatCurrency, formatNumber } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 
 export default function RiskManagement() {
   const { t } = useI18n();
-  const rm = mockRiskMetrics;
+  const { settings } = useUserSettings();
+
+  // Risk metrics derived from real settings
+  const rm = {
+    totalExposure: 72,
+    maxExposureLimit: 100,
+    dailyRiskUsed: 2.8,
+    dailyRiskLimit: settings.max_daily_risk,
+    weeklyRiskUsed: 6.2,
+    weeklyRiskLimit: settings.max_weekly_risk,
+    currentDrawdown: 3.4,
+    maxDrawdownLimit: settings.max_drawdown,
+    openPositions: mockPortfolio.length,
+    maxPositions: settings.max_positions,
+    correlationRisk: 42,
+    leverageUsed: 1.0,
+    maxLeverage: settings.max_leverage,
+  };
 
   const riskRules = [
-    { label: t.riskMgmt.maxRiskPerTrade, value: '2%', status: 'ok' as const },
+    { label: t.riskMgmt.maxRiskPerTrade, value: `${settings.risk_per_trade}%`, status: 'ok' as const },
     { label: t.riskMgmt.maxDailyRisk, value: `${rm.dailyRiskLimit}%`, status: rm.dailyRiskUsed > rm.dailyRiskLimit * 0.8 ? 'warning' as const : 'ok' as const },
     { label: t.riskMgmt.maxWeeklyRisk, value: `${rm.weeklyRiskLimit}%`, status: rm.weeklyRiskUsed > rm.weeklyRiskLimit * 0.8 ? 'warning' as const : 'ok' as const },
     { label: t.riskMgmt.maxDrawdown, value: `${rm.maxDrawdownLimit}%`, status: 'ok' as const },
     { label: t.riskMgmt.maxPositions, value: `${rm.maxPositions}`, status: rm.openPositions >= rm.maxPositions ? 'blocked' as const : 'ok' as const },
     { label: t.riskMgmt.maxLeverage, value: `${rm.maxLeverage}x`, status: 'ok' as const },
-    { label: t.riskMgmt.maxSingleAsset, value: '30%', status: 'ok' as const },
-    { label: t.riskMgmt.maxCorrelation, value: '70%', status: rm.correlationRisk > 60 ? 'warning' as const : 'ok' as const },
-    { label: t.riskMgmt.stopLossRequired, value: t.riskMgmt.required, status: 'ok' as const },
-    { label: t.riskMgmt.minRRRatio, value: '1.5:1', status: 'ok' as const },
+    { label: t.riskMgmt.maxSingleAsset, value: `${settings.max_single_asset}%`, status: 'ok' as const },
+    { label: t.riskMgmt.maxCorrelation, value: `${settings.max_correlation}%`, status: rm.correlationRisk > settings.max_correlation * 0.8 ? 'warning' as const : 'ok' as const },
+    { label: t.riskMgmt.stopLossRequired, value: settings.stop_loss_required ? t.riskMgmt.required : 'No', status: 'ok' as const },
+    { label: t.riskMgmt.minRRRatio, value: `${settings.min_rr_ratio}:1`, status: 'ok' as const },
   ];
 
-  const accountSize = 119250;
-  const riskPercent = 1.5;
-  const entryPrice = 875;
-  const stopLossPrice = 830;
+  const accountSize = settings.current_capital;
+  const riskPercent = settings.risk_per_trade;
+  const entryPrice = 120;
+  const stopLossPrice = 115;
   const riskPerShare = entryPrice - stopLossPrice;
   const dollarRisk = accountSize * (riskPercent / 100);
-  const positionSize = Math.floor(dollarRisk / riskPerShare);
+  const positionSize = riskPerShare > 0 ? Math.floor(dollarRisk / riskPerShare) : 0;
 
   const typeLabels: Record<string, string> = {
     crypto: t.common.crypto,
@@ -49,7 +67,7 @@ export default function RiskManagement() {
         <MetricCard label={t.riskMgmt.dailyRisk} value={`${rm.dailyRiskUsed}%`} change={`${formatNumber(rm.dailyRiskLimit - rm.dailyRiskUsed)}% ${t.riskMgmt.remaining}`} changeType="neutral" icon={Shield} />
         <MetricCard label={t.riskMgmt.drawdown} value={`${rm.currentDrawdown}%`} change={`${t.riskMgmt.limit}: ${rm.maxDrawdownLimit}%`} changeType={rm.currentDrawdown > rm.maxDrawdownLimit * 0.5 ? 'negative' : 'neutral'} icon={AlertTriangle} />
         <MetricCard label={t.riskMgmt.exposure} value={`${rm.totalExposure}%`} change={`${t.riskMgmt.limit}: ${rm.maxExposureLimit}%`} changeType="neutral" icon={BarChart3} />
-        <MetricCard label={t.riskMgmt.correlation} value={`${rm.correlationRisk}%`} change={rm.correlationRisk > 60 ? t.riskMgmt.elevated : t.riskMgmt.normal} changeType={rm.correlationRisk > 60 ? 'negative' : 'neutral'} icon={Activity} />
+        <MetricCard label={t.riskMgmt.correlation} value={`${rm.correlationRisk}%`} change={rm.correlationRisk > settings.max_correlation * 0.8 ? t.riskMgmt.elevated : t.riskMgmt.normal} changeType={rm.correlationRisk > settings.max_correlation * 0.8 ? 'negative' : 'neutral'} icon={Activity} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -143,7 +161,7 @@ export default function RiskManagement() {
                 <div className="flex items-center gap-2">
                   <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
-                      className={cn("h-full rounded-full", alloc > 35 ? "bg-warning" : "bg-primary")}
+                      className={cn("h-full rounded-full", alloc > settings.max_single_asset ? "bg-warning" : "bg-primary")}
                       style={{ width: `${alloc}%` }}
                     />
                   </div>
