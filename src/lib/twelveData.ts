@@ -52,22 +52,29 @@ async function callTwelveData(action: string, params: Record<string, unknown>) {
   return data;
 }
 
-// Fetch quotes for multiple symbols (batched)
+// Fetch quotes for multiple symbols (batched with rate limit protection)
 export async function fetchQuotes(symbols: string[]): Promise<Record<string, TwelveDataQuote>> {
-  // Twelve Data allows up to 8 symbols per request on free plan
+  // Free plan: 8 API credits/min. Each quote batch = 1 credit.
+  // Limit to 1 batch of 8 symbols max to stay under rate limit.
   const batchSize = 8;
   const results: Record<string, TwelveDataQuote> = {};
 
-  for (let i = 0; i < symbols.length; i += batchSize) {
-    const batch = symbols.slice(i, i + batchSize);
+  // Only fetch first batch to avoid rate limiting on free plan
+  const batch = symbols.slice(0, batchSize);
+  try {
     const data = await callTwelveData('quote', { symbols: batch });
-
-    // Single symbol returns object directly, multiple returns keyed object
     if (batch.length === 1) {
       results[batch[0]] = data;
     } else {
       Object.assign(results, data);
     }
+  } catch (e) {
+    console.warn('Quote fetch failed:', e);
+  }
+
+  // If there are more symbols, wait 60s before next batch (or skip)
+  if (symbols.length > batchSize) {
+    console.warn(`Rate limit: Only fetched ${batchSize} of ${symbols.length} symbols. Remaining will use mock data.`);
   }
 
   return results;
