@@ -11,24 +11,31 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
+  Settings,
+  Briefcase,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { useAuth } from "@/hooks/useAuth";
 import LanguageSelector from "@/components/LanguageSelector";
 import lhydbraLogo from "@/assets/lhydbra-logo.png";
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const { t } = useI18n();
+  const { user, signOut } = useAuth();
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
     { to: "/market", icon: BarChart3, label: t.nav.market },
+    { to: "/positions", icon: Briefcase, label: t.dashboard.openPositions },
     { to: "/strategies", icon: Brain, label: t.nav.strategies },
     { to: "/risk", icon: Shield, label: t.nav.risk },
     { to: "/agents", icon: Bot, label: t.nav.agents },
     { to: "/trade-ideas", icon: Lightbulb, label: t.nav.tradeIdeas },
     { to: "/journal", icon: BookOpen, label: t.nav.journal },
+    { to: "/settings", icon: Settings, label: "Settings" },
   ];
 
   return (
@@ -52,7 +59,7 @@ export default function AppLayout() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 space-y-1 p-2">
+        <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -99,10 +106,19 @@ export default function AppLayout() {
         {/* Top Header Bar */}
         <header className="flex items-center justify-between h-12 border-b border-border px-4 bg-card shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-muted-foreground">Intelligence. Balance. Evolution.</span>
+            <span className="text-xs font-mono text-muted-foreground">
+              {user?.email}
+            </span>
           </div>
           <div className="flex items-center gap-3">
             <LanguageSelector collapsed={false} variant="header" />
+            <button
+              onClick={signOut}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-loss border border-border rounded-md hover:bg-accent transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="font-mono">Logout</span>
+            </button>
           </div>
         </header>
         <main className="flex-1 overflow-auto">
