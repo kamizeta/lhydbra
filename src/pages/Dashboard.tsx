@@ -13,6 +13,7 @@ import {
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import ProgressBar from "@/components/shared/ProgressBar";
+import OnboardingTutorial from "@/components/OnboardingTutorial";
 import {
   mockPortfolio,
   mockAgentOutputs,
