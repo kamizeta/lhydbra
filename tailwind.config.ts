@@ -69,6 +69,7 @@ export default {
           red: "hsl(var(--terminal-red))",
           amber: "hsl(var(--terminal-amber))",
           cyan: "hsl(var(--terminal-cyan))",
+          gold: "hsl(var(--terminal-gold))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

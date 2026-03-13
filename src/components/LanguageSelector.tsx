@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 const languages: Language[] = ['es', 'en', 'pt', 'fr'];
 
-export default function LanguageSelector({ collapsed }: { collapsed?: boolean }) {
+export default function LanguageSelector({ collapsed, variant = 'sidebar' }: { collapsed?: boolean; variant?: 'sidebar' | 'header' }) {
   const { language, setLanguage } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -18,21 +18,31 @@ export default function LanguageSelector({ collapsed }: { collapsed?: boolean })
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  const isHeader = variant === 'header';
+
   return (
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+        className={cn(
+          "flex items-center gap-2 rounded-md text-sm transition-colors",
+          isHeader
+            ? "px-2.5 py-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground border border-border"
+            : "w-full px-3 py-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        )}
       >
-        <Globe className="h-4 w-4 shrink-0" />
-        {!collapsed && (
+        <Globe className="h-3.5 w-3.5 shrink-0" />
+        {(!collapsed || isHeader) && (
           <span className="text-xs font-mono">
             {languageFlags[language]} {languageNames[language]}
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 mb-1 w-40 rounded-md border border-border bg-popover p-1 shadow-lg z-50">
+        <div className={cn(
+          "absolute w-40 rounded-md border border-border bg-popover p-1 shadow-lg z-50",
+          isHeader ? "top-full right-0 mt-1" : "bottom-full left-0 mb-1"
+        )}>
           {languages.map(lang => (
             <button
               key={lang}
