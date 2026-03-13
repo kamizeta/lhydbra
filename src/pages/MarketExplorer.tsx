@@ -125,7 +125,7 @@ export default function MarketExplorer() {
               <p className={cn("text-lg font-bold font-mono mt-1", avgChange >= 0 ? "text-profit" : "text-loss")}>
                 {avgChange >= 0 ? '+' : ''}{formatNumber(avgChange)}%
               </p>
-              <p className="text-xs text-muted-foreground">{assets.length} assets</p>
+              <p className="text-xs text-muted-foreground">{typeAssets.length} assets</p>
             </div>
           );
         })}
