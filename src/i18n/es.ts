@@ -136,7 +136,7 @@ export const es: Translations = {
   },
   agents: {
     title: 'Agentes AI',
-    subtitle: '7 agentes especializados • Potenciado por Lovable AI',
+    subtitle: '7 agentes especializados • Potenciado por LHYDBRA AI',
     runAllAgents: 'Ejecutar Todos',
     noOutput: 'Sin Resultados',
     noOutputDesc: 'Selecciona un agente y haz clic en el botón de reproducir para ejecutar el análisis, o haz clic en "Ejecutar Todos" para ejecutar el pipeline completo.',

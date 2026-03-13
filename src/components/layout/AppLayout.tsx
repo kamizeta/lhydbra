@@ -11,11 +11,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
-  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import LanguageSelector from "@/components/LanguageSelector";
+import lhydbraLogo from "@/assets/lhydbra-logo.png";
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -41,14 +41,12 @@ export default function AppLayout() {
         )}
       >
         {/* Logo */}
-        <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-            <TrendingUp className="h-4 w-4 text-primary-foreground" />
-          </div>
+        <div className="flex h-14 items-center gap-2 border-b border-border px-3">
+          <img src={lhydbraLogo} alt="LHYDBRA" className="h-8 w-8 shrink-0" />
           {!collapsed && (
             <div className="flex flex-col">
-              <span className="text-sm font-bold text-foreground tracking-tight">PROMPT</span>
-              <span className="text-[10px] font-mono text-primary tracking-widest">MAESTRO</span>
+              <span className="text-sm font-bold text-foreground tracking-[0.2em]">LHYDBRA</span>
+              <span className="text-[9px] font-mono text-terminal-gold tracking-wider">BALANCED INTELLIGENCE</span>
             </div>
           )}
         </div>
@@ -75,11 +73,6 @@ export default function AppLayout() {
           ))}
         </nav>
 
-        {/* Language Selector */}
-        <div className="border-t border-border p-2">
-          <LanguageSelector collapsed={collapsed} />
-        </div>
-
         {/* Collapse toggle */}
         <div className="border-t border-border p-2">
           <button
@@ -102,9 +95,20 @@ export default function AppLayout() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Header Bar */}
+        <header className="flex items-center justify-between h-12 border-b border-border px-4 bg-card shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-muted-foreground">Intelligence. Balance. Evolution.</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <LanguageSelector collapsed={false} variant="header" />
+          </div>
+        </header>
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
