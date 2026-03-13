@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
+import { lovable } from '@/integrations/lovable';
 import lhydbraLogo from '@/assets/lhydbra-logo.png';
 
 export default function AuthPage() {
