@@ -115,8 +115,8 @@ export default function MarketExplorer() {
       {/* Market stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {(['crypto', 'stock', 'etf', 'commodity'] as AssetType[]).map(type => {
-          const assets = mockAssets.filter(a => a.type === type);
-          const avgChange = assets.reduce((s, a) => s + a.changePercent, 0) / assets.length;
+          const typeAssets = assets.filter(a => a.type === type);
+          const avgChange = typeAssets.length > 0 ? typeAssets.reduce((s, a) => s + a.changePercent, 0) / typeAssets.length : 0;
           return (
             <div key={type} className="terminal-border rounded-lg p-3">
               <p className="text-xs uppercase text-muted-foreground tracking-wider">
