@@ -15,6 +15,7 @@ export default function AgentsPanel() {
   const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
   const { data: liveAssets } = useQuickQuotes();
   const { results, runningAgent, runAgent, runAllAgents } = useAIAgent();
+  const { settings } = useUserSettings();
 
   const agents: { id: AgentType; name: string; icon: typeof Activity; description: string }[] = [
     { id: 'market-analyst', name: t.agents.marketAnalyst, icon: Activity, description: t.agents.marketAnalystDesc },
@@ -32,14 +33,30 @@ export default function AgentsPanel() {
 
   const portfolioData = mockPortfolio.map(p => ({ symbol: p.symbol, type: p.type, qty: p.quantity, entry: p.avgEntry, current: p.currentPrice, pnl: p.pnlPercent, alloc: p.allocation, strategy: p.strategy, sl: p.stopLoss, tp: p.takeProfit }));
 
+  // Include user settings so AI agents know the user's capital and risk parameters
+  const userConfig = {
+    initial_capital: settings.initial_capital,
+    current_capital: settings.current_capital,
+    risk_per_trade: settings.risk_per_trade,
+    max_daily_risk: settings.max_daily_risk,
+    max_weekly_risk: settings.max_weekly_risk,
+    max_drawdown: settings.max_drawdown,
+    max_positions: settings.max_positions,
+    max_leverage: settings.max_leverage,
+    max_single_asset: settings.max_single_asset,
+    max_correlation: settings.max_correlation,
+    stop_loss_required: settings.stop_loss_required,
+    min_rr_ratio: settings.min_rr_ratio,
+  };
+
   const handleRun = (agentId: AgentType) => {
     setSelectedAgent(agentId);
-    runAgent(agentId, marketData, portfolioData);
+    runAgent(agentId, { marketData, userConfig }, portfolioData);
   };
 
   const handleRunAll = () => {
     setSelectedAgent('market-analyst');
-    runAllAgents(marketData, portfolioData);
+    runAllAgents({ marketData, userConfig }, portfolioData);
   };
 
   return (
