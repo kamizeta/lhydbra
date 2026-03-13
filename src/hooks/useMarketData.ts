@@ -74,8 +74,8 @@ export function useQuickQuotes(assetTypes?: AssetType[]) {
 
       return assets;
     },
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: 90_000,
+    refetchInterval: 180_000,
     retry: 1,
   });
 }
