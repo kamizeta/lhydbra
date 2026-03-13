@@ -4,24 +4,32 @@ import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolum
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
-
-const typeFilters: { label: string; value: AssetType | 'all' }[] = [
-  { label: 'All', value: 'all' },
-  { label: 'Crypto', value: 'crypto' },
-  { label: 'Stocks', value: 'stock' },
-  { label: 'ETFs', value: 'etf' },
-  { label: 'Commodities', value: 'commodity' },
-];
+import { useI18n } from "@/i18n";
 
 type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength';
 
 export default function MarketExplorer() {
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<AssetType | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('relativeStrength');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  // Use real data with fallback to mock
+  const typeFilters: { label: string; value: AssetType | 'all' }[] = [
+    { label: t.common.all, value: 'all' },
+    { label: t.common.crypto, value: 'crypto' },
+    { label: t.common.stocks, value: 'stock' },
+    { label: t.common.etfs, value: 'etf' },
+    { label: t.common.commodities, value: 'commodity' },
+  ];
+
+  const typeLabels: Record<string, string> = {
+    crypto: t.common.crypto,
+    stock: t.common.stocks,
+    etf: t.common.etfs,
+    commodity: t.common.commodities,
+  };
+
   const { data: liveAssets, isLoading, isError, refetch } = useQuickQuotes();
   const assets = liveAssets && liveAssets.length > 0 ? liveAssets : mockAssets;
 
@@ -61,20 +69,20 @@ export default function MarketExplorer() {
     <div className="p-6 space-y-6 animate-slide-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Market Explorer</h1>
-          <p className="text-sm text-muted-foreground font-mono">Crypto • Stocks • ETFs • Commodities</p>
+          <h1 className="text-2xl font-bold text-foreground">{t.market.title}</h1>
+          <p className="text-sm text-muted-foreground font-mono">{t.market.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {isLoading && (
             <StatusBadge variant="info" dot>
-              <Loader2 className="h-3 w-3 animate-spin mr-1" />Loading live data...
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />{t.common.loadingLiveData}
             </StatusBadge>
           )}
           {!isLoading && liveAssets && liveAssets.length > 0 && (
-            <StatusBadge variant="profit" dot>LIVE</StatusBadge>
+            <StatusBadge variant="profit" dot>{t.common.live}</StatusBadge>
           )}
           {!isLoading && (!liveAssets || liveAssets.length === 0) && (
-            <StatusBadge variant="warning" dot>MOCK DATA</StatusBadge>
+            <StatusBadge variant="warning" dot>{t.common.mockData}</StatusBadge>
           )}
           <button onClick={() => refetch()} className="rounded-md bg-secondary p-2 text-muted-foreground hover:text-foreground transition-colors">
             <RefreshCw className="h-4 w-4" />
@@ -88,7 +96,7 @@ export default function MarketExplorer() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search assets..."
+            placeholder={t.common.searchAssets}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
@@ -119,13 +127,11 @@ export default function MarketExplorer() {
           const avgChange = typeAssets.length > 0 ? typeAssets.reduce((s, a) => s + a.changePercent, 0) / typeAssets.length : 0;
           return (
             <div key={type} className="terminal-border rounded-lg p-3">
-              <p className="text-xs uppercase text-muted-foreground tracking-wider">
-                {type === 'stock' ? 'Stocks' : type === 'etf' ? 'ETFs' : type === 'commodity' ? 'Commodities' : 'Crypto'}
-              </p>
+              <p className="text-xs uppercase text-muted-foreground tracking-wider">{typeLabels[type]}</p>
               <p className={cn("text-lg font-bold font-mono mt-1", avgChange >= 0 ? "text-profit" : "text-loss")}>
                 {avgChange >= 0 ? '+' : ''}{formatNumber(avgChange)}%
               </p>
-              <p className="text-xs text-muted-foreground">{typeAssets.length} assets</p>
+              <p className="text-xs text-muted-foreground">{typeAssets.length} {t.common.assets}</p>
             </div>
           );
         })}
@@ -137,16 +143,16 @@ export default function MarketExplorer() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
-                <th className="text-left p-3">Asset</th>
-                <SortHeader label="Price" sortKey="price" />
+                <th className="text-left p-3">{t.common.asset}</th>
+                <SortHeader label={t.common.price} sortKey="price" />
                 <SortHeader label="24h %" sortKey="changePercent" />
-                <SortHeader label="Volume" sortKey="volume" />
-                <th className="text-center p-3">Trend</th>
+                <SortHeader label={t.market.volume} sortKey="volume" />
+                <th className="text-center p-3">{t.market.trend}</th>
                 <SortHeader label="RSI" sortKey="rsi" />
                 <th className="text-center p-3">MACD</th>
-                <SortHeader label="Momentum" sortKey="momentum" />
+                <SortHeader label={t.market.momentum} sortKey="momentum" />
                 <SortHeader label="RS" sortKey="relativeStrength" />
-                <th className="text-center p-3">Vol%</th>
+                <th className="text-center p-3">{t.market.volatility}</th>
               </tr>
             </thead>
             <tbody>

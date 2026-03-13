@@ -3,19 +3,10 @@ import { Lightbulb, Check, X, ArrowRight, Target, Shield, TrendingUp } from "luc
 import { mockTradeIdeas, TradeIdea, formatCurrency, formatNumber } from "@/lib/mockData";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
-
-const steps = [
-  'Market Diagnosis',
-  'Strategy Selection',
-  'Asset Selection',
-  'Risk Validation',
-  'Trade Proposal',
-  'User Approval',
-  'Monitoring',
-  'Post Analysis',
-];
+import { useI18n } from "@/i18n";
 
 export default function TradeIdeas() {
+  const { t } = useI18n();
   const [ideas, setIdeas] = useState(mockTradeIdeas);
   const [selectedIdea, setSelectedIdea] = useState<TradeIdea | null>(null);
 
@@ -25,21 +16,21 @@ export default function TradeIdeas() {
   return (
     <div className="p-6 space-y-6 animate-slide-in">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Trade Ideas</h1>
-        <p className="text-sm text-muted-foreground font-mono">Investment flow • AI-generated proposals</p>
+        <h1 className="text-2xl font-bold text-foreground">{t.tradeIdeas.title}</h1>
+        <p className="text-sm text-muted-foreground font-mono">{t.tradeIdeas.subtitle}</p>
       </div>
 
       {/* Investment Flow */}
       <div className="terminal-border rounded-lg p-4">
-        <h2 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3">Investment Flow</h2>
+        <h2 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3">{t.tradeIdeas.investmentFlow}</h2>
         <div className="flex items-center gap-1 overflow-x-auto pb-2">
-          {steps.map((step, i) => (
+          {t.tradeIdeas.steps.map((step, i) => (
             <div key={step} className="flex items-center gap-1 shrink-0">
               <div className="flex items-center gap-1.5 rounded-md bg-accent/50 border border-border px-3 py-1.5">
                 <span className="text-[10px] font-mono text-primary font-bold">{i + 1}</span>
                 <span className="text-xs text-muted-foreground">{step}</span>
               </div>
-              {i < steps.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+              {i < t.tradeIdeas.steps.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0" />}
             </div>
           ))}
         </div>
@@ -88,7 +79,7 @@ export default function TradeIdeas() {
                     <div className="font-mono font-bold text-foreground">{formatNumber(idea.riskReward)}</div>
                   </div>
                   <div className="hidden md:block">
-                    <div className="text-xs text-muted-foreground">Confidence</div>
+                    <div className="text-xs text-muted-foreground">{t.common.confidence}</div>
                     <div className={cn("font-mono font-bold", idea.confidence > 75 ? "text-profit" : idea.confidence > 60 ? "text-warning" : "text-muted-foreground")}>
                       {idea.confidence}%
                     </div>
@@ -114,11 +105,11 @@ export default function TradeIdeas() {
 
               {/* Trade details row */}
               <div className="flex gap-4 mt-3 text-xs font-mono">
-                <span className="text-muted-foreground">Entry: <span className="text-foreground">{formatCurrency(idea.entry)}</span></span>
+                <span className="text-muted-foreground">{t.common.entry}: <span className="text-foreground">{formatCurrency(idea.entry)}</span></span>
                 <span className="text-muted-foreground">SL: <span className="text-loss">{formatCurrency(idea.stopLoss)}</span></span>
                 <span className="text-muted-foreground">TP: <span className="text-profit">{formatCurrency(idea.takeProfit)}</span></span>
-                <span className="text-muted-foreground">Size: <span className="text-foreground">{idea.positionSize}</span></span>
-                <span className="text-muted-foreground">Risk: <span className="text-warning">{idea.riskPercent}%</span></span>
+                <span className="text-muted-foreground">{t.common.size}: <span className="text-foreground">{idea.positionSize}</span></span>
+                <span className="text-muted-foreground">{t.common.risk}: <span className="text-warning">{idea.riskPercent}%</span></span>
               </div>
             </div>
           ))}
@@ -130,7 +121,7 @@ export default function TradeIdeas() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Lightbulb className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-bold text-foreground">Trade Detail</h2>
+                <h2 className="text-sm font-bold text-foreground">{t.tradeIdeas.tradeDetail}</h2>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -142,14 +133,14 @@ export default function TradeIdeas() {
 
                 <div className="rounded-md bg-accent/50 p-3 space-y-2">
                   {[
-                    ['Entry', formatCurrency(selectedIdea.entry), ''],
-                    ['Stop Loss', formatCurrency(selectedIdea.stopLoss), 'text-loss'],
-                    ['Take Profit', formatCurrency(selectedIdea.takeProfit), 'text-profit'],
-                    ['R/R Ratio', formatNumber(selectedIdea.riskReward), ''],
-                    ['Position Size', `${selectedIdea.positionSize} units`, ''],
-                    ['Risk', `${selectedIdea.riskPercent}%`, 'text-warning'],
-                    ['Confidence', `${selectedIdea.confidence}%`, selectedIdea.confidence > 70 ? 'text-profit' : ''],
-                    ['Strategy', selectedIdea.strategy, 'text-primary'],
+                    [t.common.entry, formatCurrency(selectedIdea.entry), ''],
+                    [t.common.stopLoss, formatCurrency(selectedIdea.stopLoss), 'text-loss'],
+                    [t.common.takeProfit, formatCurrency(selectedIdea.takeProfit), 'text-profit'],
+                    [t.tradeIdeas.rrRatio, formatNumber(selectedIdea.riskReward), ''],
+                    [t.common.size, `${selectedIdea.positionSize} ${t.tradeIdeas.units}`, ''],
+                    [t.common.risk, `${selectedIdea.riskPercent}%`, 'text-warning'],
+                    [t.common.confidence, `${selectedIdea.confidence}%`, selectedIdea.confidence > 70 ? 'text-profit' : ''],
+                    [t.common.strategy, selectedIdea.strategy, 'text-primary'],
                   ].map(([label, value, color]) => (
                     <div key={label as string} className="flex justify-between text-xs">
                       <span className="text-muted-foreground">{label}</span>
@@ -160,21 +151,21 @@ export default function TradeIdeas() {
 
                 <div>
                   <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Target className="h-3 w-3" /> Reasoning
+                    <Target className="h-3 w-3" /> {t.tradeIdeas.reasoning}
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">{selectedIdea.reasoning}</p>
                 </div>
 
                 <div>
                   <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Shield className="h-3 w-3" /> Agent Analysis
+                    <Shield className="h-3 w-3" /> {t.tradeIdeas.agentAnalysis}
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">{selectedIdea.agentAnalysis}</p>
                 </div>
 
                 <div className="rounded-md bg-primary/10 border border-primary/20 p-3">
                   <p className="text-[10px] font-mono text-primary">
-                    MT4/MT5 READY • Order can be exported for execution
+                    {t.tradeIdeas.mt4Ready}
                   </p>
                 </div>
               </div>
@@ -182,8 +173,8 @@ export default function TradeIdeas() {
           ) : (
             <div className="flex flex-col items-center justify-center h-48 text-center">
               <Lightbulb className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">Select a trade idea</p>
-              <p className="text-xs text-muted-foreground">to see full details</p>
+              <p className="text-sm text-muted-foreground">{t.tradeIdeas.selectTradeIdea}</p>
+              <p className="text-xs text-muted-foreground">{t.tradeIdeas.toSeeDetails}</p>
             </div>
           )}
         </div>

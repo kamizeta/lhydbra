@@ -6,21 +6,23 @@ import { useQuickQuotes } from "@/hooks/useMarketData";
 import { useAIAgent, type AgentType } from "@/hooks/useAIAgent";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
-
-const agents: { id: AgentType; name: string; icon: typeof Activity; description: string }[] = [
-  { id: 'market-analyst', name: 'Market Analyst', icon: Activity, description: 'Analyzes trends, volatility, momentum, macro events, and liquidity.' },
-  { id: 'asset-selector', name: 'Asset Selector', icon: Target, description: 'Filters and ranks assets by relative strength, volume, and trend.' },
-  { id: 'strategy-engine', name: 'Strategy Engine', icon: Brain, description: 'Selects optimal strategy and capital allocation.' },
-  { id: 'risk-manager', name: 'Risk Manager', icon: Shield, description: 'Evaluates position sizing, exposure, correlations, and drawdown.' },
-  { id: 'order-preparator', name: 'Order Preparator', icon: FileText, description: 'Prepares entry, SL, TP, and position size for execution.' },
-  { id: 'portfolio-manager', name: 'Portfolio Manager', icon: PieChart, description: 'Manages diversification, rebalancing, and sector exposure.' },
-  { id: 'learning-agent', name: 'Learning Agent', icon: GraduationCap, description: 'Analyzes past trades and delivers improvement recommendations.' },
-];
+import { useI18n } from "@/i18n";
 
 export default function AgentsPanel() {
+  const { t } = useI18n();
   const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
   const { data: liveAssets } = useQuickQuotes();
   const { results, runningAgent, runAgent, runAllAgents } = useAIAgent();
+
+  const agents: { id: AgentType; name: string; icon: typeof Activity; description: string }[] = [
+    { id: 'market-analyst', name: t.agents.marketAnalyst, icon: Activity, description: t.agents.marketAnalystDesc },
+    { id: 'asset-selector', name: t.agents.assetSelector, icon: Target, description: t.agents.assetSelectorDesc },
+    { id: 'strategy-engine', name: t.agents.strategyEngine, icon: Brain, description: t.agents.strategyEngineDesc },
+    { id: 'risk-manager', name: t.agents.riskManager, icon: Shield, description: t.agents.riskManagerDesc },
+    { id: 'order-preparator', name: t.agents.orderPreparator, icon: FileText, description: t.agents.orderPreparatorDesc },
+    { id: 'portfolio-manager', name: t.agents.portfolioManager, icon: PieChart, description: t.agents.portfolioManagerDesc },
+    { id: 'learning-agent', name: t.agents.learningAgent, icon: GraduationCap, description: t.agents.learningAgentDesc },
+  ];
 
   const marketData = liveAssets && liveAssets.length > 0
     ? liveAssets.map(a => ({ symbol: a.symbol, name: a.name, type: a.type, price: a.price, change: a.changePercent, rsi: a.rsi, trend: a.trend, momentum: a.momentum, rs: a.relativeStrength, volatility: a.volatility }))
@@ -42,8 +44,8 @@ export default function AgentsPanel() {
     <div className="p-6 space-y-6 animate-slide-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">AI Agents</h1>
-          <p className="text-sm text-muted-foreground font-mono">7 specialized agents • Powered by Lovable AI</p>
+          <h1 className="text-2xl font-bold text-foreground">{t.agents.title}</h1>
+          <p className="text-sm text-muted-foreground font-mono">{t.agents.subtitle}</p>
         </div>
         <button
           onClick={handleRunAll}
@@ -56,9 +58,9 @@ export default function AgentsPanel() {
           )}
         >
           {runningAgent ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Running...</>
+            <><Loader2 className="h-4 w-4 animate-spin" /> {t.common.running}</>
           ) : (
-            <><Zap className="h-4 w-4" /> Run All Agents</>
+            <><Zap className="h-4 w-4" /> {t.agents.runAllAgents}</>
           )}
         </button>
       </div>
@@ -113,7 +115,7 @@ export default function AgentsPanel() {
                 </div>
                 {hasResult && (
                   <div className="mt-2 flex items-center gap-2">
-                    <StatusBadge variant="profit" dot>Complete</StatusBadge>
+                    <StatusBadge variant="profit" dot>{t.common.complete}</StatusBadge>
                     <span className="text-[10px] font-mono text-muted-foreground">
                       {new Date(result.timestamp).toLocaleTimeString()}
                     </span>
@@ -122,7 +124,7 @@ export default function AgentsPanel() {
                 {isRunning && result?.isStreaming && (
                   <div className="mt-2">
                     <StatusBadge variant="info" dot>
-                      <Loader2 className="h-2.5 w-2.5 animate-spin mr-1" />Analyzing...
+                      <Loader2 className="h-2.5 w-2.5 animate-spin mr-1" />{t.common.analyzing}
                     </StatusBadge>
                   </div>
                 )}
@@ -139,7 +141,7 @@ export default function AgentsPanel() {
                 <div className="flex items-center gap-2">
                   <Bot className="h-4 w-4 text-primary" />
                   <h2 className="text-sm font-bold text-foreground">
-                    {agents.find(a => a.id === selectedAgent)?.name} Output
+                    {agents.find(a => a.id === selectedAgent)?.name} — {t.agents.output}
                   </h2>
                   {results[selectedAgent]?.isStreaming && (
                     <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
@@ -170,9 +172,9 @@ export default function AgentsPanel() {
           ) : (
             <div className="flex flex-col items-center justify-center h-96 text-center">
               <Bot className="h-12 w-12 text-muted-foreground/30 mb-4" />
-              <h3 className="text-sm font-medium text-muted-foreground">No Agent Output</h3>
+              <h3 className="text-sm font-medium text-muted-foreground">{t.agents.noOutput}</h3>
               <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                Select an agent and click the play button to run analysis, or click "Run All Agents" to execute the full pipeline.
+                {t.agents.noOutputDesc}
               </p>
             </div>
           )}

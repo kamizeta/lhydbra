@@ -8,26 +8,28 @@ import {
   Bot,
   Lightbulb,
   BookOpen,
-  Settings,
   ChevronLeft,
   ChevronRight,
   Activity,
   TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/market", icon: BarChart3, label: "Mercado" },
-  { to: "/strategies", icon: Brain, label: "Estrategias" },
-  { to: "/risk", icon: Shield, label: "Riesgo" },
-  { to: "/agents", icon: Bot, label: "Agentes AI" },
-  { to: "/trade-ideas", icon: Lightbulb, label: "Trade Ideas" },
-  { to: "/journal", icon: BookOpen, label: "Journal" },
-];
+import { useI18n } from "@/i18n";
+import LanguageSelector from "@/components/LanguageSelector";
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const { t } = useI18n();
+
+  const navItems = [
+    { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
+    { to: "/market", icon: BarChart3, label: t.nav.market },
+    { to: "/strategies", icon: Brain, label: t.nav.strategies },
+    { to: "/risk", icon: Shield, label: t.nav.risk },
+    { to: "/agents", icon: Bot, label: t.nav.agents },
+    { to: "/trade-ideas", icon: Lightbulb, label: t.nav.tradeIdeas },
+    { to: "/journal", icon: BookOpen, label: t.nav.journal },
+  ];
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -73,6 +75,11 @@ export default function AppLayout() {
           ))}
         </nav>
 
+        {/* Language Selector */}
+        <div className="border-t border-border p-2">
+          <LanguageSelector collapsed={collapsed} />
+        </div>
+
         {/* Collapse toggle */}
         <div className="border-t border-border p-2">
           <button
@@ -88,7 +95,7 @@ export default function AppLayout() {
           <div className="flex items-center gap-2">
             <Activity className="h-3 w-3 text-profit animate-pulse-glow" />
             {!collapsed && (
-              <span className="text-[10px] font-mono text-muted-foreground">MARKET OPEN</span>
+              <span className="text-[10px] font-mono text-muted-foreground">{t.common.marketOpen}</span>
             )}
           </div>
         </div>
