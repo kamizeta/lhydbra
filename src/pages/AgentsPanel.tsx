@@ -48,6 +48,8 @@ export default function AgentsPanel() {
           <h1 className="text-2xl font-bold text-foreground">{t.agents.title}</h1>
           <p className="text-sm text-muted-foreground font-mono">{t.agents.subtitle}</p>
         </div>
+        <div className="flex items-center gap-2">
+          <AgentsHelpButton />
         <button
           onClick={handleRunAll}
           disabled={!!runningAgent}
