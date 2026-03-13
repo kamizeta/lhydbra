@@ -4,6 +4,7 @@ import { Bot, Brain, Target, Shield, FileText, PieChart, GraduationCap, Activity
 import { mockAssets, mockPortfolio, mockAgentOutputs } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import { useAIAgent, type AgentType } from "@/hooks/useAIAgent";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import StatusBadge from "@/components/shared/StatusBadge";
 import AgentsHelpButton from "@/components/AgentsHelpButton";
 import { cn } from "@/lib/utils";
