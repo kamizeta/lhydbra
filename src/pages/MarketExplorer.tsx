@@ -21,7 +21,11 @@ export default function MarketExplorer() {
   const [sortKey, setSortKey] = useState<SortKey>('relativeStrength');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  const filtered = mockAssets
+  // Use real data with fallback to mock
+  const { data: liveAssets, isLoading, isError, refetch } = useQuickQuotes();
+  const assets = liveAssets && liveAssets.length > 0 ? liveAssets : mockAssets;
+
+  const filtered = assets
     .filter(a => typeFilter === 'all' || a.type === typeFilter)
     .filter(a => a.symbol.toLowerCase().includes(search.toLowerCase()) || a.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
