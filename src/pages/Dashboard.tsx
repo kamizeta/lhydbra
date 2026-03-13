@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   DollarSign,
   TrendingUp,
@@ -15,8 +16,9 @@ import StatusBadge from "@/components/shared/StatusBadge";
 import ProgressBar from "@/components/shared/ProgressBar";
 import OnboardingTutorial from "@/components/OnboardingTutorial";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import {
-  mockPortfolio,
   mockAgentOutputs,
   mockTradeIdeas,
   formatCurrency,
@@ -25,9 +27,38 @@ import {
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 
+interface DBPosition {
+  id: string;
+  symbol: string;
+  name: string;
+  asset_type: string;
+  direction: string;
+  quantity: number;
+  avg_entry: number;
+  stop_loss: number | null;
+  take_profit: number | null;
+  strategy: string | null;
+  status: string;
+  pnl: number | null;
+}
+
 export default function Dashboard() {
   const { t, language } = useI18n();
+  const { user } = useAuth();
   const { settings, loading: settingsLoading } = useUserSettings();
+  const [positions, setPositions] = useState<DBPosition[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('positions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'open')
+        .order('opened_at', { ascending: false })
+        .then(({ data }) => setPositions((data as DBPosition[]) || []));
+    }
+  }, [user]);
   const pendingIdeas = mockTradeIdeas.filter(t => t.status === 'pending');
   const warnings = mockAgentOutputs.filter(a => a.severity === 'warning' || a.severity === 'critical');
 
