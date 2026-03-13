@@ -6,58 +6,59 @@
 
 @layer base {
   :root {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 92%;
+    --background: 225 33% 7%;
+    --foreground: 220 14% 90%;
 
-    --card: 222 41% 9%;
-    --card-foreground: 210 40% 92%;
+    --card: 224 30% 10%;
+    --card-foreground: 220 14% 90%;
 
-    --popover: 222 41% 9%;
-    --popover-foreground: 210 40% 92%;
+    --popover: 224 30% 10%;
+    --popover-foreground: 220 14% 90%;
 
-    --primary: 210 100% 56%;
-    --primary-foreground: 222 47% 6%;
+    --primary: 157 78% 54%;
+    --primary-foreground: 225 33% 7%;
 
-    --secondary: 222 30% 14%;
-    --secondary-foreground: 210 40% 80%;
+    --secondary: 224 25% 14%;
+    --secondary-foreground: 220 14% 80%;
 
-    --muted: 222 30% 12%;
-    --muted-foreground: 215 20% 55%;
+    --muted: 224 25% 12%;
+    --muted-foreground: 220 10% 55%;
 
-    --accent: 222 30% 16%;
-    --accent-foreground: 210 40% 92%;
+    --accent: 224 25% 16%;
+    --accent-foreground: 220 14% 90%;
 
     --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 220 14% 98%;
 
-    --border: 222 30% 16%;
-    --input: 222 30% 16%;
-    --ring: 210 100% 56%;
+    --border: 224 25% 16%;
+    --input: 224 25% 16%;
+    --ring: 157 78% 54%;
 
     --radius: 0.5rem;
 
-    --profit: 152 69% 45%;
-    --profit-foreground: 152 69% 12%;
+    --profit: 157 78% 54%;
+    --profit-foreground: 157 78% 12%;
     --loss: 0 72% 51%;
     --loss-foreground: 0 72% 95%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 38 92% 10%;
-    --info: 210 100% 56%;
+    --warning: 43 96% 46%;
+    --warning-foreground: 43 96% 10%;
+    --info: 174 72% 47%;
 
-    --terminal-glow: 210 100% 56%;
-    --terminal-green: 152 69% 45%;
+    --terminal-glow: 157 78% 54%;
+    --terminal-green: 157 78% 54%;
     --terminal-red: 0 72% 51%;
-    --terminal-amber: 38 92% 50%;
-    --terminal-cyan: 187 85% 53%;
+    --terminal-amber: 43 96% 46%;
+    --terminal-cyan: 174 72% 47%;
+    --terminal-gold: 43 76% 47%;
 
-    --sidebar-background: 222 47% 5%;
-    --sidebar-foreground: 210 40% 70%;
-    --sidebar-primary: 210 100% 56%;
-    --sidebar-primary-foreground: 222 47% 6%;
-    --sidebar-accent: 222 30% 12%;
-    --sidebar-accent-foreground: 210 40% 92%;
-    --sidebar-border: 222 30% 12%;
-    --sidebar-ring: 210 100% 56%;
+    --sidebar-background: 225 33% 5%;
+    --sidebar-foreground: 220 14% 70%;
+    --sidebar-primary: 157 78% 54%;
+    --sidebar-primary-foreground: 225 33% 7%;
+    --sidebar-accent: 224 25% 12%;
+    --sidebar-accent-foreground: 220 14% 90%;
+    --sidebar-border: 224 25% 12%;
+    --sidebar-ring: 157 78% 54%;
 
     font-family: 'Inter', sans-serif;
   }
@@ -111,6 +112,9 @@
   }
   .bg-warning {
     background-color: hsl(var(--warning));
+  }
+  .text-gold {
+    color: hsl(var(--terminal-gold));
   }
   .glow-primary {
     box-shadow: 0 0 20px hsl(var(--terminal-glow) / 0.15), 0 0 40px hsl(var(--terminal-glow) / 0.05);
