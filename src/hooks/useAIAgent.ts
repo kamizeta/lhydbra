@@ -130,7 +130,7 @@ export function useAIAgent() {
     } finally {
       setRunningAgent(null);
     }
-  }, []);
+  }, [language]);
 
   const runAllAgents = useCallback(async (
     marketData?: unknown,
