@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Search, Filter, ArrowUpDown, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Search, Filter, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw } from "lucide-react";
 import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolume, formatMarketCap } from "@/lib/mockData";
+import { useQuickQuotes } from "@/hooks/useMarketData";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
 
