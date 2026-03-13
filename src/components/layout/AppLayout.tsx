@@ -48,8 +48,8 @@ export default function AppLayout() {
         )}
       >
         {/* Logo */}
-        <div className="flex h-14 items-center gap-2 border-b border-border px-3">
-          <img src={lhydbraLogo} alt="LHYDBRA" className="h-8 w-8 shrink-0" />
+        <div className="flex h-20 items-center gap-3 border-b border-border px-3">
+          <img src={lhydbraLogo} alt="LHYDBRA" className="h-16 w-16 shrink-0" />
           {!collapsed && (
             <div className="flex flex-col">
               <span className="text-sm font-bold text-foreground tracking-[0.2em]">LHYDBRA</span>
