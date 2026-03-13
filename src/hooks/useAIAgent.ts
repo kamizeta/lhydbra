@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { useI18n } from '@/i18n';
 
 export type AgentType =
   | 'market-analyst'
@@ -22,6 +23,7 @@ const AGENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`;
 export function useAIAgent() {
   const [results, setResults] = useState<Record<AgentType, AgentResult>>({} as Record<AgentType, AgentResult>);
   const [runningAgent, setRunningAgent] = useState<AgentType | null>(null);
+  const { language } = useI18n();
 
   const runAgent = useCallback(async (
     agent: AgentType,
@@ -42,7 +44,7 @@ export function useAIAgent() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ agent, marketData, portfolioData, tradeHistory }),
+        body: JSON.stringify({ agent, marketData, portfolioData, tradeHistory, language }),
       });
 
       if (!resp.ok) {
@@ -128,7 +130,7 @@ export function useAIAgent() {
     } finally {
       setRunningAgent(null);
     }
-  }, []);
+  }, [language]);
 
   const runAllAgents = useCallback(async (
     marketData?: unknown,

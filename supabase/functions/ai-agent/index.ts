@@ -107,7 +107,7 @@ serve(async (req) => {
       });
     }
 
-    const { agent, marketData, portfolioData, tradeHistory } = await req.json();
+    const { agent, marketData, portfolioData, tradeHistory, language } = await req.json();
 
     const systemPrompt = AGENT_PROMPTS[agent];
     if (!systemPrompt) {
@@ -117,10 +117,25 @@ serve(async (req) => {
       });
     }
 
+    // Language instruction
+    const langMap: Record<string, string> = {
+      es: "IMPORTANT: You MUST write your ENTIRE response in Spanish (Español). All headers, analysis, recommendations and text must be in Spanish.",
+      pt: "IMPORTANT: You MUST write your ENTIRE response in Portuguese (Português). All headers, analysis, recommendations and text must be in Portuguese.",
+      fr: "IMPORTANT: You MUST write your ENTIRE response in French (Français). All headers, analysis, recommendations and text must be in French.",
+      en: "Write your response in English.",
+    };
+    const langInstruction = langMap[language] || langMap["en"];
+
     // Build context message with available data
     let context = "";
     if (marketData) {
-      context += `\n\n## Current Market Data\n\`\`\`json\n${JSON.stringify(marketData, null, 2)}\n\`\`\``;
+      // marketData may contain userConfig
+      const md = marketData.marketData || marketData;
+      const uc = marketData.userConfig;
+      context += `\n\n## Current Market Data\n\`\`\`json\n${JSON.stringify(md, null, 2)}\n\`\`\``;
+      if (uc) {
+        context += `\n\n## User Capital & Risk Parameters\n\`\`\`json\n${JSON.stringify(uc, null, 2)}\n\`\`\``;
+      }
     }
     if (portfolioData) {
       context += `\n\n## Current Portfolio\n\`\`\`json\n${JSON.stringify(portfolioData, null, 2)}\n\`\`\``;
@@ -129,7 +144,7 @@ serve(async (req) => {
       context += `\n\n## Trade History\n\`\`\`json\n${JSON.stringify(tradeHistory, null, 2)}\n\`\`\``;
     }
 
-    const userMessage = `Analyze the following data and provide your professional assessment.${context}`;
+    const userMessage = `${langInstruction}\n\nAnalyze the following data and provide your professional assessment.${context}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
