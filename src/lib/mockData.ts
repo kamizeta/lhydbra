@@ -129,12 +129,12 @@ export const mockAssets: Asset[] = [
 
 // Mock portfolio
 export const mockPortfolio: PortfolioPosition[] = [
-  { symbol: 'BTC/USD', name: 'Bitcoin', type: 'crypto', quantity: 0.5, avgEntry: 62500, currentPrice: 67842.50, pnl: 2671.25, pnlPercent: 8.55, allocation: 28.5, stopLoss: 59000, takeProfit: 75000, strategy: 'Trend Following' },
-  { symbol: 'NVDA', name: 'NVIDIA', type: 'stock', quantity: 15, avgEntry: 820, currentPrice: 875.30, pnl: 829.50, pnlPercent: 6.74, allocation: 22.1, stopLoss: 780, takeProfit: 950, strategy: 'Momentum' },
-  { symbol: 'SPY', name: 'S&P 500 ETF', type: 'etf', quantity: 30, avgEntry: 508, currentPrice: 521.40, pnl: 402.00, pnlPercent: 2.64, allocation: 18.2, stopLoss: 495, takeProfit: 545, strategy: 'Dollar Cost Avg' },
-  { symbol: 'XAU/USD', name: 'Gold', type: 'commodity', quantity: 5, avgEntry: 2280, currentPrice: 2348.60, pnl: 343.00, pnlPercent: 3.01, allocation: 12.4, stopLoss: 2220, takeProfit: 2450, strategy: 'Defensive' },
-  { symbol: 'SOL/USD', name: 'Solana', type: 'crypto', quantity: 50, avgEntry: 155, currentPrice: 178.35, pnl: 1167.50, pnlPercent: 15.06, allocation: 10.8, stopLoss: 140, takeProfit: 210, strategy: 'Breakout' },
-  { symbol: 'MSFT', name: 'Microsoft', type: 'stock', quantity: 8, avgEntry: 415, currentPrice: 428.74, pnl: 109.92, pnlPercent: 3.31, allocation: 8.0, stopLoss: 400, takeProfit: 460, strategy: 'Trend Following' },
+  { symbol: 'BTC/USD', name: 'Bitcoin', type: 'crypto', quantity: 0.5, avgEntry: 78000, currentPrice: 83500, pnl: 2750, pnlPercent: 7.05, allocation: 28.5, stopLoss: 72000, takeProfit: 95000, strategy: 'Trend Following' },
+  { symbol: 'NVDA', name: 'NVIDIA', type: 'stock', quantity: 50, avgEntry: 108, currentPrice: 117.60, pnl: 480, pnlPercent: 8.89, allocation: 22.1, stopLoss: 100, takeProfit: 135, strategy: 'Momentum' },
+  { symbol: 'SPY', name: 'S&P 500 ETF', type: 'etf', quantity: 30, avgEntry: 545, currentPrice: 559.80, pnl: 444, pnlPercent: 2.72, allocation: 18.2, stopLoss: 530, takeProfit: 580, strategy: 'Dollar Cost Avg' },
+  { symbol: 'XAU/USD', name: 'Gold', type: 'commodity', quantity: 5, avgEntry: 2850, currentPrice: 2985.40, pnl: 677, pnlPercent: 4.75, allocation: 12.4, stopLoss: 2780, takeProfit: 3100, strategy: 'Defensive' },
+  { symbol: 'SOL/USD', name: 'Solana', type: 'crypto', quantity: 50, avgEntry: 115, currentPrice: 128.50, pnl: 675, pnlPercent: 11.74, allocation: 10.8, stopLoss: 100, takeProfit: 160, strategy: 'Breakout' },
+  { symbol: 'MSFT', name: 'Microsoft', type: 'stock', quantity: 8, avgEntry: 375, currentPrice: 388.50, pnl: 108, pnlPercent: 3.60, allocation: 8.0, stopLoss: 360, takeProfit: 420, strategy: 'Trend Following' },
 ];
 
 export const mockStrategies: Strategy[] = [
