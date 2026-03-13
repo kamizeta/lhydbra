@@ -5,6 +5,7 @@ import { mockAssets, mockPortfolio, mockAgentOutputs } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import { useAIAgent, type AgentType } from "@/hooks/useAIAgent";
 import StatusBadge from "@/components/shared/StatusBadge";
+import AgentsHelpButton from "@/components/AgentsHelpButton";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 
