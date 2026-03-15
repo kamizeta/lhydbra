@@ -138,13 +138,14 @@ async function fetchFCSData(symbols: string[], apiKey: string, type: 'stock' | '
     });
 
     url = `https://api-v4.fcsapi.com/stock/latest?symbol=${encodeURIComponent(fcsSymbols.join(','))}&access_key=${apiKey}`;
+    console.log('FCS stock URL:', url);
     const response = await fetch(url);
+    const data = await response.json();
+    console.log('FCS stock response:', JSON.stringify(data).slice(0, 500));
     if (!response.ok) {
-      const text = await response.text();
-      console.error('FCS stock error:', response.status, text);
+      console.error('FCS stock error:', response.status);
       throw new Error(`FCS API stock error: ${response.status}`);
     }
-    const data = await response.json();
 
     if (data.status && data.response) {
       for (const item of data.response) {
