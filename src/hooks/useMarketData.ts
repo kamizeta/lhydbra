@@ -34,7 +34,7 @@ export function useMarketData() {
       return assets;
     },
     staleTime: 60_000,
-    refetchInterval: 120_000, // 2 minutes - safe with hybrid approach
+    refetchInterval: autoRefreshEnabled ? 60_000 : false,
     retry: 2,
   });
 }
