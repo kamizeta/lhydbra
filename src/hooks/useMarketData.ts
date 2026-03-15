@@ -7,6 +7,7 @@ import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 const ALL_SYMBOL_IDS = ALL_SYMBOLS.map(s => s.tdSymbol);
 
 export function useMarketData() {
+  const autoRefreshEnabled = useAutoRefresh((s) => s.enabled);
   return useQuery({
     queryKey: ['market-data'],
     queryFn: async (): Promise<Asset[]> => {
