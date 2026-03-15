@@ -41,7 +41,28 @@ export const ALL_SYMBOLS = Object.entries(MARKET_SYMBOLS).flatMap(([type, symbol
   symbols.map(s => ({ ...s, type: type as AssetType }))
 );
 
-// Call edge function
+// Call the hybrid edge function - routes to FreeCryptoAPI / FCS API / Twelve Data
+async function callHybridMarketData(params: {
+  cryptoSymbols?: string[];
+  stockSymbols?: string[];
+  etfSymbols?: string[];
+  commoditySymbols?: string[];
+}): Promise<Record<string, TwelveDataQuote>> {
+  const { data, error } = await supabase.functions.invoke('market-data-hybrid', {
+    body: params,
+  });
+
+  if (error) throw new Error(`Hybrid market data error: ${error.message}`);
+  if (data?.error) throw new Error(`Market data: ${data.error}`);
+  
+  if (data?.errors?.length) {
+    console.warn('Partial market data errors:', data.errors);
+  }
+
+  return (data?.data || {}) as Record<string, TwelveDataQuote>;
+}
+
+// Legacy Twelve Data edge function call (for technical indicators)
 async function callTwelveData(action: string, params: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke('twelve-data', {
     body: { action, params },
@@ -52,35 +73,47 @@ async function callTwelveData(action: string, params: Record<string, unknown>) {
   return data;
 }
 
-// Fetch quotes for multiple symbols (batched with rate limit protection)
+// Fetch all quotes using hybrid approach - NO rate limit issues
 export async function fetchQuotes(symbols: string[]): Promise<Record<string, TwelveDataQuote>> {
-  // Free plan: 8 API credits/min. Each quote batch = 1 credit.
-  // Limit to 1 batch of 8 symbols max to stay under rate limit.
-  const batchSize = 8;
-  const results: Record<string, TwelveDataQuote> = {};
+  // Group symbols by type
+  const cryptoSymbols: string[] = [];
+  const stockSymbols: string[] = [];
+  const etfSymbols: string[] = [];
+  const commoditySymbols: string[] = [];
 
-  // Only fetch first batch to avoid rate limiting on free plan
-  const batch = symbols.slice(0, batchSize);
-  try {
-    const data = await callTwelveData('quote', { symbols: batch });
-    if (batch.length === 1) {
-      results[batch[0]] = data;
-    } else {
-      Object.assign(results, data);
+  for (const symbol of symbols) {
+    const info = ALL_SYMBOLS.find(s => s.tdSymbol === symbol || s.symbol === symbol);
+    if (!info) continue;
+    
+    switch (info.type) {
+      case 'crypto': cryptoSymbols.push(info.tdSymbol); break;
+      case 'stock': stockSymbols.push(info.tdSymbol); break;
+      case 'etf': etfSymbols.push(info.tdSymbol); break;
+      case 'commodity': commoditySymbols.push(info.tdSymbol); break;
     }
+  }
+
+  try {
+    return await callHybridMarketData({ cryptoSymbols, stockSymbols, etfSymbols, commoditySymbols });
   } catch (e) {
-    console.warn('Quote fetch failed:', e);
+    console.warn('Hybrid fetch failed, trying legacy Twelve Data:', e);
+    // Fallback to legacy Twelve Data function
+    try {
+      const batchSize = 8;
+      const batch = symbols.slice(0, batchSize);
+      const data = await callTwelveData('quote', { symbols: batch });
+      if (batch.length === 1) {
+        return { [batch[0]]: data };
+      }
+      return data;
+    } catch (fallbackError) {
+      console.warn('Legacy fallback also failed:', fallbackError);
+      return {};
+    }
   }
-
-  // If there are more symbols, wait 60s before next batch (or skip)
-  if (symbols.length > batchSize) {
-    console.warn(`Rate limit: Only fetched ${batchSize} of ${symbols.length} symbols. Remaining will use mock data.`);
-  }
-
-  return results;
 }
 
-// Fetch RSI for a symbol
+// Fetch RSI for a symbol (still uses Twelve Data for technical indicators)
 export async function fetchRSI(symbol: string, interval = '1day', timePeriod = 14) {
   return callTwelveData('rsi', { symbol, interval, time_period: timePeriod });
 }
@@ -118,9 +151,10 @@ export interface TwelveDataQuote {
     high: string;
   };
   is_market_open: boolean;
+  _source?: string;
 }
 
-// Transform Twelve Data quote to our Asset format
+// Transform quote to our Asset format
 export function quoteToAsset(
   quote: TwelveDataQuote,
   symbolInfo: { symbol: string; name: string; type: AssetType },
@@ -135,25 +169,18 @@ export function quoteToAsset(
   const low = parseFloat(quote.low);
   const volume = parseInt(quote.volume) || 0;
 
-  // Derive trend from price vs open and change
   let trend: 'uptrend' | 'downtrend' | 'sideways' = 'sideways';
   if (changePct > 1) trend = 'uptrend';
   else if (changePct < -1) trend = 'downtrend';
 
-  // MACD signal
   let macdSignal: 'bullish' | 'bearish' | 'neutral' = 'neutral';
   if (macdValue) {
     if (macdValue.macd > macdValue.signal) macdSignal = 'bullish';
     else if (macdValue.macd < macdValue.signal) macdSignal = 'bearish';
   }
 
-  // Derive volatility from high-low range
   const volatility = price > 0 ? ((high - low) / price) * 100 : 0;
-
-  // Simple momentum from change percent
   const momentum = Math.max(0, Math.min(100, 50 + changePct * 5));
-
-  // Relative strength from RSI (simplified)
   const rsi = rsiValue || 50;
   const relativeStrength = Math.max(0, Math.min(100, rsi + changePct * 2));
 
