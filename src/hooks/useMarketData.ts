@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchQuotes, ALL_SYMBOLS, quoteToAsset, type TwelveDataQuote } from '@/lib/twelveData';
 import { mockAssets, type Asset, type AssetType } from '@/lib/mockData';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 // With hybrid approach we can fetch ALL symbols - no rate limit on FreeCryptoAPI
 const ALL_SYMBOL_IDS = ALL_SYMBOLS.map(s => s.tdSymbol);
