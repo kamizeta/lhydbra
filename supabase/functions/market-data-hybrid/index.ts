@@ -49,6 +49,7 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
   if (cached) return cached as Record<string, unknown>;
 
   const url = `https://api.freecryptoapi.com/v1/getData?symbol=${encodeURIComponent(query)}`;
+  console.log('FreeCryptoAPI URL:', url);
   const response = await fetch(url, {
     headers: { 'x-api-key': apiKey },
   });
@@ -60,6 +61,7 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
   }
 
   const data = await response.json();
+  console.log('FreeCryptoAPI response keys:', JSON.stringify(Object.keys(data)), 'has data.data:', !!data.data, 'has data.symbol:', !!data.symbol);
   
   // Normalize to our standard format keyed by original symbol (BTC/USD)
   const result: Record<string, unknown> = {};
