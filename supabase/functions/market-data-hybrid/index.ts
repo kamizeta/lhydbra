@@ -51,7 +51,7 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
   const url = `https://api.freecryptoapi.com/v1/getData?symbol=${encodeURIComponent(query)}`;
   console.log('FreeCryptoAPI URL:', url);
   const response = await fetch(url, {
-    headers: { 'x-api-key': apiKey },
+    headers: { 'Authorization': `Bearer ${apiKey}` },
   });
   
   if (!response.ok) {
