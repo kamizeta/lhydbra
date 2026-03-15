@@ -56,6 +56,7 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
       console.log('FreeCryptoAPI URL:', url);
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${apiKey}` },
+      });
       if (!response.ok) {
         console.error(`FreeCryptoAPI error for ${base}:`, response.status);
         return;
