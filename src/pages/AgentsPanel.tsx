@@ -70,13 +70,33 @@ export default function AgentsPanel() {
     min_rr_ratio: settings.min_rr_ratio,
   };
 
+  const autoRefresh = useAutoRefresh();
+  const wasAutoRefreshOn = useRef(false);
+
+  const pauseAutoRefresh = () => {
+    if (autoRefresh.enabled) {
+      wasAutoRefreshOn.current = true;
+      autoRefresh.setEnabled(false);
+    }
+  };
+
+  // Restore auto-refresh when all agents finish
+  useEffect(() => {
+    if (!runningAgent && wasAutoRefreshOn.current) {
+      autoRefresh.setEnabled(true);
+      wasAutoRefreshOn.current = false;
+    }
+  }, [runningAgent]);
+
   const handleRun = (agentId: AgentType) => {
     setSelectedAgent(agentId);
+    pauseAutoRefresh();
     runAgent(agentId, { marketData, userConfig }, portfolioData, tradeHistory);
   };
 
   const handleRunAll = () => {
     setSelectedAgent('market-analyst');
+    pauseAutoRefresh();
     runAllAgents({ marketData, userConfig }, portfolioData, tradeHistory);
   };
 
