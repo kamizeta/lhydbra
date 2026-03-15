@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { Bot, Brain, Target, Shield, FileText, PieChart, GraduationCap, Activity, Play, Loader2, Zap } from "lucide-react";
-import { mockAssets, mockPortfolio, mockAgentOutputs } from "@/lib/mockData";
+import { mockAssets } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import { useAIAgent, type AgentType } from "@/hooks/useAIAgent";
 import { useUserSettings } from "@/hooks/useUserSettings";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import StatusBadge from "@/components/shared/StatusBadge";
 import AgentsHelpButton from "@/components/AgentsHelpButton";
 import { cn } from "@/lib/utils";
