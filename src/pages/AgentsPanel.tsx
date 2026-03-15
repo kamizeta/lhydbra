@@ -11,6 +11,7 @@ import StatusBadge from "@/components/shared/StatusBadge";
 import AgentsHelpButton from "@/components/AgentsHelpButton";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 export default function AgentsPanel() {
   const { t } = useI18n();
