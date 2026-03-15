@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { Bot, Brain, Target, Shield, FileText, PieChart, GraduationCap, Activity, Play, Loader2, Zap } from "lucide-react";
 import { mockAssets } from "@/lib/mockData";
@@ -11,6 +11,7 @@ import StatusBadge from "@/components/shared/StatusBadge";
 import AgentsHelpButton from "@/components/AgentsHelpButton";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 export default function AgentsPanel() {
   const { t } = useI18n();
@@ -69,13 +70,33 @@ export default function AgentsPanel() {
     min_rr_ratio: settings.min_rr_ratio,
   };
 
+  const autoRefresh = useAutoRefresh();
+  const wasAutoRefreshOn = useRef(false);
+
+  const pauseAutoRefresh = () => {
+    if (autoRefresh.enabled) {
+      wasAutoRefreshOn.current = true;
+      autoRefresh.setEnabled(false);
+    }
+  };
+
+  // Restore auto-refresh when all agents finish
+  useEffect(() => {
+    if (!runningAgent && wasAutoRefreshOn.current) {
+      autoRefresh.setEnabled(true);
+      wasAutoRefreshOn.current = false;
+    }
+  }, [runningAgent]);
+
   const handleRun = (agentId: AgentType) => {
     setSelectedAgent(agentId);
+    pauseAutoRefresh();
     runAgent(agentId, { marketData, userConfig }, portfolioData, tradeHistory);
   };
 
   const handleRunAll = () => {
     setSelectedAgent('market-analyst');
+    pauseAutoRefresh();
     runAllAgents({ marketData, userConfig }, portfolioData, tradeHistory);
   };
 

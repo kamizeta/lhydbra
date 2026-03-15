@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchQuotes, ALL_SYMBOLS, quoteToAsset, type TwelveDataQuote } from '@/lib/twelveData';
 import { mockAssets, type Asset, type AssetType } from '@/lib/mockData';
+import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 // With hybrid approach we can fetch ALL symbols - no rate limit on FreeCryptoAPI
 const ALL_SYMBOL_IDS = ALL_SYMBOLS.map(s => s.tdSymbol);
 
 export function useMarketData() {
+  const autoRefreshEnabled = useAutoRefresh((s) => s.enabled);
   return useQuery({
     queryKey: ['market-data'],
     queryFn: async (): Promise<Asset[]> => {
@@ -32,12 +34,13 @@ export function useMarketData() {
       return assets;
     },
     staleTime: 60_000,
-    refetchInterval: 120_000, // 2 minutes - safe with hybrid approach
+    refetchInterval: autoRefreshEnabled ? 60_000 : false,
     retry: 2,
   });
 }
 
 export function useQuickQuotes(assetTypes?: AssetType[]) {
+  const autoRefreshEnabled = useAutoRefresh((s) => s.enabled);
   return useQuery({
     queryKey: ['quick-quotes', assetTypes],
     queryFn: async (): Promise<Asset[]> => {
@@ -68,7 +71,7 @@ export function useQuickQuotes(assetTypes?: AssetType[]) {
       return assets;
     },
     staleTime: 60_000,
-    refetchInterval: 120_000,
+    refetchInterval: autoRefreshEnabled ? 60_000 : false,
     retry: 2,
   });
 }

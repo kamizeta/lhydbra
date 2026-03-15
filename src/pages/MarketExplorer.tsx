@@ -1,15 +1,30 @@
-import { useState } from "react";
-import { Search, Filter, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Search, Filter, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff } from "lucide-react";
 import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolume, formatMarketCap } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength';
 
 export default function MarketExplorer() {
   const { t } = useI18n();
+  const autoRefresh = useAutoRefresh();
+  const [countdown, setCountdown] = useState(60);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    if (autoRefresh.enabled) {
+      setCountdown(60);
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => prev <= 1 ? 60 : prev - 1);
+      }, 1000);
+    }
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, [autoRefresh.enabled]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<AssetType | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('relativeStrength');
@@ -84,7 +99,20 @@ export default function MarketExplorer() {
           {!isLoading && (!liveAssets || liveAssets.length === 0) && (
             <StatusBadge variant="warning" dot>{t.common.mockData}</StatusBadge>
           )}
-          <button onClick={() => refetch()} className="rounded-md bg-secondary p-2 text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            onClick={() => autoRefresh.toggle()}
+            className={cn(
+              "rounded-md px-3 py-2 text-xs font-medium flex items-center gap-1.5 transition-colors",
+              autoRefresh.enabled
+                ? "bg-profit/15 text-profit border border-profit/30 hover:bg-profit/25"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
+            )}
+            title={autoRefresh.enabled ? `Auto-refresh: ${countdown}s` : 'Auto-refresh off'}
+          >
+            {autoRefresh.enabled ? <Timer className="h-3.5 w-3.5" /> : <TimerOff className="h-3.5 w-3.5" />}
+            {autoRefresh.enabled ? `${countdown}s` : 'Off'}
+          </button>
+          <button onClick={() => { refetch(); setCountdown(60); }} className="rounded-md bg-secondary p-2 text-muted-foreground hover:text-foreground transition-colors">
             <RefreshCw className="h-4 w-4" />
           </button>
         </div>
