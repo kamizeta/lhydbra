@@ -46,11 +46,9 @@ export default function RiskManagement() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  // Calculate real risk metrics from actual positions
   const totalCapital = settings.current_capital;
   const openCount = positions.length;
 
-  // Calculate exposure per asset type
   const exposureByType: Record<string, number> = {};
   let totalExposureValue = 0;
   positions.forEach(p => {
@@ -60,7 +58,6 @@ export default function RiskManagement() {
   });
   const totalExposurePct = totalCapital > 0 ? (totalExposureValue / totalCapital) * 100 : 0;
 
-  // Calculate risk used (positions with stop loss)
   let totalRiskDollars = 0;
   positions.forEach(p => {
     if (p.stop_loss) {
@@ -70,7 +67,6 @@ export default function RiskManagement() {
   });
   const dailyRiskUsed = totalCapital > 0 ? (totalRiskDollars / totalCapital) * 100 : 0;
 
-  // Max single asset exposure
   const maxSingleExposure = totalCapital > 0
     ? Math.max(0, ...Object.values(exposureByType).map(v => (v / totalCapital) * 100))
     : 0;
@@ -80,9 +76,9 @@ export default function RiskManagement() {
     maxExposureLimit: 100,
     dailyRiskUsed: parseFloat(dailyRiskUsed.toFixed(1)),
     dailyRiskLimit: settings.max_daily_risk,
-    weeklyRiskUsed: parseFloat(dailyRiskUsed.toFixed(1)), // Simplified: same as daily for now
+    weeklyRiskUsed: parseFloat(dailyRiskUsed.toFixed(1)),
     weeklyRiskLimit: settings.max_weekly_risk,
-    currentDrawdown: 0, // Would need historical equity curve
+    currentDrawdown: 0,
     maxDrawdownLimit: settings.max_drawdown,
     openPositions: openCount,
     maxPositions: settings.max_positions,
@@ -104,11 +100,13 @@ export default function RiskManagement() {
     { label: t.riskMgmt.minRRRatio, value: `${settings.min_rr_ratio}:1`, status: 'ok' as const },
   ];
 
+  // Position sizing from real data: use first open position or zeros
+  const firstPos = positions[0];
   const accountSize = settings.current_capital;
   const riskPercent = settings.risk_per_trade;
-  const entryPrice = 120;
-  const stopLossPrice = 115;
-  const riskPerShare = entryPrice - stopLossPrice;
+  const entryPrice = firstPos ? Number(firstPos.avg_entry) : 0;
+  const stopLossPrice = firstPos?.stop_loss ? Number(firstPos.stop_loss) : 0;
+  const riskPerShare = entryPrice > 0 && stopLossPrice > 0 ? Math.abs(entryPrice - stopLossPrice) : 0;
   const dollarRisk = accountSize * (riskPercent / 100);
   const positionSize = riskPerShare > 0 ? Math.floor(dollarRisk / riskPerShare) : 0;
 
@@ -188,31 +186,43 @@ export default function RiskManagement() {
                 <span className="text-muted-foreground">{t.riskMgmt.dollarAtRisk}</span>
                 <span className="font-mono text-loss">{formatCurrency(dollarRisk)}</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">{t.common.entry}</span>
-                <span className="font-mono text-foreground">{formatCurrency(entryPrice)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">{t.common.stopLoss}</span>
-                <span className="font-mono text-loss">{formatCurrency(stopLossPrice)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">{t.riskMgmt.riskPerShare}</span>
-                <span className="font-mono text-foreground">{formatCurrency(riskPerShare)}</span>
-              </div>
+              {firstPos ? (
+                <>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">{t.common.entry}</span>
+                    <span className="font-mono text-foreground">{formatCurrency(entryPrice)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">{t.common.stopLoss}</span>
+                    <span className="font-mono text-loss">{formatCurrency(stopLossPrice)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">{t.riskMgmt.riskPerShare}</span>
+                    <span className="font-mono text-foreground">{formatCurrency(riskPerShare)}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-[10px] text-muted-foreground italic text-center pt-1">
+                  Sin posiciones abiertas — datos en vivo aparecerán aquí
+                </p>
+              )}
             </div>
             <div className="rounded-md bg-primary/10 border border-primary/20 p-3">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium text-foreground">{t.riskMgmt.positionSize}</span>
-                <span className="text-xl font-bold font-mono text-primary">{positionSize} {t.riskMgmt.shares}</span>
+                <span className="text-xl font-bold font-mono text-primary">
+                  {positionSize > 0 ? `${positionSize} ${t.riskMgmt.shares}` : '—'}
+                </span>
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">
-                {t.riskMgmt.totalValue}: {formatCurrency(positionSize * entryPrice)}
-              </p>
+              {positionSize > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {t.riskMgmt.totalValue}: {formatCurrency(positionSize * entryPrice)}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Exposure by type - from real positions */}
+          {/* Exposure by type */}
           <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mt-6 mb-3">{t.riskMgmt.exposureByMarket}</h3>
           {(['crypto', 'stock', 'etf', 'commodity'] as const).map(type => {
             const alloc = totalCapital > 0 ? ((exposureByType[type] || 0) / totalCapital) * 100 : 0;

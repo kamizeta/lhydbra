@@ -109,6 +109,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           email: string | null
           full_name: string | null
@@ -116,6 +117,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -123,6 +125,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string | null
@@ -199,6 +202,8 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          binance_api_key: string | null
+          binance_api_secret: string | null
           created_at: string
           current_capital: number
           id: string
@@ -217,6 +222,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          binance_api_key?: string | null
+          binance_api_secret?: string | null
           created_at?: string
           current_capital?: number
           id?: string
@@ -235,6 +242,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          binance_api_key?: string | null
+          binance_api_secret?: string | null
           created_at?: string
           current_capital?: number
           id?: string
