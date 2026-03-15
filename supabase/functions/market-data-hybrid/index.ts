@@ -49,8 +49,9 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
   if (cached) return cached as Record<string, unknown>;
 
   const url = `https://api.freecryptoapi.com/v1/getData?symbol=${encodeURIComponent(query)}`;
+  console.log('FreeCryptoAPI URL:', url);
   const response = await fetch(url, {
-    headers: { 'x-api-key': apiKey },
+    headers: { 'Authorization': `Bearer ${apiKey}` },
   });
   
   if (!response.ok) {
@@ -60,39 +61,46 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
   }
 
   const data = await response.json();
+  console.log('FreeCryptoAPI raw response (first 500 chars):', JSON.stringify(data).slice(0, 500));
   
   // Normalize to our standard format keyed by original symbol (BTC/USD)
   const result: Record<string, unknown> = {};
   
-  if (data.data) {
-    // Multiple symbols response
-    for (const [key, value] of Object.entries(data.data)) {
+  // FreeCryptoAPI returns { status: true, symbols: { BTC: {...}, ETH: {...} } }
+  const symbolsData = data.symbols || data.data || {};
+  
+  if (typeof symbolsData === 'object' && Object.keys(symbolsData).length > 0) {
+    for (const [key, value] of Object.entries(symbolsData)) {
       const v = value as FreeCryptoResponse;
       const originalSymbol = symbolMap[key] || key;
+      const price = v.price || parseFloat(String(v.close || '0'));
+      if (!price || price <= 0) continue;
+      
       result[originalSymbol] = {
         symbol: originalSymbol,
         name: v.name || key,
         exchange: 'Crypto',
         currency: 'USD',
-        open: String(v.price / (1 + (v.change_percentage_24h || 0) / 100)),
-        high: String(v.high_24h || v.price),
-        low: String(v.low_24h || v.price),
-        close: String(v.price),
+        open: String(price / (1 + (v.change_percentage_24h || 0) / 100)),
+        high: String(v.high_24h || price),
+        low: String(v.low_24h || price),
+        close: String(price),
         volume: String(v.volume || 0),
-        previous_close: String(v.price - (v.change_24h || 0)),
+        previous_close: String(price - (v.change_24h || 0)),
         change: String(v.change_24h || 0),
         percent_change: String(v.change_percentage_24h || 0),
         is_market_open: true,
         _source: 'freecryptoapi',
       };
     }
-  } else if (data.symbol) {
-    // Single symbol response
+  } else if (data.price || data.symbol) {
+    // Single symbol response (flat object)
     const v = data as FreeCryptoResponse;
-    const originalSymbol = symbolMap[v.symbol] || v.symbol;
+    const sym = v.symbol || Object.keys(symbolMap)[0];
+    const originalSymbol = symbolMap[sym] || sym;
     result[originalSymbol] = {
       symbol: originalSymbol,
-      name: v.name || v.symbol,
+      name: v.name || sym,
       exchange: 'Crypto',
       currency: 'USD',
       open: String(v.price / (1 + (v.change_percentage_24h || 0) / 100)),
@@ -108,6 +116,7 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
     };
   }
 
+  console.log('FreeCryptoAPI parsed results:', Object.keys(result));
   setCache(cacheKey, result);
   return result;
 }
@@ -136,13 +145,14 @@ async function fetchFCSData(symbols: string[], apiKey: string, type: 'stock' | '
     });
 
     url = `https://api-v4.fcsapi.com/stock/latest?symbol=${encodeURIComponent(fcsSymbols.join(','))}&access_key=${apiKey}`;
+    console.log('FCS stock URL:', url);
     const response = await fetch(url);
+    const data = await response.json();
+    console.log('FCS stock response:', JSON.stringify(data).slice(0, 500));
     if (!response.ok) {
-      const text = await response.text();
-      console.error('FCS stock error:', response.status, text);
+      console.error('FCS stock error:', response.status);
       throw new Error(`FCS API stock error: ${response.status}`);
     }
-    const data = await response.json();
 
     if (data.status && data.response) {
       for (const item of data.response) {
@@ -244,52 +254,49 @@ serve(async (req) => {
     const fcsKey = Deno.env.get("FCS_API_KEY");
     const twelveDataKey = Deno.env.get("TWELVE_DATA_API_KEY");
 
+    console.log('[DEBUG] Keys found:', { crypto: !!freeCryptoKey, fcs: !!fcsKey, td: !!twelveDataKey });
+    console.log('[DEBUG] Symbols:', { cryptoSymbols, stockSymbols, etfSymbols, commoditySymbols });
+
     const allResults: Record<string, unknown> = {};
     const errors: string[] = [];
 
     // Fetch crypto from FreeCryptoAPI (or fallback to Twelve Data)
     if (cryptoSymbols?.length > 0) {
+      let cryptoFetched = false;
       try {
         if (freeCryptoKey) {
           const data = await fetchCryptoData(cryptoSymbols, freeCryptoKey);
-          Object.assign(allResults, data);
-        } else if (twelveDataKey) {
-          console.log('FreeCryptoAPI key not set, falling back to Twelve Data for crypto');
-          const data = await fetchTwelveDataFallback(cryptoSymbols.slice(0, 4), twelveDataKey);
-          Object.assign(allResults, data);
+          const keys = Object.keys(data);
+          if (keys.length > 0) {
+            Object.assign(allResults, data);
+            cryptoFetched = true;
+          } else {
+            console.log('FreeCryptoAPI returned empty, falling back to Twelve Data');
+          }
         }
       } catch (e) {
         errors.push(`Crypto: ${e instanceof Error ? e.message : 'Unknown error'}`);
-        // Try Twelve Data fallback
-        if (twelveDataKey) {
-          try {
-            const data = await fetchTwelveDataFallback(cryptoSymbols.slice(0, 4), twelveDataKey);
-            Object.assign(allResults, data);
-          } catch (_) { /* silent */ }
-        }
+      }
+      // Fallback to Twelve Data if FreeCryptoAPI didn't return data
+      if (!cryptoFetched && twelveDataKey) {
+        try {
+          const data = await fetchTwelveDataFallback(cryptoSymbols.slice(0, 4), twelveDataKey);
+          Object.assign(allResults, data);
+        } catch (_) { /* silent */ }
       }
     }
 
-    // Fetch stocks + ETFs from FCS API (or fallback to Twelve Data)
+    // Fetch stocks + ETFs from Twelve Data (FCS free plan doesn't support stocks)
     const allStocks = [...(stockSymbols || []), ...(etfSymbols || [])];
-    if (allStocks.length > 0) {
+    if (allStocks.length > 0 && twelveDataKey) {
       try {
-        if (fcsKey) {
-          const data = await fetchFCSData(allStocks, fcsKey, 'stock');
-          Object.assign(allResults, data);
-        } else if (twelveDataKey) {
-          console.log('FCS API key not set, falling back to Twelve Data for stocks');
-          const data = await fetchTwelveDataFallback(allStocks.slice(0, 4), twelveDataKey);
-          Object.assign(allResults, data);
-        }
+        // Twelve Data: batch up to 8 symbols
+        const batch = allStocks.slice(0, 8);
+        console.log('Fetching stocks from Twelve Data:', batch);
+        const data = await fetchTwelveDataFallback(batch, twelveDataKey);
+        Object.assign(allResults, data);
       } catch (e) {
         errors.push(`Stocks: ${e instanceof Error ? e.message : 'Unknown error'}`);
-        if (twelveDataKey) {
-          try {
-            const data = await fetchTwelveDataFallback(allStocks.slice(0, 4), twelveDataKey);
-            Object.assign(allResults, data);
-          } catch (_) { /* silent */ }
-        }
       }
     }
 
