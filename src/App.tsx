@@ -12,6 +12,7 @@ import MarketExplorer from "@/pages/MarketExplorer";
 import Strategies from "@/pages/Strategies";
 import RiskManagement from "@/pages/RiskManagement";
 import AgentsPanel from "@/pages/AgentsPanel";
+import AgentHistory from "@/pages/AgentHistory";
 import TradeIdeas from "@/pages/TradeIdeas";
 import Journal from "@/pages/Journal";
 import SettingsPage from "@/pages/SettingsPage";
