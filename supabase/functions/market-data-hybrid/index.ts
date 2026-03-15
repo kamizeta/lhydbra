@@ -276,26 +276,17 @@ serve(async (req) => {
       }
     }
 
-    // Fetch stocks + ETFs from FCS API (or fallback to Twelve Data)
+    // Fetch stocks + ETFs from Twelve Data (FCS free plan doesn't support stocks)
     const allStocks = [...(stockSymbols || []), ...(etfSymbols || [])];
-    if (allStocks.length > 0) {
+    if (allStocks.length > 0 && twelveDataKey) {
       try {
-        if (fcsKey) {
-          const data = await fetchFCSData(allStocks, fcsKey, 'stock');
-          Object.assign(allResults, data);
-        } else if (twelveDataKey) {
-          console.log('FCS API key not set, falling back to Twelve Data for stocks');
-          const data = await fetchTwelveDataFallback(allStocks.slice(0, 4), twelveDataKey);
-          Object.assign(allResults, data);
-        }
+        // Twelve Data: batch up to 8 symbols
+        const batch = allStocks.slice(0, 8);
+        console.log('Fetching stocks from Twelve Data:', batch);
+        const data = await fetchTwelveDataFallback(batch, twelveDataKey);
+        Object.assign(allResults, data);
       } catch (e) {
         errors.push(`Stocks: ${e instanceof Error ? e.message : 'Unknown error'}`);
-        if (twelveDataKey) {
-          try {
-            const data = await fetchTwelveDataFallback(allStocks.slice(0, 4), twelveDataKey);
-            Object.assign(allResults, data);
-          } catch (_) { /* silent */ }
-        }
       }
     }
 
