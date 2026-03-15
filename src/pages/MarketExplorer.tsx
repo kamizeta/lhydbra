@@ -10,6 +10,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength';
 
 export default function MarketExplorer() {
+  const { t } = useI18n();
   const autoRefresh = useAutoRefresh();
   const [countdown, setCountdown] = useState(60);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
