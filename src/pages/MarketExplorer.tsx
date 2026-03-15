@@ -5,6 +5,7 @@ import { useQuickQuotes } from "@/hooks/useMarketData";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength';
 
