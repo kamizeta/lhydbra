@@ -40,6 +40,7 @@ export function useMarketData() {
 }
 
 export function useQuickQuotes(assetTypes?: AssetType[]) {
+  const autoRefreshEnabled = useAutoRefresh((s) => s.enabled);
   return useQuery({
     queryKey: ['quick-quotes', assetTypes],
     queryFn: async (): Promise<Asset[]> => {
