@@ -71,32 +71,32 @@ export default function AgentsPanel() {
   };
 
   const autoRefresh = useAutoRefresh();
-  const wasAutoRefreshOn = useRef(false);
+  const prevAutoRefreshState = useRef<boolean | null>(null);
 
-  const pauseAutoRefresh = () => {
-    if (autoRefresh.enabled) {
-      wasAutoRefreshOn.current = true;
-      autoRefresh.setEnabled(false);
+  const enableAutoRefreshForAgents = () => {
+    prevAutoRefreshState.current = autoRefresh.enabled;
+    if (!autoRefresh.enabled) {
+      autoRefresh.setEnabled(true);
     }
   };
 
-  // Restore auto-refresh when all agents finish
+  // Restore previous auto-refresh state when agents finish
   useEffect(() => {
-    if (!runningAgent && wasAutoRefreshOn.current) {
-      autoRefresh.setEnabled(true);
-      wasAutoRefreshOn.current = false;
+    if (!runningAgent && prevAutoRefreshState.current !== null) {
+      autoRefresh.setEnabled(prevAutoRefreshState.current);
+      prevAutoRefreshState.current = null;
     }
   }, [runningAgent]);
 
   const handleRun = (agentId: AgentType) => {
     setSelectedAgent(agentId);
-    pauseAutoRefresh();
+    enableAutoRefreshForAgents();
     runAgent(agentId, { marketData, userConfig }, portfolioData, tradeHistory);
   };
 
   const handleRunAll = () => {
     setSelectedAgent('market-analyst');
-    pauseAutoRefresh();
+    enableAutoRefreshForAgents();
     runAllAgents({ marketData, userConfig }, portfolioData, tradeHistory);
   };
 
