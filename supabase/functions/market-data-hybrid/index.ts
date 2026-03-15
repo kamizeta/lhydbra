@@ -61,40 +61,46 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
   }
 
   const data = await response.json();
-  console.log('FreeCryptoAPI response keys:', JSON.stringify(Object.keys(data)), 'has data.data:', !!data.data, 'has data.symbol:', !!data.symbol);
+  console.log('FreeCryptoAPI raw response (first 500 chars):', JSON.stringify(data).slice(0, 500));
   
   // Normalize to our standard format keyed by original symbol (BTC/USD)
   const result: Record<string, unknown> = {};
   
-  if (data.data) {
-    // Multiple symbols response
-    for (const [key, value] of Object.entries(data.data)) {
+  // FreeCryptoAPI returns { status: true, symbols: { BTC: {...}, ETH: {...} } }
+  const symbolsData = data.symbols || data.data || {};
+  
+  if (typeof symbolsData === 'object' && Object.keys(symbolsData).length > 0) {
+    for (const [key, value] of Object.entries(symbolsData)) {
       const v = value as FreeCryptoResponse;
       const originalSymbol = symbolMap[key] || key;
+      const price = v.price || parseFloat(String(v.close || '0'));
+      if (!price || price <= 0) continue;
+      
       result[originalSymbol] = {
         symbol: originalSymbol,
         name: v.name || key,
         exchange: 'Crypto',
         currency: 'USD',
-        open: String(v.price / (1 + (v.change_percentage_24h || 0) / 100)),
-        high: String(v.high_24h || v.price),
-        low: String(v.low_24h || v.price),
-        close: String(v.price),
+        open: String(price / (1 + (v.change_percentage_24h || 0) / 100)),
+        high: String(v.high_24h || price),
+        low: String(v.low_24h || price),
+        close: String(price),
         volume: String(v.volume || 0),
-        previous_close: String(v.price - (v.change_24h || 0)),
+        previous_close: String(price - (v.change_24h || 0)),
         change: String(v.change_24h || 0),
         percent_change: String(v.change_percentage_24h || 0),
         is_market_open: true,
         _source: 'freecryptoapi',
       };
     }
-  } else if (data.symbol) {
-    // Single symbol response
+  } else if (data.price || data.symbol) {
+    // Single symbol response (flat object)
     const v = data as FreeCryptoResponse;
-    const originalSymbol = symbolMap[v.symbol] || v.symbol;
+    const sym = v.symbol || Object.keys(symbolMap)[0];
+    const originalSymbol = symbolMap[sym] || sym;
     result[originalSymbol] = {
       symbol: originalSymbol,
-      name: v.name || v.symbol,
+      name: v.name || sym,
       exchange: 'Crypto',
       currency: 'USD',
       open: String(v.price / (1 + (v.change_percentage_24h || 0) / 100)),
@@ -110,6 +116,7 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
     };
   }
 
+  console.log('FreeCryptoAPI parsed results:', Object.keys(result));
   setCache(cacheKey, result);
   return result;
 }
