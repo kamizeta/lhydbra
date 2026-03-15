@@ -4,7 +4,7 @@ import { mockAssets, type Asset, type AssetType } from '@/lib/mockData';
 
 // Priority symbols to fetch live (max 8 for free plan)
 const PRIORITY_SYMBOLS = [
-  'BTC/USD', 'ETH/USD', 'SOL/USD', 'AAPL'
+  'BTC/USD', 'ETH/USD', 'SOL/USD', 'AAPL', 'NVDA', 'XRP/USD', 'XAU/USD', 'TSLA'
 ];
 
 // Fetch market data: live for priority symbols, mock for the rest
