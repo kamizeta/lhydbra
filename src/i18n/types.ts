@@ -190,4 +190,13 @@ export interface Translations {
     pnlByAsset: string;
     exit: string;
   };
+  // Agent History
+  agentHistory: {
+    title: string;
+    sessions: string;
+    session: string;
+    agents: string;
+    noHistory: string;
+    noHistoryDesc: string;
+  };
 }

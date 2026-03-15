@@ -190,4 +190,12 @@ export const en: Translations = {
     pnlByAsset: 'P&L by Asset',
     exit: 'Exit',
   },
+  agentHistory: {
+    title: 'AI Agent History',
+    sessions: 'analysis sessions',
+    session: 'Session',
+    agents: 'agents',
+    noHistory: 'No analysis history',
+    noHistoryDesc: 'Run the AI agents to generate analyses that will be saved here automatically.',
+  },
 };
