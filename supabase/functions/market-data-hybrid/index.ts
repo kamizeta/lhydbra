@@ -247,6 +247,9 @@ serve(async (req) => {
     const fcsKey = Deno.env.get("FCS_API_KEY");
     const twelveDataKey = Deno.env.get("TWELVE_DATA_API_KEY");
 
+    console.log('[DEBUG] Keys found:', { crypto: !!freeCryptoKey, fcs: !!fcsKey, td: !!twelveDataKey });
+    console.log('[DEBUG] Symbols:', { cryptoSymbols, stockSymbols, etfSymbols, commoditySymbols });
+
     const allResults: Record<string, unknown> = {};
     const errors: string[] = [];
 
