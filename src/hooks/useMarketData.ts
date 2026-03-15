@@ -71,7 +71,7 @@ export function useQuickQuotes(assetTypes?: AssetType[]) {
       return assets;
     },
     staleTime: 60_000,
-    refetchInterval: 120_000,
+    refetchInterval: autoRefreshEnabled ? 60_000 : false,
     retry: 2,
   });
 }
