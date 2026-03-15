@@ -14,10 +14,25 @@ import { useI18n } from "@/i18n";
 
 export default function AgentsPanel() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
   const { data: liveAssets } = useQuickQuotes();
   const { results, runningAgent, runAgent, runAllAgents } = useAIAgent();
   const { settings } = useUserSettings();
+
+  // Fetch real positions from DB
+  const [positions, setPositions] = useState<any[]>([]);
+  const [closedTrades, setClosedTrades] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    // Fetch open positions
+    supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'open')
+      .then(({ data }) => { if (data) setPositions(data); });
+    // Fetch closed trades for learning agent
+    supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'closed').order('closed_at', { ascending: false }).limit(50)
+      .then(({ data }) => { if (data) setClosedTrades(data); });
+  }, [user]);
 
   const agents: { id: AgentType; name: string; icon: typeof Activity; description: string }[] = [
     { id: 'market-analyst', name: t.agents.marketAnalyst, icon: Activity, description: t.agents.marketAnalystDesc },
@@ -33,7 +48,10 @@ export default function AgentsPanel() {
     ? liveAssets.map(a => ({ symbol: a.symbol, name: a.name, type: a.type, price: a.price, change: a.changePercent, rsi: a.rsi, trend: a.trend, momentum: a.momentum, rs: a.relativeStrength, volatility: a.volatility }))
     : mockAssets.map(a => ({ symbol: a.symbol, name: a.name, type: a.type, price: a.price, change: a.changePercent, rsi: a.rsi, trend: a.trend, momentum: a.momentum, rs: a.relativeStrength, volatility: a.volatility }));
 
-  const portfolioData = mockPortfolio.map(p => ({ symbol: p.symbol, type: p.type, qty: p.quantity, entry: p.avgEntry, current: p.currentPrice, pnl: p.pnlPercent, alloc: p.allocation, strategy: p.strategy, sl: p.stopLoss, tp: p.takeProfit }));
+  // Use real positions from DB instead of mock
+  const portfolioData = positions.map(p => ({ symbol: p.symbol, type: p.asset_type, qty: p.quantity, entry: p.avg_entry, direction: p.direction, strategy: p.strategy, sl: p.stop_loss, tp: p.take_profit }));
+
+  const tradeHistory = closedTrades.map(t => ({ symbol: t.symbol, direction: t.direction, entry: t.avg_entry, exit: t.close_price, pnl: t.pnl, strategy: t.strategy, opened: t.opened_at, closed: t.closed_at }));
 
   // Include user settings so AI agents know the user's capital and risk parameters
   const userConfig = {
