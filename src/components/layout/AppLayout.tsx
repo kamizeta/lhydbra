@@ -34,6 +34,7 @@ export default function AppLayout() {
     { to: "/strategies", icon: Brain, label: t.nav.strategies },
     { to: "/risk", icon: Shield, label: t.nav.risk },
     { to: "/agents", icon: Bot, label: t.nav.agents },
+    { to: "/agent-history", icon: History, label: t.agentHistory.title },
     { to: "/trade-ideas", icon: Lightbulb, label: t.nav.tradeIdeas },
     { to: "/journal", icon: BookOpen, label: t.nav.journal },
     { to: "/settings", icon: Settings, label: "Settings" },
