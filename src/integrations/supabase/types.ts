@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_analyses: {
+        Row: {
+          agent_type: string
+          content: string
+          created_at: string
+          id: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          agent_type: string
+          content: string
+          created_at?: string
+          id?: string
+          session_id?: string
+          user_id: string
+        }
+        Update: {
+          agent_type?: string
+          content?: string
+          created_at?: string
+          id?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       positions: {
         Row: {
           asset_type: string

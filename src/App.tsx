@@ -12,6 +12,7 @@ import MarketExplorer from "@/pages/MarketExplorer";
 import Strategies from "@/pages/Strategies";
 import RiskManagement from "@/pages/RiskManagement";
 import AgentsPanel from "@/pages/AgentsPanel";
+import AgentHistory from "@/pages/AgentHistory";
 import TradeIdeas from "@/pages/TradeIdeas";
 import Journal from "@/pages/Journal";
 import SettingsPage from "@/pages/SettingsPage";
@@ -41,6 +42,7 @@ function ProtectedRoutes() {
         <Route path="/strategies" element={<Strategies />} />
         <Route path="/risk" element={<RiskManagement />} />
         <Route path="/agents" element={<AgentsPanel />} />
+        <Route path="/agent-history" element={<AgentHistory />} />
         <Route path="/trade-ideas" element={<TradeIdeas />} />
         <Route path="/journal" element={<Journal />} />
         <Route path="/settings" element={<SettingsPage />} />

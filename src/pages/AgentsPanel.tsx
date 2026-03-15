@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { Bot, Brain, Target, Shield, FileText, PieChart, GraduationCap, Activity, Play, Loader2, Zap } from "lucide-react";
 import { mockAssets } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
-import { useAIAgent, type AgentType } from "@/hooks/useAIAgent";
+import { useAgentStore, type AgentType } from "@/hooks/useAgentStore";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,12 +14,22 @@ import { useI18n } from "@/i18n";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 export default function AgentsPanel() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { user } = useAuth();
   const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
   const { data: liveAssets } = useQuickQuotes();
-  const { results, runningAgent, runAgent, runAllAgents } = useAIAgent();
+  const { results, runningAgent, runAgent, runAllAgents, setLanguage } = useAgentStore();
   const { settings } = useUserSettings();
+
+  // Sync language to global store
+  useEffect(() => { setLanguage(language); }, [language, setLanguage]);
+
+  // Auto-select running agent when returning to page
+  useEffect(() => {
+    if (runningAgent && !selectedAgent) {
+      setSelectedAgent(runningAgent);
+    }
+  }, [runningAgent, selectedAgent]);
 
   // Fetch real positions from DB
   const [positions, setPositions] = useState<any[]>([]);
@@ -27,10 +37,8 @@ export default function AgentsPanel() {
 
   useEffect(() => {
     if (!user) return;
-    // Fetch open positions
     supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'open')
       .then(({ data }) => { if (data) setPositions(data); });
-    // Fetch closed trades for learning agent
     supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'closed').order('closed_at', { ascending: false }).limit(50)
       .then(({ data }) => { if (data) setClosedTrades(data); });
   }, [user]);
@@ -49,12 +57,9 @@ export default function AgentsPanel() {
     ? liveAssets.map(a => ({ symbol: a.symbol, name: a.name, type: a.type, price: a.price, change: a.changePercent, rsi: a.rsi, trend: a.trend, momentum: a.momentum, rs: a.relativeStrength, volatility: a.volatility }))
     : mockAssets.map(a => ({ symbol: a.symbol, name: a.name, type: a.type, price: a.price, change: a.changePercent, rsi: a.rsi, trend: a.trend, momentum: a.momentum, rs: a.relativeStrength, volatility: a.volatility }));
 
-  // Use real positions from DB instead of mock
   const portfolioData = positions.map(p => ({ symbol: p.symbol, type: p.asset_type, qty: p.quantity, entry: p.avg_entry, direction: p.direction, strategy: p.strategy, sl: p.stop_loss, tp: p.take_profit }));
-
   const tradeHistory = closedTrades.map(t => ({ symbol: t.symbol, direction: t.direction, entry: t.avg_entry, exit: t.close_price, pnl: t.pnl, strategy: t.strategy, opened: t.opened_at, closed: t.closed_at }));
 
-  // Include user settings so AI agents know the user's capital and risk parameters
   const userConfig = {
     initial_capital: settings.initial_capital,
     current_capital: settings.current_capital,
@@ -80,7 +85,6 @@ export default function AgentsPanel() {
     }
   };
 
-  // Restore previous auto-refresh state when agents finish
   useEffect(() => {
     if (!runningAgent && prevAutoRefreshState.current !== null) {
       autoRefresh.setEnabled(prevAutoRefreshState.current);
