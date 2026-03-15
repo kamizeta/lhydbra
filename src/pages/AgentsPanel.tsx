@@ -71,12 +71,12 @@ export default function AgentsPanel() {
 
   const handleRun = (agentId: AgentType) => {
     setSelectedAgent(agentId);
-    runAgent(agentId, { marketData, userConfig }, portfolioData);
+    runAgent(agentId, { marketData, userConfig }, portfolioData, tradeHistory);
   };
 
   const handleRunAll = () => {
     setSelectedAgent('market-analyst');
-    runAllAgents({ marketData, userConfig }, portfolioData);
+    runAllAgents({ marketData, userConfig }, portfolioData, tradeHistory);
   };
 
   return (
