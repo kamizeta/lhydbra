@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { Bot, Brain, Target, Shield, FileText, PieChart, GraduationCap, Activity, Play, Loader2, Zap } from "lucide-react";
 import { mockAssets } from "@/lib/mockData";
