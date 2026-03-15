@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, DollarSign, Shield, AlertTriangle } from 'lucide-react';
+import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSettings, type UserSettings } from '@/hooks/useUserSettings';
