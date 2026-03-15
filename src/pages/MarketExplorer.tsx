@@ -10,7 +10,20 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength';
 
 export default function MarketExplorer() {
-  const { t } = useI18n();
+  const autoRefresh = useAutoRefresh();
+  const [countdown, setCountdown] = useState(60);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    if (autoRefresh.enabled) {
+      setCountdown(60);
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => prev <= 1 ? 60 : prev - 1);
+      }, 1000);
+    }
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, [autoRefresh.enabled]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<AssetType | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('relativeStrength');
