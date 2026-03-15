@@ -146,6 +146,52 @@ export default function SettingsPage() {
             </label>
           </div>
         </div>
+
+        {/* Reset Section */}
+        <div className="lg:col-span-2 terminal-border rounded-lg p-5 space-y-4 border-destructive/30">
+          <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Trash2 className="h-4 w-4 text-destructive" />
+            Reset Data
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Elimina todas las posiciones, señales de trade y reinicia los datos de tu cuenta. Esta acción no se puede deshacer.
+          </p>
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={async () => {
+                if (!user || !confirm('¿Eliminar todas las posiciones abiertas y cerradas?')) return;
+                await supabase.from('positions').delete().eq('user_id', user.id);
+                toast.success('Posiciones eliminadas ✓');
+              }}
+              className="flex items-center gap-2 px-3 py-2 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-xs font-medium hover:bg-destructive/20 transition-colors"
+            >
+              <Trash2 className="h-3 w-3" /> Borrar Posiciones
+            </button>
+            <button
+              onClick={async () => {
+                if (!user || !confirm('¿Eliminar todas las señales de trade?')) return;
+                await supabase.from('trade_signals').delete().eq('user_id', user.id);
+                toast.success('Señales eliminadas ✓');
+              }}
+              className="flex items-center gap-2 px-3 py-2 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-xs font-medium hover:bg-destructive/20 transition-colors"
+            >
+              <Trash2 className="h-3 w-3" /> Borrar Señales
+            </button>
+            <button
+              onClick={async () => {
+                if (!user || !confirm('⚠️ ¿BORRAR TODO? Posiciones, señales y resetear capital. Esta acción no se puede deshacer.')) return;
+                await Promise.all([
+                  supabase.from('positions').delete().eq('user_id', user.id),
+                  supabase.from('trade_signals').delete().eq('user_id', user.id),
+                ]);
+                toast.success('Todo reseteado ✓');
+              }}
+              className="flex items-center gap-2 px-3 py-2 bg-destructive text-destructive-foreground rounded-md text-xs font-bold hover:bg-destructive/90 transition-colors"
+            >
+              <Trash2 className="h-3 w-3" /> Resetear Todo
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
