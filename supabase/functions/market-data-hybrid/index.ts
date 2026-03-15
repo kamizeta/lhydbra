@@ -262,24 +262,27 @@ serve(async (req) => {
 
     // Fetch crypto from FreeCryptoAPI (or fallback to Twelve Data)
     if (cryptoSymbols?.length > 0) {
+      let cryptoFetched = false;
       try {
         if (freeCryptoKey) {
           const data = await fetchCryptoData(cryptoSymbols, freeCryptoKey);
-          Object.assign(allResults, data);
-        } else if (twelveDataKey) {
-          console.log('FreeCryptoAPI key not set, falling back to Twelve Data for crypto');
-          const data = await fetchTwelveDataFallback(cryptoSymbols.slice(0, 4), twelveDataKey);
-          Object.assign(allResults, data);
+          const keys = Object.keys(data);
+          if (keys.length > 0) {
+            Object.assign(allResults, data);
+            cryptoFetched = true;
+          } else {
+            console.log('FreeCryptoAPI returned empty, falling back to Twelve Data');
+          }
         }
       } catch (e) {
         errors.push(`Crypto: ${e instanceof Error ? e.message : 'Unknown error'}`);
-        // Try Twelve Data fallback
-        if (twelveDataKey) {
-          try {
-            const data = await fetchTwelveDataFallback(cryptoSymbols.slice(0, 4), twelveDataKey);
-            Object.assign(allResults, data);
-          } catch (_) { /* silent */ }
-        }
+      }
+      // Fallback to Twelve Data if FreeCryptoAPI didn't return data
+      if (!cryptoFetched && twelveDataKey) {
+        try {
+          const data = await fetchTwelveDataFallback(cryptoSymbols.slice(0, 4), twelveDataKey);
+          Object.assign(allResults, data);
+        } catch (_) { /* silent */ }
       }
     }
 
