@@ -10,6 +10,20 @@ export const MARKET_SYMBOLS: Record<AssetType, { symbol: string; name: string; t
     { symbol: 'BNB/USD', name: 'BNB', tdSymbol: 'BNB/USD' },
     { symbol: 'ADA/USD', name: 'Cardano', tdSymbol: 'ADA/USD' },
     { symbol: 'XRP/USD', name: 'Ripple', tdSymbol: 'XRP/USD' },
+    { symbol: 'DOGE/USD', name: 'Dogecoin', tdSymbol: 'DOGE/USD' },
+    { symbol: 'AVAX/USD', name: 'Avalanche', tdSymbol: 'AVAX/USD' },
+    { symbol: 'DOT/USD', name: 'Polkadot', tdSymbol: 'DOT/USD' },
+    { symbol: 'LINK/USD', name: 'Chainlink', tdSymbol: 'LINK/USD' },
+    { symbol: 'MATIC/USD', name: 'Polygon', tdSymbol: 'MATIC/USD' },
+    { symbol: 'SHIB/USD', name: 'Shiba Inu', tdSymbol: 'SHIB/USD' },
+    { symbol: 'UNI/USD', name: 'Uniswap', tdSymbol: 'UNI/USD' },
+    { symbol: 'ATOM/USD', name: 'Cosmos', tdSymbol: 'ATOM/USD' },
+    { symbol: 'LTC/USD', name: 'Litecoin', tdSymbol: 'LTC/USD' },
+    { symbol: 'NEAR/USD', name: 'NEAR Protocol', tdSymbol: 'NEAR/USD' },
+    { symbol: 'SUI/USD', name: 'Sui', tdSymbol: 'SUI/USD' },
+    { symbol: 'APT/USD', name: 'Aptos', tdSymbol: 'APT/USD' },
+    { symbol: 'ARB/USD', name: 'Arbitrum', tdSymbol: 'ARB/USD' },
+    { symbol: 'OP/USD', name: 'Optimism', tdSymbol: 'OP/USD' },
   ],
   stock: [
     { symbol: 'AAPL', name: 'Apple Inc.', tdSymbol: 'AAPL' },
@@ -19,6 +33,23 @@ export const MARKET_SYMBOLS: Record<AssetType, { symbol: string; name: string; t
     { symbol: 'AMZN', name: 'Amazon.com', tdSymbol: 'AMZN' },
     { symbol: 'GOOGL', name: 'Alphabet Inc.', tdSymbol: 'GOOGL' },
     { symbol: 'META', name: 'Meta Platforms', tdSymbol: 'META' },
+    { symbol: 'AMD', name: 'AMD Inc.', tdSymbol: 'AMD' },
+    { symbol: 'NFLX', name: 'Netflix Inc.', tdSymbol: 'NFLX' },
+    { symbol: 'CRM', name: 'Salesforce Inc.', tdSymbol: 'CRM' },
+    { symbol: 'JPM', name: 'JPMorgan Chase', tdSymbol: 'JPM' },
+    { symbol: 'V', name: 'Visa Inc.', tdSymbol: 'V' },
+    { symbol: 'MA', name: 'Mastercard Inc.', tdSymbol: 'MA' },
+    { symbol: 'WMT', name: 'Walmart Inc.', tdSymbol: 'WMT' },
+    { symbol: 'DIS', name: 'Walt Disney Co.', tdSymbol: 'DIS' },
+    { symbol: 'BA', name: 'Boeing Co.', tdSymbol: 'BA' },
+    { symbol: 'INTC', name: 'Intel Corp.', tdSymbol: 'INTC' },
+    { symbol: 'KO', name: 'Coca-Cola Co.', tdSymbol: 'KO' },
+    { symbol: 'PFE', name: 'Pfizer Inc.', tdSymbol: 'PFE' },
+    { symbol: 'PYPL', name: 'PayPal Holdings', tdSymbol: 'PYPL' },
+    { symbol: 'UBER', name: 'Uber Technologies', tdSymbol: 'UBER' },
+    { symbol: 'COIN', name: 'Coinbase Global', tdSymbol: 'COIN' },
+    { symbol: 'PLTR', name: 'Palantir Tech.', tdSymbol: 'PLTR' },
+    { symbol: 'SNOW', name: 'Snowflake Inc.', tdSymbol: 'SNOW' },
   ],
   etf: [
     { symbol: 'SPY', name: 'S&P 500 ETF', tdSymbol: 'SPY' },
@@ -27,6 +58,16 @@ export const MARKET_SYMBOLS: Record<AssetType, { symbol: string; name: string; t
     { symbol: 'ARKK', name: 'ARK Innovation', tdSymbol: 'ARKK' },
     { symbol: 'XLE', name: 'Energy Select', tdSymbol: 'XLE' },
     { symbol: 'XLK', name: 'Technology Select', tdSymbol: 'XLK' },
+    { symbol: 'IWM', name: 'Russell 2000 ETF', tdSymbol: 'IWM' },
+    { symbol: 'EEM', name: 'Emerging Markets', tdSymbol: 'EEM' },
+    { symbol: 'GLD', name: 'Gold ETF (SPDR)', tdSymbol: 'GLD' },
+    { symbol: 'TLT', name: 'Treasury Bond 20Y+', tdSymbol: 'TLT' },
+    { symbol: 'DIA', name: 'Dow Jones ETF', tdSymbol: 'DIA' },
+    { symbol: 'XLF', name: 'Financial Select', tdSymbol: 'XLF' },
+    { symbol: 'XLV', name: 'Healthcare Select', tdSymbol: 'XLV' },
+    { symbol: 'SOXX', name: 'Semiconductor ETF', tdSymbol: 'SOXX' },
+    { symbol: 'VOO', name: 'Vanguard S&P 500', tdSymbol: 'VOO' },
+    { symbol: 'KWEB', name: 'China Internet ETF', tdSymbol: 'KWEB' },
   ],
   commodity: [
     { symbol: 'XAU/USD', name: 'Gold', tdSymbol: 'XAU/USD' },
@@ -34,6 +75,16 @@ export const MARKET_SYMBOLS: Record<AssetType, { symbol: string; name: string; t
     { symbol: 'CL', name: 'Crude Oil', tdSymbol: 'CL' },
     { symbol: 'NG', name: 'Natural Gas', tdSymbol: 'NG' },
     { symbol: 'HG', name: 'Copper', tdSymbol: 'HG' },
+    { symbol: 'EUR/USD', name: 'Euro/Dollar', tdSymbol: 'EUR/USD' },
+    { symbol: 'GBP/USD', name: 'Pound/Dollar', tdSymbol: 'GBP/USD' },
+    { symbol: 'USD/JPY', name: 'Dollar/Yen', tdSymbol: 'USD/JPY' },
+    { symbol: 'AUD/USD', name: 'Aussie/Dollar', tdSymbol: 'AUD/USD' },
+    { symbol: 'USD/CAD', name: 'Dollar/CAD', tdSymbol: 'USD/CAD' },
+    { symbol: 'USD/CHF', name: 'Dollar/Swiss', tdSymbol: 'USD/CHF' },
+    { symbol: 'NZD/USD', name: 'Kiwi/Dollar', tdSymbol: 'NZD/USD' },
+    { symbol: 'EUR/GBP', name: 'Euro/Pound', tdSymbol: 'EUR/GBP' },
+    { symbol: 'EUR/JPY', name: 'Euro/Yen', tdSymbol: 'EUR/JPY' },
+    { symbol: 'GBP/JPY', name: 'Pound/Yen', tdSymbol: 'GBP/JPY' },
   ],
 };
 
@@ -47,6 +98,7 @@ async function callHybridMarketData(params: {
   stockSymbols?: string[];
   etfSymbols?: string[];
   commoditySymbols?: string[];
+  forexSymbols?: string[];
 }): Promise<Record<string, TwelveDataQuote>> {
   const { data, error } = await supabase.functions.invoke('market-data-hybrid', {
     body: params,
@@ -80,24 +132,31 @@ export async function fetchQuotes(symbols: string[]): Promise<Record<string, Twe
   const stockSymbols: string[] = [];
   const etfSymbols: string[] = [];
   const commoditySymbols: string[] = [];
+  const forexSymbols: string[] = [];
+
+  // Forex pairs that go via FCS forex endpoint
+  const forexPairs = new Set(['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CAD', 'USD/CHF', 'NZD/USD', 'EUR/GBP', 'EUR/JPY', 'GBP/JPY']);
 
   for (const symbol of symbols) {
     const info = ALL_SYMBOLS.find(s => s.tdSymbol === symbol || s.symbol === symbol);
     if (!info) continue;
     
-    switch (info.type) {
-      case 'crypto': cryptoSymbols.push(info.tdSymbol); break;
-      case 'stock': stockSymbols.push(info.tdSymbol); break;
-      case 'etf': etfSymbols.push(info.tdSymbol); break;
-      case 'commodity': commoditySymbols.push(info.tdSymbol); break;
+    if (info.type === 'commodity' && forexPairs.has(info.symbol)) {
+      forexSymbols.push(info.tdSymbol);
+    } else {
+      switch (info.type) {
+        case 'crypto': cryptoSymbols.push(info.tdSymbol); break;
+        case 'stock': stockSymbols.push(info.tdSymbol); break;
+        case 'etf': etfSymbols.push(info.tdSymbol); break;
+        case 'commodity': commoditySymbols.push(info.tdSymbol); break;
+      }
     }
   }
 
   try {
-    return await callHybridMarketData({ cryptoSymbols, stockSymbols, etfSymbols, commoditySymbols });
+    return await callHybridMarketData({ cryptoSymbols, stockSymbols, etfSymbols, commoditySymbols, forexSymbols });
   } catch (e) {
     console.warn('Hybrid fetch failed, trying legacy Twelve Data:', e);
-    // Fallback to legacy Twelve Data function
     try {
       const batchSize = 8;
       const batch = symbols.slice(0, batchSize);
