@@ -56,50 +56,47 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
       console.log('FreeCryptoAPI URL:', url);
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${apiKey}` },
-      });
-  
-  if (!response.ok) {
-    const text = await response.text();
-    console.error('FreeCryptoAPI error:', response.status, text);
-    throw new Error(`FreeCryptoAPI error: ${response.status}`);
-  }
+      if (!response.ok) {
+        console.error(`FreeCryptoAPI error for ${base}:`, response.status);
+        return;
+      }
 
-  const data = await response.json();
-  console.log('FreeCryptoAPI raw response (first 500 chars):', JSON.stringify(data).slice(0, 500));
-  
-  // Normalize to our standard format keyed by original symbol (BTC/USD)
-  const result: Record<string, unknown> = {};
-  
-  // FreeCryptoAPI returns { status: "success", symbols: [{symbol:"BTC", last:"72883.77", ...}] }
-  const symbolsArr = Array.isArray(data.symbols) ? data.symbols : [];
-  
-  for (const item of symbolsArr) {
-    const base = item.symbol || '';
-    const originalSymbol = symbolMap[base] || `${base}/USD`;
-    const price = parseFloat(String(item.last || item.price || '0'));
-    if (!price || price <= 0) continue;
-    
-    const changePct = parseFloat(String(item.daily_change_percentage || '0'));
-    const high = parseFloat(String(item.highest || item.high_24h || price));
-    const low = parseFloat(String(item.lowest || item.low_24h || price));
-    
-    result[originalSymbol] = {
-      symbol: originalSymbol,
-      name: item.name || base,
-      exchange: item.source_exchange || 'Crypto',
-      currency: 'USD',
-      open: String(price / (1 + changePct / 100)),
-      high: String(high),
-      low: String(low),
-      close: String(price),
-      volume: String(item.volume || 0),
-      previous_close: String(price / (1 + changePct / 100)),
-      change: String(price - price / (1 + changePct / 100)),
-      percent_change: String(changePct),
-      is_market_open: true,
-      _source: 'freecryptoapi',
-    };
-  }
+      const data = await response.json();
+      console.log(`FreeCryptoAPI ${base} response:`, JSON.stringify(data).slice(0, 300));
+      
+      const symbolsArr = Array.isArray(data.symbols) ? data.symbols : [];
+      for (const item of symbolsArr) {
+        const sym = item.symbol || base;
+        const originalSymbol = symbolMap[sym] || `${sym}/USD`;
+        const price = parseFloat(String(item.last || item.price || '0'));
+        if (!price || price <= 0) continue;
+        
+        const changePct = parseFloat(String(item.daily_change_percentage || '0'));
+        const high = parseFloat(String(item.highest || item.high_24h || price));
+        const low = parseFloat(String(item.lowest || item.low_24h || price));
+        
+        result[originalSymbol] = {
+          symbol: originalSymbol,
+          name: item.name || sym,
+          exchange: item.source_exchange || 'Crypto',
+          currency: 'USD',
+          open: String(price / (1 + changePct / 100)),
+          high: String(high),
+          low: String(low),
+          close: String(price),
+          volume: String(item.volume || 0),
+          previous_close: String(price / (1 + changePct / 100)),
+          change: String(price - price / (1 + changePct / 100)),
+          percent_change: String(changePct),
+          is_market_open: true,
+          _source: 'freecryptoapi',
+        };
+      }
+    } catch (e) {
+      console.error(`FreeCryptoAPI error for ${base}:`, e);
+    }
+  }));
+
   console.log('FreeCryptoAPI parsed results:', Object.keys(result));
   setCache(cacheKey, result);
   return result;
