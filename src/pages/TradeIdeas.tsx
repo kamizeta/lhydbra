@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+import ApproveToPositionDialog from "@/components/trade/ApproveToPositionDialog";
 
 interface TradeSignal {
   id: string;
@@ -34,6 +35,7 @@ export default function TradeIdeas() {
   const [signals, setSignals] = useState<TradeSignal[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSignal, setSelectedSignal] = useState<TradeSignal | null>(null);
+  const [approveSignal, setApproveSignal] = useState<TradeSignal | null>(null);
 
   const loadSignals = async () => {
     if (!user) return;
@@ -53,7 +55,6 @@ export default function TradeIdeas() {
     loadSignals();
   }, [user]);
 
-  // Realtime updates
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -70,6 +71,10 @@ export default function TradeIdeas() {
 
     return () => { supabase.removeChannel(channel); };
   }, [user]);
+
+  const handleApprove = (signal: TradeSignal) => {
+    setApproveSignal(signal);
+  };
 
   const updateStatus = async (id: string, status: string) => {
     const { error } = await supabase
@@ -91,8 +96,13 @@ export default function TradeIdeas() {
     if (!error) {
       setSignals(prev => prev.filter(s => s.id !== id));
       if (selectedSignal?.id === id) setSelectedSignal(null);
-      toast({ title: 'Trade signal deleted' });
+      toast.success('Trade signal deleted');
     }
+  };
+
+  const handlePositionCreated = async (signalId: string) => {
+    await updateStatus(signalId, 'approved');
+    setApproveSignal(null);
   };
 
   if (loading) {
@@ -131,7 +141,7 @@ export default function TradeIdeas() {
           <Lightbulb className="h-10 w-10 text-muted-foreground/30 mb-3" />
           <h3 className="text-sm font-medium text-muted-foreground">No hay ideas de trade</h3>
           <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-            Ejecuta los agentes de AI (especialmente el "Preparador de Órdenes") para generar ideas de trade automáticamente.
+            Ejecuta los agentes de AI para generar ideas de trade automáticamente.
           </p>
         </div>
       ) : (
@@ -149,10 +159,7 @@ export default function TradeIdeas() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "rounded-md p-2",
-                      signal.direction === 'long' ? "bg-profit/15" : "bg-loss/15"
-                    )}>
+                    <div className={cn("rounded-md p-2", signal.direction === 'long' ? "bg-profit/15" : "bg-loss/15")}>
                       <TrendingUp className={cn("h-4 w-4", signal.direction === 'long' ? "text-profit" : "text-loss rotate-180")} />
                     </div>
                     <div>
@@ -187,8 +194,9 @@ export default function TradeIdeas() {
                       {signal.status === 'pending' && (
                         <>
                           <button
-                            onClick={(e) => { e.stopPropagation(); updateStatus(signal.id, 'approved'); }}
+                            onClick={(e) => { e.stopPropagation(); handleApprove(signal); }}
                             className="rounded-md bg-profit/15 p-2 text-profit hover:bg-profit/25 transition-colors"
+                            title="Aprobar y abrir posición"
                           >
                             <Check className="h-4 w-4" />
                           </button>
@@ -210,7 +218,6 @@ export default function TradeIdeas() {
                   </div>
                 </div>
 
-                {/* Trade details row */}
                 <div className="flex gap-4 mt-3 text-xs font-mono">
                   <span className="text-muted-foreground">{t.common.entry}: <span className="text-foreground">{formatCurrency(signal.entry_price)}</span></span>
                   <span className="text-muted-foreground">SL: <span className="text-loss">{formatCurrency(signal.stop_loss)}</span></span>
@@ -288,6 +295,15 @@ export default function TradeIdeas() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Approve → Open Position Dialog */}
+      {approveSignal && (
+        <ApproveToPositionDialog
+          signal={approveSignal}
+          onClose={() => setApproveSignal(null)}
+          onConfirm={handlePositionCreated}
+        />
       )}
     </div>
   );
