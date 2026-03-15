@@ -14,6 +14,7 @@ import {
   Settings,
   Briefcase,
   LogOut,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
