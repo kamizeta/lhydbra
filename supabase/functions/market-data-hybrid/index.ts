@@ -36,23 +36,27 @@ interface FreeCryptoResponse {
 }
 
 async function fetchCryptoData(symbols: string[], apiKey: string) {
-  // FreeCryptoAPI uses symbols like BTC, ETH (without /USD)
   const symbolMap: Record<string, string> = {};
   for (const s of symbols) {
     const base = s.replace('/USD', '');
     symbolMap[base] = s;
   }
 
-  const query = Object.keys(symbolMap).join(',');
-  const cacheKey = `crypto:${query}`;
+  const bases = Object.keys(symbolMap);
+  const cacheKey = `crypto:${bases.sort().join(',')}`;
   const cached = getCached(cacheKey);
   if (cached) return cached as Record<string, unknown>;
 
-  const url = `https://api.freecryptoapi.com/v1/getData?symbol=${encodeURIComponent(query)}`;
-  console.log('FreeCryptoAPI URL:', url);
-  const response = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${apiKey}` },
-  });
+  const result: Record<string, unknown> = {};
+
+  // FreeCryptoAPI free plan: fetch one symbol at a time (batch returns empty)
+  await Promise.all(bases.map(async (base) => {
+    try {
+      const url = `https://api.freecryptoapi.com/v1/getData?symbol=${base}`;
+      console.log('FreeCryptoAPI URL:', url);
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+      });
   
   if (!response.ok) {
     const text = await response.text();
