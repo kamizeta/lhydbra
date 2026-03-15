@@ -99,7 +99,20 @@ export default function MarketExplorer() {
           {!isLoading && (!liveAssets || liveAssets.length === 0) && (
             <StatusBadge variant="warning" dot>{t.common.mockData}</StatusBadge>
           )}
-          <button onClick={() => refetch()} className="rounded-md bg-secondary p-2 text-muted-foreground hover:text-foreground transition-colors">
+          <button
+            onClick={() => autoRefresh.toggle()}
+            className={cn(
+              "rounded-md px-3 py-2 text-xs font-medium flex items-center gap-1.5 transition-colors",
+              autoRefresh.enabled
+                ? "bg-profit/15 text-profit border border-profit/30 hover:bg-profit/25"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
+            )}
+            title={autoRefresh.enabled ? `Auto-refresh: ${countdown}s` : 'Auto-refresh off'}
+          >
+            {autoRefresh.enabled ? <Timer className="h-3.5 w-3.5" /> : <TimerOff className="h-3.5 w-3.5" />}
+            {autoRefresh.enabled ? `${countdown}s` : 'Off'}
+          </button>
+          <button onClick={() => { refetch(); setCountdown(60); }} className="rounded-md bg-secondary p-2 text-muted-foreground hover:text-foreground transition-colors">
             <RefreshCw className="h-4 w-4" />
           </button>
         </div>
