@@ -193,9 +193,10 @@ export default function MarketExplorer() {
                       <StatusBadge variant={
                         asset.type === 'crypto' ? 'info' :
                         asset.type === 'stock' ? 'primary' :
-                        asset.type === 'etf' ? 'neutral' : 'warning'
+                        asset.type === 'etf' ? 'neutral' :
+                        asset.type === 'forex' ? 'profit' : 'warning'
                       }>
-                        {asset.type === 'commodity' ? 'CMD' : asset.type.toUpperCase()}
+                        {asset.type === 'commodity' ? 'CMD' : asset.type === 'forex' ? 'FX' : asset.type.toUpperCase()}
                       </StatusBadge>
                       <div>
                         <div className="font-mono font-medium text-foreground">{asset.symbol}</div>
