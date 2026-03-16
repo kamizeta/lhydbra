@@ -442,18 +442,18 @@ export default function MarketExplorer() {
         </div>
       )}
 
-      {/* Market stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {/* Market stats - horizontal scroll on mobile */}
+      <div className="flex md:grid md:grid-cols-5 gap-2 md:gap-4 overflow-x-auto pb-1 -mb-1 scrollbar-none">
         {(['crypto', 'stock', 'etf', 'forex', 'commodity'] as AssetType[]).map(type => {
           const typeAssets = assets.filter(a => a.type === type);
           const avgChange = typeAssets.length > 0 ? typeAssets.reduce((s, a) => s + a.changePercent, 0) / typeAssets.length : 0;
           return (
-            <div key={type} className="terminal-border rounded-lg p-3">
-              <p className="text-xs uppercase text-muted-foreground tracking-wider">{typeLabels[type]}</p>
-              <p className={cn("text-lg font-bold font-mono mt-1", avgChange >= 0 ? "text-profit" : "text-loss")}>
+            <div key={type} className="terminal-border rounded-lg p-2 md:p-3 min-w-[100px] shrink-0 md:shrink md:min-w-0">
+              <p className="text-[10px] md:text-xs uppercase text-muted-foreground tracking-wider">{typeLabels[type]}</p>
+              <p className={cn("text-sm md:text-lg font-bold font-mono mt-0.5", avgChange >= 0 ? "text-profit" : "text-loss")}>
                 {avgChange >= 0 ? '+' : ''}{formatNumber(avgChange)}%
               </p>
-              <p className="text-xs text-muted-foreground">{typeAssets.length} {t.common.assets}</p>
+              <p className="text-[10px] text-muted-foreground">{typeAssets.length}</p>
             </div>
           );
         })}
