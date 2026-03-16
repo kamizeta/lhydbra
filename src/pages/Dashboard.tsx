@@ -366,12 +366,12 @@ export default function Dashboard() {
         </div>
 
         {/* Right column */}
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Pending Ideas */}
-          <div className="terminal-border rounded-lg p-4 space-y-3 cursor-pointer" onClick={() => navigate('/trade-ideas')}>
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              {t.dashboard.pendingTradeIdeas}
+          <div className="terminal-border rounded-lg p-3 space-y-2 cursor-pointer" onClick={() => navigate('/trade-ideas')}>
+            <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
+              <Zap className="h-3.5 w-3.5 text-primary" />
+              Ideas
             </h2>
             {pendingSignals.length === 0 ? (
               <p className="text-xs text-muted-foreground font-mono">Sin ideas pendientes. Ejecuta los agentes para generar nuevas.</p>
