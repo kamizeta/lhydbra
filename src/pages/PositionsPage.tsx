@@ -132,6 +132,7 @@ export default function PositionsPage() {
                 <option value="stock">{t.common.stocks}</option>
                 <option value="crypto">{t.common.crypto}</option>
                 <option value="etf">{t.common.etfs}</option>
+                <option value="forex">{t.common.forex}</option>
                 <option value="commodity">{t.common.commodities}</option>
               </select>
             </div>

@@ -114,6 +114,7 @@ export default function RiskManagement() {
     crypto: t.common.crypto,
     stock: t.common.stocks,
     etf: t.common.etfs,
+    forex: t.common.forex,
     commodity: t.common.commodities,
   };
 
