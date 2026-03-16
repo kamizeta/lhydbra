@@ -499,6 +499,28 @@ export default function MarketExplorer() {
                         {asset.relativeStrength}
                       </span>
                     </td>
+                    <td className="text-center p-3">
+                      {score ? (
+                        <div className="flex flex-col items-center">
+                          <div className={cn(
+                            "rounded-full px-2.5 py-1 text-xs font-mono font-bold",
+                            score.total_score >= 70 ? "bg-profit/15 text-profit" :
+                            score.total_score >= 50 ? "bg-warning/15 text-warning" :
+                            "bg-loss/15 text-loss"
+                          )}>
+                            {score.total_score}
+                          </div>
+                          <span className={cn("text-[9px] font-mono mt-0.5",
+                            score.direction === 'long' ? "text-profit" :
+                            score.direction === 'short' ? "text-loss" : "text-muted-foreground"
+                          )}>
+                            {score.direction.toUpperCase()}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/50">—</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
