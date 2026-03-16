@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, BarChart3, Bot, Lightbulb, Briefcase,
-  ChevronLeft, ChevronRight, Activity, Settings, LogOut,
+  ChevronLeft, ChevronRight, Activity, Settings, LogOut, Menu, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
@@ -15,6 +15,7 @@ import { usePositionAlerts } from "@/hooks/usePositionAlerts";
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { t } = useI18n();
   const { user, signOut } = useAuth();
   useRegimeAlerts();
@@ -31,15 +32,31 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <aside className={cn("flex flex-col border-r border-border bg-sidebar transition-all duration-300", collapsed ? "w-16" : "w-56")}>
-        <div className="flex h-20 items-center gap-3 border-b border-border px-3">
-          <img src={lhydbraLogo} alt="LHYDBRA" className="h-16 w-16 shrink-0" />
-          {!collapsed && (
-            <div className="flex flex-col">
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setMobileOpen(false)} />
+      )}
+
+      {/* Sidebar */}
+      <aside className={cn(
+        "flex flex-col border-r border-border bg-sidebar transition-all duration-300 z-50",
+        // Mobile: fixed overlay drawer
+        "fixed inset-y-0 left-0 md:relative",
+        mobileOpen ? "translate-x-0 w-56" : "-translate-x-full md:translate-x-0",
+        collapsed ? "md:w-16" : "md:w-56"
+      )}>
+        <div className="flex h-14 md:h-20 items-center gap-3 border-b border-border px-3">
+          <img src={lhydbraLogo} alt="LHYDBRA" className="h-10 w-10 md:h-16 md:w-16 shrink-0" />
+          {(!collapsed || mobileOpen) && (
+            <div className="flex flex-col flex-1">
               <span className="text-sm font-bold text-foreground tracking-[0.2em]">LHYDBRA</span>
               <span className="text-[9px] font-mono text-terminal-gold tracking-wider">BALANCED INTELLIGENCE</span>
             </div>
           )}
+          {/* Close button on mobile */}
+          <button onClick={() => setMobileOpen(false)} className="md:hidden p-1 text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
@@ -48,6 +65,7 @@ export default function AppLayout() {
               key={item.to}
               to={item.to}
               end={item.to === "/"}
+              onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -56,12 +74,12 @@ export default function AppLayout() {
               }
             >
               <item.icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              {(!collapsed || mobileOpen) && <span>{item.label}</span>}
             </NavLink>
           ))}
         </nav>
 
-        <div className="border-t border-border p-2">
+        <div className="hidden md:block border-t border-border p-2">
           <button onClick={() => setCollapsed(!collapsed)} className="flex w-full items-center justify-center rounded-md py-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
@@ -70,22 +88,26 @@ export default function AppLayout() {
         <div className="border-t border-border p-3">
           <div className="flex items-center gap-2">
             <Activity className="h-3 w-3 text-profit animate-pulse-glow" />
-            {!collapsed && <span className="text-[10px] font-mono text-muted-foreground">{t.common.marketOpen}</span>}
+            {(!collapsed || mobileOpen) && <span className="text-[10px] font-mono text-muted-foreground">{t.common.marketOpen}</span>}
           </div>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between h-12 border-b border-border px-4 bg-card shrink-0">
+        <header className="flex items-center justify-between h-12 border-b border-border px-3 md:px-4 bg-card shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-muted-foreground">{user?.email}</span>
+            {/* Mobile hamburger */}
+            <button onClick={() => setMobileOpen(true)} className="md:hidden p-1 text-muted-foreground hover:text-foreground">
+              <Menu className="h-5 w-5" />
+            </button>
+            <span className="text-xs font-mono text-muted-foreground hidden sm:inline">{user?.email}</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <NotificationBell />
             <LanguageSelector collapsed={false} variant="header" />
-            <button onClick={signOut} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-loss border border-border rounded-md hover:bg-accent transition-colors">
+            <button onClick={signOut} className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-loss border border-border rounded-md hover:bg-accent transition-colors">
               <LogOut className="h-3.5 w-3.5" />
-              <span className="font-mono">Logout</span>
+              <span className="font-mono hidden sm:inline">Logout</span>
             </button>
           </div>
         </header>

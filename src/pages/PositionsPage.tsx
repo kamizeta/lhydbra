@@ -114,49 +114,36 @@ export default function PositionsPage() {
     setSyncing(true);
     setSyncResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke('alpaca-sync', {
-        body: { paper },
-      });
+      const { data, error } = await supabase.functions.invoke('alpaca-sync', { body: { paper } });
       if (error || data?.error) {
         toast.error(`Sync error: ${data?.error || error?.message}`);
       } else {
         const changes = data?.changes || [];
         setSyncResult({ changes, synced_at: data?.synced_at });
         if (changes.length > 0) {
-          toast.success(`Alpaca sync: ${changes.length} cambio(s) aplicados`);
+          toast.success(`Alpaca sync: ${changes.length} cambio(s)`);
           loadPositions();
         } else {
-          toast.info('Alpaca sync: todo sincronizado, sin cambios');
+          toast.info('Alpaca sync: sin cambios');
         }
       }
-    } catch (err) {
-      toast.error('Error al sincronizar con Alpaca');
-    }
+    } catch { toast.error('Error sync Alpaca'); }
     setSyncing(false);
   }, [user]);
 
-  // Auto-sync on mount
   useEffect(() => {
     if (user && positions.length >= 0 && !loading) {
-      // Delay auto-sync slightly to let positions load first
       const timer = setTimeout(() => syncAlpaca(true), 2000);
       return () => clearTimeout(timer);
     }
   }, [user, loading]);
 
-  const handlePositionClosed = () => {
-    setClosingPosition(null);
-    loadPositions();
-  };
+  const handlePositionClosed = () => { setClosingPosition(null); loadPositions(); };
 
   const checkSlTpHit = (pos: Position, currentPrice: number | undefined) => {
     if (!currentPrice) return { hitSl: false, hitTp: false };
-    const hitSl = pos.stop_loss != null && (
-      pos.direction === 'long' ? currentPrice <= Number(pos.stop_loss) : currentPrice >= Number(pos.stop_loss)
-    );
-    const hitTp = pos.take_profit != null && (
-      pos.direction === 'long' ? currentPrice >= Number(pos.take_profit) : currentPrice <= Number(pos.take_profit)
-    );
+    const hitSl = pos.stop_loss != null && (pos.direction === 'long' ? currentPrice <= Number(pos.stop_loss) : currentPrice >= Number(pos.stop_loss));
+    const hitTp = pos.take_profit != null && (pos.direction === 'long' ? currentPrice >= Number(pos.take_profit) : currentPrice <= Number(pos.take_profit));
     return { hitSl, hitTp };
   };
 
@@ -170,69 +157,68 @@ export default function PositionsPage() {
     else { toast.success('SL/TP updated'); setEditingSlTp(null); loadPositions(); }
   };
 
+  // Format price compactly
+  const fmtPrice = (n: number) => {
+    if (n >= 1000) return `$${(n / 1000).toFixed(1)}k`;
+    if (n >= 1) return `$${n.toFixed(2)}`;
+    return `$${n.toPrecision(3)}`;
+  };
+
   return (
-    <div className="p-6 space-y-6 animate-slide-in">
-      <div className="flex items-center justify-between">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 animate-slide-in">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{t.dashboard.openPositions}</h1>
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-muted-foreground font-mono">{positions.length} {t.common.active}</p>
+          <h1 className="text-lg md:text-2xl font-bold text-foreground">{t.dashboard.openPositions}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground font-mono">{positions.length} {t.common.active}</span>
             {positions.length > 0 && (
-              <span className={cn("text-sm font-mono font-bold", totalPnL >= 0 ? "text-profit" : "text-loss")}>
-                PnL Total: {totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)} ({totalPnLPercent >= 0 ? '+' : ''}{totalPnLPercent.toFixed(2)}%)
+              <span className={cn("text-xs font-mono font-bold", totalPnL >= 0 ? "text-profit" : "text-loss")}>
+                PnL: {totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)} ({totalPnLPercent >= 0 ? '+' : ''}{totalPnLPercent.toFixed(1)}%)
               </span>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => syncAlpaca(true)}
-            disabled={syncing}
-            className="flex items-center gap-2 px-3 py-2 border border-border rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
-            title="Sincronizar con Alpaca (Paper)"
-          >
-            {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            {syncing ? 'Syncing...' : 'Sync Alpaca'}
+          <button onClick={() => syncAlpaca(true)} disabled={syncing}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border rounded-md text-[10px] md:text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50">
+            {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>
           </button>
           <button onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors">
-            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            {showForm ? 'Cancel' : 'New Position'}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-semibold hover:bg-primary/90 transition-colors">
+            {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{showForm ? 'Cancel' : 'New'}</span>
           </button>
         </div>
       </div>
 
       {/* Sync results banner */}
       {syncResult && syncResult.changes.length > 0 && (
-        <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1.5">
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-2.5 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-primary flex items-center gap-1.5">
-              <RefreshCw className="h-3.5 w-3.5" /> Alpaca Sync — {syncResult.changes.length} cambio(s)
+            <span className="text-[10px] font-bold text-primary flex items-center gap-1">
+              <RefreshCw className="h-3 w-3" /> Sync — {syncResult.changes.length} cambio(s)
             </span>
             <button onClick={() => setSyncResult(null)} className="text-muted-foreground hover:text-foreground">
               <X className="h-3 w-3" />
             </button>
           </div>
           {syncResult.changes.map((c, i) => (
-            <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
-              <span className={cn(
-                "px-1.5 py-0.5 rounded font-bold uppercase",
-                c.action === 'opened' ? "bg-profit/10 text-profit" :
-                c.action === 'closed' ? "bg-loss/10 text-loss" :
-                "bg-warning/10 text-warning"
-              )}>
-                {c.action}
-              </span>
+            <div key={i} className="flex items-center gap-1.5 text-[10px] font-mono">
+              <span className={cn("px-1 py-0.5 rounded font-bold uppercase",
+                c.action === 'opened' ? "bg-profit/10 text-profit" : c.action === 'closed' ? "bg-loss/10 text-loss" : "bg-warning/10 text-warning"
+              )}>{c.action}</span>
               <span className="text-foreground font-medium">{c.symbol}</span>
-              <span className="text-muted-foreground">{c.detail}</span>
             </div>
           ))}
         </div>
       )}
 
+      {/* Add form */}
       {showForm && (
-        <form onSubmit={addPosition} className="terminal-border rounded-lg p-4 space-y-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <form onSubmit={addPosition} className="terminal-border rounded-lg p-3 md:p-4 space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
             {[
               { label: 'Symbol', key: 'symbol', type: 'text' },
               { label: 'Name', key: 'name', type: 'text' },
@@ -253,7 +239,7 @@ export default function PositionsPage() {
               </select>
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground font-mono uppercase">Direction</label>
+              <label className="text-[10px] text-muted-foreground font-mono uppercase">Dir</label>
               <select value={form.direction} onChange={(e) => setForm(f => ({ ...f, direction: e.target.value }))}
                 className="w-full mt-1 px-2 py-1.5 bg-background border border-border rounded-md text-xs text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none">
                 <option value="long">LONG</option><option value="short">SHORT</option>
@@ -262,7 +248,7 @@ export default function PositionsPage() {
             {['quantity', 'avg_entry', 'stop_loss', 'take_profit'].map(key => (
               <div key={key}>
                 <label className="text-[10px] text-muted-foreground font-mono uppercase">
-                  {key === 'avg_entry' ? t.common.entry : key === 'stop_loss' ? t.common.stopLoss : key === 'take_profit' ? t.common.takeProfit : 'Quantity'}
+                  {key === 'avg_entry' ? 'Entry' : key === 'stop_loss' ? 'SL' : key === 'take_profit' ? 'TP' : 'Qty'}
                 </label>
                 <input type="number" step="any" value={(form as any)[key]} onChange={(e) => setForm(prev => ({ ...prev, [key]: Number(e.target.value) }))}
                   required={key === 'quantity' || key === 'avg_entry'}
@@ -281,8 +267,121 @@ export default function PositionsPage() {
         </form>
       )}
 
-      {/* Positions Table */}
-      <div className="terminal-border rounded-lg overflow-x-auto">
+      {/* ─── MOBILE: Card layout ─── */}
+      <div className="md:hidden space-y-2">
+        {positions.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-xs font-mono">No open positions</div>
+        ) : positions.map((pos) => {
+          const pnlData = getPnL(pos);
+          const { hitSl, hitTp } = checkSlTpHit(pos, pnlData?.currentPrice);
+          const isEditing = editingSlTp?.id === pos.id;
+
+          return (
+            <div key={pos.id}
+              onClick={() => pos.signal_id && setViewSignalId(pos.signal_id)}
+              className={cn(
+                "terminal-border rounded-lg p-3 space-y-2 transition-colors",
+                (hitSl || hitTp) ? "border-warning/40 bg-warning/5" : ""
+              )}>
+              {/* Row 1: Symbol + Direction + PnL */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-sm text-foreground">{pos.symbol}</span>
+                  <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded",
+                    pos.direction === 'long' ? "bg-profit/10 text-profit" : "bg-loss/10 text-loss"
+                  )}>
+                    {pos.direction === 'long' ? '▲' : '▼'} {pos.direction.toUpperCase()}
+                  </span>
+                  {pos.signal_id && <Lightbulb className="h-3 w-3 text-primary/60" />}
+                  {(hitSl || hitTp) && (
+                    <span className="text-[9px] font-bold text-warning flex items-center gap-0.5">
+                      <AlertTriangle className="h-2.5 w-2.5" /> {hitSl ? 'SL HIT' : 'TP HIT'}
+                    </span>
+                  )}
+                </div>
+                {pnlData && (
+                  <div className="text-right">
+                    <span className={cn("font-mono font-bold text-sm", pnlData.pnl >= 0 ? "text-profit" : "text-loss")}>
+                      {pnlData.pnl >= 0 ? '+' : ''}{fmtPrice(Math.abs(pnlData.pnl))}
+                    </span>
+                    <div className={cn("text-[10px] font-mono", pnlData.pnlPercent >= 0 ? "text-profit" : "text-loss")}>
+                      {pnlData.pnlPercent >= 0 ? '+' : ''}{pnlData.pnlPercent.toFixed(2)}%
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Row 2: Key metrics grid */}
+              <div className="grid grid-cols-4 gap-2 text-[10px] font-mono">
+                <div>
+                  <span className="text-muted-foreground">Qty</span>
+                  <div className="text-foreground">{pos.quantity}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Entry</span>
+                  <div className="text-foreground">{fmtPrice(pos.avg_entry)}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Now</span>
+                  <div className="text-foreground">{pnlData ? fmtPrice(pnlData.currentPrice) : '—'}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Strat</span>
+                  <div className="text-foreground truncate">{pos.strategy || '—'}</div>
+                </div>
+              </div>
+
+              {/* Row 3: SL/TP + Actions */}
+              <div className="flex items-center justify-between" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-3 text-[10px] font-mono">
+                  {isEditing ? (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <span className="text-loss">SL:</span>
+                        <input type="number" step="any" value={editingSlTp.sl}
+                          onChange={e => setEditingSlTp(prev => prev ? { ...prev, sl: e.target.value } : null)}
+                          className="w-14 px-1 py-0.5 bg-background border border-border rounded text-[10px] text-loss font-mono" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-profit">TP:</span>
+                        <input type="number" step="any" value={editingSlTp.tp}
+                          onChange={e => setEditingSlTp(prev => prev ? { ...prev, tp: e.target.value } : null)}
+                          className="w-14 px-1 py-0.5 bg-background border border-border rounded text-[10px] text-profit font-mono" />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span><span className={cn(hitSl ? "text-warning font-bold" : "text-loss")}>SL: {pos.stop_loss ? fmtPrice(Number(pos.stop_loss)) : '—'}</span></span>
+                      <span><span className={cn(hitTp ? "text-warning font-bold" : "text-profit")}>TP: {pos.take_profit ? fmtPrice(Number(pos.take_profit)) : '—'}</span></span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  {isEditing ? (
+                    <button onClick={saveSlTp} className="p-1 rounded bg-profit/10 text-profit hover:bg-profit/20">
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                  ) : (
+                    <button onClick={() => setEditingSlTp({ id: pos.id, sl: pos.stop_loss?.toString() || '', tp: pos.take_profit?.toString() || '' })}
+                      className="p-1 text-muted-foreground hover:text-primary">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button onClick={() => setClosingPosition(pos)} className="p-1 rounded bg-loss/10 text-loss hover:bg-loss/20">
+                    <DollarSign className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => deletePosition(pos.id)} className="p-1 text-muted-foreground hover:text-loss">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ─── DESKTOP: Table layout ─── */}
+      <div className="hidden md:block terminal-border rounded-lg overflow-x-auto">
         <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="border-b border-border text-[10px] text-muted-foreground uppercase tracking-wider">
@@ -312,8 +411,7 @@ export default function PositionsPage() {
                 <tr key={pos.id} className={cn(
                   "border-b border-border/50 transition-colors cursor-pointer",
                   (hitSl || hitTp) ? "bg-warning/15 border-warning/40" : "hover:bg-accent/30"
-                )}
-                  onClick={() => pos.signal_id && setViewSignalId(pos.signal_id)}>
+                )} onClick={() => pos.signal_id && setViewSignalId(pos.signal_id)}>
                   <td className="p-2">
                     <div className="flex items-center gap-1.5">
                       <div className="min-w-0">
@@ -395,8 +493,7 @@ export default function PositionsPage() {
                         </button>
                       )}
                       <button onClick={() => setClosingPosition(pos)}
-                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-loss/10 text-loss hover:bg-loss/20 transition-colors text-[10px] font-bold"
-                        title="Cerrar posición">
+                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-loss/10 text-loss hover:bg-loss/20 transition-colors text-[10px] font-bold">
                         <DollarSign className="h-3 w-3" />
                       </button>
                       <button onClick={() => deletePosition(pos.id)}
@@ -412,7 +509,6 @@ export default function PositionsPage() {
         </table>
       </div>
 
-      {/* Close Position Dialog */}
       {closingPosition && (
         <ClosePositionDialog
           position={closingPosition}
@@ -422,20 +518,15 @@ export default function PositionsPage() {
         />
       )}
 
-      {/* Portfolio Engine - Rebalancing Recommendations */}
-      <div className="terminal-border rounded-lg p-4">
+      <div className="terminal-border rounded-lg p-3 md:p-4">
         <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
-          <PieChart className="h-4 w-4 text-primary" /> Portfolio Engine — Rebalanceo
+          <PieChart className="h-4 w-4 text-primary" /> Portfolio Engine
         </h2>
         <PortfolioEngine />
       </div>
 
-      {/* Signal Detail from Position */}
       {viewSignalId && (
-        <PositionSignalDetail
-          signalId={viewSignalId}
-          onClose={() => setViewSignalId(null)}
-        />
+        <PositionSignalDetail signalId={viewSignalId} onClose={() => setViewSignalId(null)} />
       )}
     </div>
   );
