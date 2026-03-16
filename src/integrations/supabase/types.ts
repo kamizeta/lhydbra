@@ -246,6 +246,7 @@ export type Database = {
           pnl: number | null
           quantity: number
           regime_at_entry: string | null
+          signal_id: string | null
           status: string
           stop_loss: number | null
           strategy: string | null
@@ -270,6 +271,7 @@ export type Database = {
           pnl?: number | null
           quantity: number
           regime_at_entry?: string | null
+          signal_id?: string | null
           status?: string
           stop_loss?: number | null
           strategy?: string | null
@@ -294,6 +296,7 @@ export type Database = {
           pnl?: number | null
           quantity?: number
           regime_at_entry?: string | null
+          signal_id?: string | null
           status?: string
           stop_loss?: number | null
           strategy?: string | null
@@ -303,7 +306,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "positions_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "trade_signals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
