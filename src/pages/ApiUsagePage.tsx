@@ -33,6 +33,7 @@ const SOURCE_COLORS: Record<string, string> = {
   "fcsapi-stock": "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
   twelvedata: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
   finnhub: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  alphavantage: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   "yahoo-batch": "bg-red-500/20 text-red-400 border-red-500/30",
   "yahoo-chart": "bg-pink-500/20 text-pink-400 border-pink-500/30",
   "db-cache": "bg-muted text-muted-foreground border-border",
@@ -44,20 +45,22 @@ const SOURCE_LABELS: Record<string, string> = {
   "fcsapi-stock": "FCS API (Stocks)",
   twelvedata: "Twelve Data",
   finnhub: "Finnhub",
+  alphavantage: "Alpha Vantage",
   "yahoo-batch": "Yahoo Batch",
   "yahoo-chart": "Yahoo Chart",
   "db-cache": "DB Cache",
 };
 
 const SOURCE_LIMITS: Record<string, string> = {
-  freecryptoapi: "Ilimitado (key-based)",
-  "fcsapi-forex": "~500 calls/hr (free)",
-  "fcsapi-stock": "~500 calls/hr (free)",
-  twelvedata: "8 credits/min (free)",
-  finnhub: "60 calls/min (free)",
-  "yahoo-batch": "Sin límite oficial (rate-limited)",
-  "yahoo-chart": "Sin límite oficial (rate-limited)",
-  "db-cache": "Sin límite",
+  freecryptoapi: "Ilimitado (key-based) · sin reset",
+  "fcsapi-forex": "500 req/h · reset cada 1h · 1 req = N symbols",
+  "fcsapi-stock": "500 req/h · reset cada 1h · 1 req = N symbols",
+  twelvedata: "8 credits/min · reset 1 min · 800/día · 1 sym = 1 credit",
+  finnhub: "60 req/min · reset 1 min · 1 sym = 1 req",
+  alphavantage: "25 req/día · reset 24h · 1 sym = 1 req",
+  "yahoo-batch": "Sin límite oficial · rate-limited por IP · N sym/req",
+  "yahoo-chart": "Sin límite oficial · rate-limited por IP · 1 sym/req",
+  "db-cache": "Sin límite · caché local DB",
 };
 
 export default function ApiUsagePage() {
