@@ -148,15 +148,28 @@ export default function TradeIdeas() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Ideas List */}
           <div className="lg:col-span-2 space-y-3">
-            {signals.map(signal => (
+            {signals.map(signal => {
+              const isApproved = signal.status === 'approved';
+              const isRejected = signal.status === 'rejected';
+              return (
               <div
                 key={signal.id}
                 className={cn(
-                  "terminal-border rounded-lg p-4 cursor-pointer transition-all",
-                  selectedSignal?.id === signal.id && "ring-1 ring-primary glow-primary"
+                  "terminal-border rounded-lg p-4 cursor-pointer transition-all relative overflow-hidden",
+                  selectedSignal?.id === signal.id && "ring-1 ring-primary glow-primary",
+                  isApproved && "border-profit/40",
+                  isRejected && "border-loss/40",
                 )}
                 onClick={() => setSelectedSignal(signal)}
               >
+                {/* Status indicator bar */}
+                {(isApproved || isRejected) && (
+                  <div className={cn(
+                    "absolute left-0 top-0 bottom-0 w-1",
+                    isApproved ? "bg-profit" : "bg-loss"
+                  )} />
+                )}
+
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className={cn("rounded-md p-2", signal.direction === 'long' ? "bg-profit/15" : "bg-loss/15")}>
@@ -172,7 +185,7 @@ export default function TradeIdeas() {
                           signal.status === 'pending' ? 'warning' :
                           signal.status === 'approved' ? 'profit' :
                           signal.status === 'rejected' ? 'loss' : 'neutral'
-                        }>
+                        } dot>
                           {signal.status.toUpperCase()}
                         </StatusBadge>
                       </div>
@@ -226,7 +239,8 @@ export default function TradeIdeas() {
                   {signal.risk_percent && <span className="text-muted-foreground">{t.common.risk}: <span className="text-warning">{signal.risk_percent}%</span></span>}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Detail panel */}
