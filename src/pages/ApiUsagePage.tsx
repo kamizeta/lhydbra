@@ -121,6 +121,12 @@ export default function ApiUsagePage() {
   const totalCalls = stats.reduce((s, r) => s + r.totalCalls, 0);
   const totalReturned = stats.reduce((s, r) => s + r.totalReturned, 0);
 
+  // Cache efficiency metrics
+  const cacheHitCalls = stats.filter(s => s.source === 'db-cache-hit' || s.source === 'mem-cache').reduce((s, r) => s + r.totalReturned, 0);
+  const apiCalls = stats.filter(s => !['db-cache-hit', 'mem-cache', 'db-cache'].includes(s.source)).reduce((s, r) => s + r.totalCalls, 0);
+  const cacheHitPercent = totalReturned > 0 ? Math.round((cacheHitCalls / totalReturned) * 100) : 0;
+  const requestsSaved = cacheHitCalls;
+
   // Last 20 logs for activity feed
   const recentLogs = usageLogs?.slice(0, 20) || [];
 
