@@ -17,6 +17,9 @@ import TradeIdeas from "@/pages/TradeIdeas";
 import Journal from "@/pages/Journal";
 import SettingsPage from "@/pages/SettingsPage";
 import PositionsPage from "@/pages/PositionsPage";
+import OpportunityRadar from "@/pages/OpportunityRadar";
+import StrategyLab from "@/pages/StrategyLab";
+import ControlCenter from "@/pages/ControlCenter";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
