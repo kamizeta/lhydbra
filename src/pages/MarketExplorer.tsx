@@ -35,6 +35,7 @@ export default function MarketExplorer() {
     { label: t.common.crypto, value: 'crypto' },
     { label: t.common.stocks, value: 'stock' },
     { label: t.common.etfs, value: 'etf' },
+    { label: t.common.forex, value: 'forex' },
     { label: t.common.commodities, value: 'commodity' },
   ];
 
@@ -42,6 +43,7 @@ export default function MarketExplorer() {
     crypto: t.common.crypto,
     stock: t.common.stocks,
     etf: t.common.etfs,
+    forex: t.common.forex,
     commodity: t.common.commodities,
   };
 
@@ -149,8 +151,8 @@ export default function MarketExplorer() {
       </div>
 
       {/* Market stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {(['crypto', 'stock', 'etf', 'commodity'] as AssetType[]).map(type => {
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {(['crypto', 'stock', 'etf', 'forex', 'commodity'] as AssetType[]).map(type => {
           const typeAssets = assets.filter(a => a.type === type);
           const avgChange = typeAssets.length > 0 ? typeAssets.reduce((s, a) => s + a.changePercent, 0) / typeAssets.length : 0;
           return (
@@ -191,9 +193,10 @@ export default function MarketExplorer() {
                       <StatusBadge variant={
                         asset.type === 'crypto' ? 'info' :
                         asset.type === 'stock' ? 'primary' :
-                        asset.type === 'etf' ? 'neutral' : 'warning'
+                        asset.type === 'etf' ? 'neutral' :
+                        asset.type === 'forex' ? 'profit' : 'warning'
                       }>
-                        {asset.type === 'commodity' ? 'CMD' : asset.type.toUpperCase()}
+                        {asset.type === 'commodity' ? 'CMD' : asset.type === 'forex' ? 'FX' : asset.type.toUpperCase()}
                       </StatusBadge>
                       <div>
                         <div className="font-mono font-medium text-foreground">{asset.symbol}</div>

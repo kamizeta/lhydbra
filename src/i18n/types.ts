@@ -12,6 +12,7 @@ export interface Translations {
     crypto: string;
     stocks: string;
     etfs: string;
+    forex: string;
     commodities: string;
     assets: string;
     trades: string;
