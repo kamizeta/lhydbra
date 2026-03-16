@@ -42,7 +42,8 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
   const { user } = useAuth();
   const { settings } = useUserSettings();
   const [entryPrice, setEntryPrice] = useState(signal.entry_price);
-  const [quantity, setQuantity] = useState(signal.position_size || 0);
+  const [quantity, setQuantity] = useState(0);
+  const [quantityTouched, setQuantityTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [openPosition, setOpenPosition] = useState(true);
   const [violations, setViolations] = useState<RiskViolation[]>([]);
@@ -67,15 +68,14 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
   const availableExposure = Math.max(0, maxTotalExposure - existingExposure);
   const leverageCap = entryPrice > 0 ? availableExposure / entryPrice : Infinity;
 
-  const idealSize = Math.min(riskBasedSize, concentrationCap, leverageCap);
+  const idealSize = Math.max(0, Math.min(riskBasedSize, concentrationCap, leverageCap));
   const idealSizeDisplay = isFractional ? parseFloat(idealSize.toFixed(6)) : Math.floor(idealSize);
 
-  // Auto-set quantity to ideal on first load
+  // Keep the default quantity aligned with the safe ideal size until the user edits it manually
   useEffect(() => {
-    if (idealSizeDisplay > 0 && quantity === 0) {
-      setQuantity(idealSizeDisplay);
-    }
-  }, [idealSizeDisplay]);
+    if (!loaded || quantityTouched) return;
+    setQuantity(idealSizeDisplay > 0 ? idealSizeDisplay : 0);
+  }, [loaded, idealSizeDisplay, quantityTouched]);
 
   // Fetch current portfolio state for risk validation
   useEffect(() => {
@@ -370,7 +370,10 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
               <div className="flex items-center justify-between">
                 <label className="text-[10px] text-muted-foreground font-mono uppercase">Cantidad / Tamaño</label>
                 <button
-                  onClick={() => setQuantity(idealSizeDisplay)}
+                  onClick={() => {
+                    setQuantity(idealSizeDisplay);
+                    setQuantityTouched(true);
+                  }}
                   className="text-[10px] text-primary hover:underline font-mono"
                 >
                   Usar ideal: {idealSizeDisplay}
@@ -380,7 +383,10 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
                 type="number"
                 step="any"
                 value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
+                onChange={(e) => {
+                  setQuantity(Number(e.target.value));
+                  setQuantityTouched(true);
+                }}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
             </div>
