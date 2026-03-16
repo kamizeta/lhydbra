@@ -500,11 +500,17 @@ export default function MarketExplorer() {
                 const score = scoresMap?.[asset.symbol];
                 return (
                   <tr key={asset.symbol} className={cn(
-                    "border-b border-border/50 transition-colors group",
+                    "border-b border-border/50 transition-colors group cursor-pointer",
                     asset.isMock
                       ? "hover:bg-accent/20"
                       : features ? "hover:bg-accent/30" : "hover:bg-accent/20"
-                  )}>
+                  )} onClick={() => {
+                    let tvSymbol = asset.symbol.replace('/', '');
+                    if (asset.type === 'crypto') tvSymbol = `BINANCE:${tvSymbol.replace('USD', 'USDT')}`;
+                    else if (asset.type === 'forex') tvSymbol = `FX:${tvSymbol}`;
+                    else tvSymbol = `NASDAQ:${asset.symbol}`;
+                    window.open(`https://www.tradingview.com/chart/?symbol=${tvSymbol}`, '_blank');
+                  }}>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         {asset.isMock && (
