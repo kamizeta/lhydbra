@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  AGENT_ORDER,
+  enqueueAgentRun,
+  fetchAgentRunSnapshot,
+  getLatestActiveRun,
+  triggerAgentRunProcessing,
+} from '@/lib/agentRunQueue';
 
 export type AgentType =
   | 'market-analyst'
@@ -22,10 +28,12 @@ interface AgentStore {
   results: Record<string, AgentResult>;
   runningAgent: AgentType | null;
   sessionId: string | null;
+  activeRunId: string | null;
   language: string;
   setLanguage: (lang: string) => void;
   _setRunning: (agent: AgentType | null) => void;
   _updateResult: (agent: AgentType, result: Partial<AgentResult>) => void;
+  resumeLatestRun: () => Promise<void>;
   runAgent: (
     agent: AgentType,
     marketData?: unknown,
@@ -45,139 +53,89 @@ interface AgentStore {
   ) => Promise<void>;
 }
 
-const AGENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`;
+let pollTimer: number | null = null;
 
-async function parseAndSaveSignals(orderOutput: string, language: string) {
+const clearPollTimer = () => {
+  if (pollTimer !== null) {
+    window.clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+};
+
+const createPlaceholderResult = (agent: AgentType): AgentResult => ({
+  agent,
+  content: '',
+  timestamp: new Date().toISOString(),
+  isStreaming: true,
+});
+
+const pollRunStatus = async (
+  runId: string,
+  set: (partial: Partial<AgentStore> | ((state: AgentStore) => Partial<AgentStore>)) => void,
+  get: () => AgentStore,
+) => {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    const snapshot = await fetchAgentRunSnapshot(runId);
+    if (get().activeRunId !== runId) return;
 
-    const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-trade-signals`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    set((state) => ({
+      sessionId: runId,
+      runningAgent: snapshot.runningAgent,
+      results: {
+        ...state.results,
+        ...snapshot.results,
       },
-      body: JSON.stringify({ orderPreparatorOutput: orderOutput, language }),
+    }));
+
+    if (!snapshot.done) {
+      pollTimer = window.setTimeout(() => {
+        void pollRunStatus(runId, set, get);
+      }, 2000);
+      return;
+    }
+
+    clearPollTimer();
+    set({ runningAgent: null, activeRunId: null });
+
+    if (snapshot.failed) {
+      toast({
+        title: 'La ejecución terminó con errores',
+        description: snapshot.run?.error_message || 'Revisa la salida de los agentes.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Agentes completados',
+      description: 'La ejecución siguió en segundo plano y ya terminó.',
     });
-
-    if (resp.ok) {
-      const result = await resp.json();
-      if (result.count > 0) {
-        toast({ title: `✅ ${result.count} trade signals saved`, description: 'Check Trade Ideas page' });
-      }
-    }
-  } catch (e) {
-    console.error('Failed to parse trade signals:', e);
+  } catch (error) {
+    clearPollTimer();
+    set({ runningAgent: null, activeRunId: null });
+    toast({
+      title: 'Error al consultar la ejecución',
+      description: error instanceof Error ? error.message : 'Unknown error',
+      variant: 'destructive',
+    });
   }
-}
+};
 
-async function saveAnalysisToDB(agent: AgentType, content: string, sessionId: string) {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    await supabase.from('agent_analyses').insert({
-      user_id: session.user.id,
-      agent_type: agent,
-      content,
-      session_id: sessionId,
-    } as any);
-  } catch (e) {
-    console.error('Failed to save agent analysis:', e);
-  }
-}
-
-async function streamAgent(
-  agent: AgentType,
-  language: string,
-  marketData: unknown,
-  portfolioData: unknown,
-  tradeHistory: unknown,
-  onChunk: (fullContent: string) => void,
-  marketFeatures?: unknown,
-  opportunityScores?: unknown,
-  strategyPerformance?: unknown,
-): Promise<string> {
-  const resp = await fetch(AGENT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-    },
-    body: JSON.stringify({ agent, marketData, portfolioData, tradeHistory, language, marketFeatures, opportunityScores, strategyPerformance }),
-  });
-
-  if (!resp.ok) {
-    const errData = await resp.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(errData.error || `HTTP ${resp.status}`);
-  }
-  if (!resp.body) throw new Error('No response body');
-
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let textBuffer = '';
-  let fullContent = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    textBuffer += decoder.decode(value, { stream: true });
-
-    let newlineIndex: number;
-    while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
-      let line = textBuffer.slice(0, newlineIndex);
-      textBuffer = textBuffer.slice(newlineIndex + 1);
-
-      if (line.endsWith('\r')) line = line.slice(0, -1);
-      if (line.startsWith(':') || line.trim() === '') continue;
-      if (!line.startsWith('data: ')) continue;
-
-      const jsonStr = line.slice(6).trim();
-      if (jsonStr === '[DONE]') break;
-
-      try {
-        const parsed = JSON.parse(jsonStr);
-        const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-        if (content) {
-          fullContent += content;
-          onChunk(fullContent);
-        }
-      } catch {
-        textBuffer = line + '\n' + textBuffer;
-        break;
-      }
-    }
-  }
-
-  // Final flush
-  if (textBuffer.trim()) {
-    for (let raw of textBuffer.split('\n')) {
-      if (!raw) continue;
-      if (raw.endsWith('\r')) raw = raw.slice(0, -1);
-      if (raw.startsWith(':') || raw.trim() === '') continue;
-      if (!raw.startsWith('data: ')) continue;
-      const jsonStr = raw.slice(6).trim();
-      if (jsonStr === '[DONE]') continue;
-      try {
-        const parsed = JSON.parse(jsonStr);
-        const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-        if (content) {
-          fullContent += content;
-          onChunk(fullContent);
-        }
-      } catch { /* ignore */ }
-    }
-  }
-
-  return fullContent;
-}
+const startRunPolling = (
+  runId: string,
+  set: (partial: Partial<AgentStore> | ((state: AgentStore) => Partial<AgentStore>)) => void,
+  get: () => AgentStore,
+) => {
+  clearPollTimer();
+  set({ activeRunId: runId, sessionId: runId });
+  void pollRunStatus(runId, set, get);
+};
 
 export const useAgentStore = create<AgentStore>((set, get) => ({
   results: {},
   runningAgent: null,
   sessionId: null,
+  activeRunId: null,
   language: 'es',
   setLanguage: (lang) => set({ language: lang }),
   _setRunning: (agent) => set({ runningAgent: agent }),
@@ -189,90 +147,80 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       },
     })),
 
-  runAgent: async (agent, marketData, portfolioData, tradeHistory, marketFeatures, opportunityScores, strategyPerformance) => {
-    const { language } = get();
-    let sessionId = get().sessionId;
-    if (!sessionId) {
-      sessionId = crypto.randomUUID();
-      set({ sessionId });
-    }
-
-    set((state) => ({
-      runningAgent: agent,
-      results: {
-        ...state.results,
-        [agent]: { agent, content: '', timestamp: new Date().toISOString(), isStreaming: true },
-      },
-    }));
-
+  resumeLatestRun: async () => {
     try {
-      const fullContent = await streamAgent(
-        agent,
-        language,
+      const runId = await getLatestActiveRun();
+      if (!runId || get().activeRunId === runId) return;
+      startRunPolling(runId, set, get);
+    } catch {
+      // silent restore failure
+    }
+  },
+
+  runAgent: async (agent, marketData, portfolioData, tradeHistory, marketFeatures, opportunityScores, strategyPerformance) => {
+    try {
+      const { language } = get();
+      const inputPayload = {
         marketData,
         portfolioData,
         tradeHistory,
-        (content) => {
-          set((state) => ({
-            results: {
-              ...state.results,
-              [agent]: { ...state.results[agent], content },
-            },
-          }));
-        },
         marketFeatures,
         opportunityScores,
         strategyPerformance,
-      );
+      };
 
       set((state) => ({
-        runningAgent: null,
+        runningAgent: agent,
         results: {
           ...state.results,
-          [agent]: { ...state.results[agent], content: fullContent, isStreaming: false },
+          [agent]: createPlaceholderResult(agent),
         },
       }));
 
-      // Save to DB
-      if (fullContent && !fullContent.startsWith('Error')) {
-        saveAnalysisToDB(agent, fullContent, sessionId);
-      }
-
-      // Parse trade signals from order-preparator
-      if (agent === 'order-preparator' && fullContent && !fullContent.startsWith('Error')) {
-        parseAndSaveSignals(fullContent, language);
-      }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Unknown error';
+      const runId = await enqueueAgentRun([agent], language, inputPayload);
+      triggerAgentRunProcessing(runId);
+      startRunPolling(runId, set, get);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast({ title: `Agent Error: ${agent}`, description: message, variant: 'destructive' });
       set((state) => ({
         runningAgent: null,
+        activeRunId: null,
         results: {
           ...state.results,
-          [agent]: { ...state.results[agent], content: `Error: ${message}`, isStreaming: false },
+          [agent]: { ...createPlaceholderResult(agent), content: `Error: ${message}`, isStreaming: false },
         },
       }));
     }
   },
 
   runAllAgents: async (marketData, portfolioData, tradeHistory, marketFeatures, opportunityScores, strategyPerformance) => {
-    // New session for full run
-    const sessionId = crypto.randomUUID();
-    set({ sessionId });
+    try {
+      const { language } = get();
+      const inputPayload = {
+        marketData,
+        portfolioData,
+        tradeHistory,
+        marketFeatures,
+        opportunityScores,
+        strategyPerformance,
+      };
 
-    const agentOrder: AgentType[] = [
-      'market-analyst',
-      'asset-selector',
-      'strategy-engine',
-      'risk-manager',
-      'order-preparator',
-      'portfolio-manager',
-      'learning-agent',
-    ];
+      set((state) => ({
+        runningAgent: AGENT_ORDER[0],
+        results: {
+          ...state.results,
+          ...Object.fromEntries(AGENT_ORDER.map((agent) => [agent, createPlaceholderResult(agent)])),
+        },
+      }));
 
-    for (const agent of agentOrder) {
-      await get().runAgent(agent, marketData, portfolioData, tradeHistory, marketFeatures, opportunityScores, strategyPerformance);
-      await new Promise((r) => setTimeout(r, 1500));
+      const runId = await enqueueAgentRun(AGENT_ORDER, language, inputPayload);
+      triggerAgentRunProcessing(runId);
+      startRunPolling(runId, set, get);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast({ title: 'Agent Error', description: message, variant: 'destructive' });
+      set({ runningAgent: null, activeRunId: null });
     }
   },
 }));
