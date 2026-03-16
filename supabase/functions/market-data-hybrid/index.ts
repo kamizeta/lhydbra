@@ -82,7 +82,7 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
   return result;
 }
 
-// ──────────────── FCS API (forex & commodities) ────────────────
+// ──────────────── FCS API (forex, commodities, stocks) ────────────────
 async function fetchFCSForex(symbols: string[], apiKey: string) {
   if (!symbols.length) return {};
   const cacheKey = `fcs:forex:${symbols.sort().join(',')}`;
@@ -121,7 +121,64 @@ async function fetchFCSForex(symbols: string[], apiKey: string) {
   return result;
 }
 
-// ──────────────── Yahoo Finance (stocks & ETFs) ────────────────
+// FCS API for stocks - uses stock/latest endpoint
+async function fetchFCSStocks(symbols: string[], apiKey: string) {
+  if (!symbols.length) return {};
+  const cacheKey = `fcs:stock:${symbols.sort().join(',')}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached as Record<string, unknown>;
+
+  const result: Record<string, unknown> = {};
+  
+  // FCS stock API uses symbol names directly
+  const url = `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&exchange=NASDAQ,NYSE,AMEX&access_key=${apiKey}`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`FCS stock error: ${response.status}`);
+      return result;
+    }
+    const data = await response.json();
+    
+    if (data.status && data.response) {
+      for (const item of data.response) {
+        const s = item.s || item.symbol;
+        if (!s) continue;
+        // Match against our symbol list
+        const matchedSymbol = symbols.find(sym => 
+          s === sym || s.startsWith(sym + ':') || s.endsWith(':' + sym) || s.includes(sym)
+        );
+        const key = matchedSymbol || s;
+        
+        result[key] = {
+          symbol: key,
+          name: item.name || key,
+          exchange: item.exchange || 'NASDAQ',
+          currency: 'USD',
+          open: String(item.o || 0),
+          high: String(item.h || 0),
+          low: String(item.l || 0),
+          close: String(item.c || 0),
+          volume: String(item.v || 0),
+          previous_close: String((parseFloat(item.c || '0')) - (parseFloat(item.ch || '0'))),
+          change: String(item.ch || 0),
+          percent_change: String(item.cp || 0),
+          is_market_open: true,
+          _source: 'fcsapi-stock',
+        };
+      }
+    }
+  } catch (e) {
+    console.error('FCS stock fetch error:', e);
+  }
+
+  if (Object.keys(result).length > 0) {
+    setCache(cacheKey, result);
+  }
+  return result;
+}
+
+// ──────────────── Yahoo Finance (stocks & ETFs fallback) ────────────────
 async function fetchYahooFinanceQuotes(symbols: string[]) {
   if (!symbols.length) return {};
   const cacheKey = `yahoo:${symbols.sort().join(',')}`;
@@ -132,7 +189,6 @@ async function fetchYahooFinanceQuotes(symbols: string[]) {
 
   try {
     const symbolsStr = symbols.join(',');
-    // Yahoo Finance v8 quote endpoint - no API key needed
     const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolsStr)}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume,regularMarketPreviousClose,shortName,longName,exchange`;
     
     const response = await fetch(url, {
@@ -143,7 +199,6 @@ async function fetchYahooFinanceQuotes(symbols: string[]) {
 
     if (!response.ok) {
       console.error(`Yahoo Finance HTTP error: ${response.status}`);
-      // Try alternative endpoint
       return await fetchYahooFinanceFallback(symbols);
     }
 
@@ -178,11 +233,12 @@ async function fetchYahooFinanceQuotes(symbols: string[]) {
     return await fetchYahooFinanceFallback(symbols);
   }
 
-  setCache(cacheKey, result);
+  if (Object.keys(result).length > 0) {
+    setCache(cacheKey, result);
+  }
   return result;
 }
 
-// Fallback: fetch individual quotes via Yahoo Finance v8 chart endpoint
 async function fetchYahooFinanceFallback(symbols: string[]) {
   const result: Record<string, unknown> = {};
 
@@ -229,7 +285,7 @@ async function fetchYahooFinanceFallback(symbols: string[]) {
   return result;
 }
 
-// ──────────────── Twelve Data (technical indicators only) ────────────────
+// ──────────────── Twelve Data (technical indicators only, kept as last resort) ────────────────
 async function fetchTwelveDataBatch(symbols: string[], apiKey: string) {
   if (!symbols.length) return {};
   const cacheKey = `td:${symbols.sort().join(',')}`;
@@ -266,8 +322,6 @@ serve(async (req) => {
 
     const allResults: Record<string, unknown> = {};
     const errors: string[] = [];
-
-    // Run all fetches in parallel for maximum speed
     const fetchPromises: Promise<void>[] = [];
 
     // 1. Crypto from FreeCryptoAPI (unlimited)
@@ -289,31 +343,48 @@ serve(async (req) => {
       );
     }
 
-    // 3. Stocks + ETFs from Yahoo Finance (NO rate limit, NO API key needed)
+    // 3. Stocks + ETFs: Try FCS API first, then Yahoo Finance, then Twelve Data
     const allStocks = [...(stockSymbols || []), ...(etfSymbols || [])];
     if (allStocks.length > 0) {
-      fetchPromises.push(
-        fetchYahooFinanceQuotes(allStocks)
-          .then(data => {
-            Object.assign(allResults, data);
-            // If Yahoo failed for some symbols, try Twelve Data as backup
-            const missing = allStocks.filter(s => !data[s]);
-            if (missing.length > 0 && twelveDataKey) {
-              return fetchTwelveDataBatch(missing.slice(0, 8), twelveDataKey)
-                .then(tdData => { Object.assign(allResults, tdData); })
-                .catch(() => {});
+      fetchPromises.push((async () => {
+        let fetched = new Set<string>();
+
+        // Try FCS API for stocks first
+        if (fcsKey) {
+          try {
+            const fcsData = await fetchFCSStocks(allStocks, fcsKey);
+            for (const [key, val] of Object.entries(fcsData)) {
+              allResults[key] = val;
+              fetched.add(key);
             }
-          })
-          .catch(e => {
-            errors.push(`Stocks/ETFs: ${e instanceof Error ? e.message : 'Unknown'}`);
-            // Fallback to Twelve Data if Yahoo completely fails
-            if (twelveDataKey) {
-              return fetchTwelveDataBatch(allStocks.slice(0, 8), twelveDataKey)
-                .then(data => { Object.assign(allResults, data); })
-                .catch(() => {});
+          } catch (e) {
+            console.error('FCS stocks failed:', e);
+          }
+        }
+
+        // Try Yahoo Finance for any missing symbols
+        const missingAfterFCS = allStocks.filter(s => !fetched.has(s));
+        if (missingAfterFCS.length > 0) {
+          try {
+            const yahooData = await fetchYahooFinanceQuotes(missingAfterFCS);
+            for (const [key, val] of Object.entries(yahooData)) {
+              allResults[key] = val;
+              fetched.add(key);
             }
-          })
-      );
+          } catch (e) {
+            console.error('Yahoo Finance failed:', e);
+          }
+        }
+
+        // Last resort: Twelve Data for any still missing (up to 8 to avoid rate limits)
+        const missingAfterYahoo = allStocks.filter(s => !fetched.has(s));
+        if (missingAfterYahoo.length > 0 && twelveDataKey) {
+          try {
+            const tdData = await fetchTwelveDataBatch(missingAfterYahoo.slice(0, 8), twelveDataKey);
+            Object.assign(allResults, tdData);
+          } catch (_) { /* silent fallback */ }
+        }
+      })());
     }
 
     await Promise.all(fetchPromises);

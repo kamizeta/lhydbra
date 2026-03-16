@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   DollarSign,
   TrendingUp,
@@ -8,7 +9,6 @@ import {
   PieChart,
   AlertTriangle,
   Zap,
-  BarChart3,
   Bot,
 } from "lucide-react";
 import MetricCard from "@/components/shared/MetricCard";
@@ -18,12 +18,7 @@ import OnboardingTutorial from "@/components/OnboardingTutorial";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  mockAgentOutputs,
-  mockTradeIdeas,
-  formatCurrency,
-  formatNumber,
-} from "@/lib/mockData";
+import { formatCurrency, formatNumber } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 
@@ -42,44 +37,114 @@ interface DBPosition {
   pnl: number | null;
 }
 
+interface DBTradeSignal {
+  id: string;
+  symbol: string;
+  name: string;
+  direction: string;
+  strategy: string;
+  risk_reward: number;
+  confidence: number;
+  status: string;
+}
+
+interface DBAgentAnalysis {
+  id: string;
+  agent_type: string;
+  content: string;
+  created_at: string;
+}
+
+const AGENT_LABELS: Record<string, string> = {
+  'market-analyst': 'Market Analyst',
+  'asset-selector': 'Asset Selector',
+  'strategy-engine': 'Strategy Engine',
+  'risk-manager': 'Risk Manager',
+  'order-preparer': 'Order Preparer',
+  'portfolio-manager': 'Portfolio Manager',
+  'learning-agent': 'Learning Agent',
+};
+
+function getAgentSeverity(agentType: string, content: string): 'info' | 'warning' | 'critical' {
+  const lower = content.toLowerCase();
+  if (agentType === 'risk-manager' || lower.includes('warning') || lower.includes('advertencia') || lower.includes('riesgo alto') || lower.includes('correlación')) return 'warning';
+  if (lower.includes('critical') || lower.includes('crítico') || lower.includes('urgente')) return 'critical';
+  return 'info';
+}
+
+function extractTitle(content: string): string {
+  // Try to extract first heading or first line
+  const headingMatch = content.match(/^#{1,3}\s+(.+)/m);
+  if (headingMatch) return headingMatch[1].slice(0, 60);
+  const firstLine = content.split('\n').find(l => l.trim().length > 10);
+  if (firstLine) return firstLine.replace(/[#*_]/g, '').trim().slice(0, 60);
+  return 'Análisis';
+}
+
 export default function Dashboard() {
   const { t, language } = useI18n();
   const { user } = useAuth();
   const { settings, loading: settingsLoading } = useUserSettings();
+  const navigate = useNavigate();
   const [positions, setPositions] = useState<DBPosition[]>([]);
+  const [pendingSignals, setPendingSignals] = useState<DBTradeSignal[]>([]);
+  const [agentOutputs, setAgentOutputs] = useState<DBAgentAnalysis[]>([]);
+  const [closedPositions, setClosedPositions] = useState<{ pnl: number | null }[]>([]);
 
   useEffect(() => {
-    if (user) {
+    if (!user) return;
+
+    // Fetch all real data in parallel
+    Promise.all([
       supabase
         .from('positions')
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'open')
-        .order('opened_at', { ascending: false })
-        .then(({ data }) => setPositions((data as DBPosition[]) || []));
-    }
+        .order('opened_at', { ascending: false }),
+      supabase
+        .from('trade_signals')
+        .select('id, symbol, name, direction, strategy, risk_reward, confidence, status')
+        .eq('user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabase
+        .from('agent_analyses')
+        .select('id, agent_type, content, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(10),
+      supabase
+        .from('positions')
+        .select('pnl')
+        .eq('user_id', user.id)
+        .eq('status', 'closed'),
+    ]).then(([posRes, sigRes, agentRes, closedRes]) => {
+      setPositions((posRes.data as DBPosition[]) || []);
+      setPendingSignals((sigRes.data as DBTradeSignal[]) || []);
+      setAgentOutputs((agentRes.data as DBAgentAnalysis[]) || []);
+      setClosedPositions((closedRes.data as { pnl: number | null }[]) || []);
+    });
   }, [user]);
-  const pendingIdeas = mockTradeIdeas.filter(t => t.status === 'pending');
-  const warnings = mockAgentOutputs.filter(a => a.severity === 'warning' || a.severity === 'critical');
 
   const dateLocale = language === 'es' ? 'es-ES' : language === 'pt' ? 'pt-BR' : language === 'fr' ? 'fr-FR' : 'en-US';
 
-  // Compute portfolio value from current capital
+  // Compute real metrics
   const portfolioValue = settings.current_capital;
-  const dailyPnl = portfolioValue * 0.0157; // placeholder until real PnL tracking
-  const dailyPnlPercent = 1.57;
+  const totalRealizedPnl = closedPositions.reduce((sum, p) => sum + (p.pnl || 0), 0);
+  const pnlPercent = settings.initial_capital > 0 ? ((portfolioValue - settings.initial_capital) / settings.initial_capital) * 100 : 0;
 
-  // Risk metrics from real settings
-  const riskMetrics = {
-    dailyRiskUsed: 2.8, // TODO: calculate from real positions
-    dailyRiskLimit: settings.max_daily_risk,
-    weeklyRiskUsed: 6.2,
-    weeklyRiskLimit: settings.max_weekly_risk,
-    currentDrawdown: 3.4,
-    maxDrawdownLimit: settings.max_drawdown,
-    openPositions: positions.length,
-    maxPositions: settings.max_positions,
-  };
+  // Real risk calculations from positions
+  const totalExposure = positions.reduce((sum, p) => sum + (p.quantity * p.avg_entry), 0);
+  const exposurePercent = portfolioValue > 0 ? (totalExposure / portfolioValue) * 100 : 0;
+  const dailyRiskUsed = portfolioValue > 0 ? Math.min(exposurePercent * (settings.risk_per_trade / 100), settings.max_daily_risk) : 0;
+
+  // Warnings from agent analyses (risk-related)
+  const warnings = agentOutputs.filter(a =>
+    a.agent_type === 'risk-manager' ||
+    getAgentSeverity(a.agent_type, a.content) !== 'info'
+  ).slice(0, 5);
 
   return (
     <div className="p-6 space-y-6 animate-slide-in">
@@ -93,48 +158,58 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <StatusBadge variant="profit" dot>{t.common.marketOpen}</StatusBadge>
           {warnings.length > 0 && (
-            <StatusBadge variant="warning" dot>{warnings.length} {t.dashboard.activeAlerts}</StatusBadge>
+            <button onClick={() => navigate('/risk')} className="cursor-pointer">
+              <StatusBadge variant="warning" dot>{warnings.length} {t.dashboard.activeAlerts}</StatusBadge>
+            </button>
           )}
         </div>
       </div>
 
-      {/* Top metrics */}
+      {/* Top metrics - clickable */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label={t.dashboard.portfolioValue}
-          value={formatCurrency(portfolioValue)}
-          change={`Capital inicial: ${formatCurrency(settings.initial_capital)}`}
-          changeType="neutral"
-          icon={DollarSign}
-        />
-        <MetricCard
-          label={t.dashboard.dailyPnl}
-          value={`+${formatCurrency(dailyPnl)}`}
-          change={`+${dailyPnlPercent}% ${t.dashboard.today}`}
-          changeType="positive"
-          icon={TrendingUp}
-        />
-        <MetricCard
-          label={t.dashboard.riskUsed}
-          value={`${riskMetrics.dailyRiskUsed}%`}
-          change={`${riskMetrics.dailyRiskLimit}% ${t.dashboard.ofDailyLimit}`}
-          changeType="neutral"
-          icon={Shield}
-          subtitle={`${t.dashboard.drawdown}: ${riskMetrics.currentDrawdown}%`}
-        />
-        <MetricCard
-          label={t.dashboard.activePositions}
-          value={`${riskMetrics.openPositions}`}
-          change={`${pendingIdeas.length} ${t.dashboard.pendingIdeas}`}
-          changeType="neutral"
-          icon={Activity}
-          subtitle={`${t.dashboard.max}: ${riskMetrics.maxPositions}`}
-        />
+        <div className="cursor-pointer" onClick={() => navigate('/settings')}>
+          <MetricCard
+            label={t.dashboard.portfolioValue}
+            value={formatCurrency(portfolioValue)}
+            change={`Capital inicial: ${formatCurrency(settings.initial_capital)}`}
+            changeType="neutral"
+            icon={DollarSign}
+          />
+        </div>
+        <div className="cursor-pointer" onClick={() => navigate('/journal')}>
+          <MetricCard
+            label={t.dashboard.dailyPnl}
+            value={totalRealizedPnl >= 0 ? `+${formatCurrency(totalRealizedPnl)}` : formatCurrency(totalRealizedPnl)}
+            change={`${pnlPercent >= 0 ? '+' : ''}${formatNumber(pnlPercent)}% total`}
+            changeType={totalRealizedPnl >= 0 ? "positive" : "negative"}
+            icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown}
+          />
+        </div>
+        <div className="cursor-pointer" onClick={() => navigate('/risk')}>
+          <MetricCard
+            label={t.dashboard.riskUsed}
+            value={`${formatNumber(dailyRiskUsed)}%`}
+            change={`${settings.max_daily_risk}% ${t.dashboard.ofDailyLimit}`}
+            changeType="neutral"
+            icon={Shield}
+            subtitle={`Exposición: ${formatCurrency(totalExposure)}`}
+          />
+        </div>
+        <div className="cursor-pointer" onClick={() => navigate('/positions')}>
+          <MetricCard
+            label={t.dashboard.activePositions}
+            value={`${positions.length}`}
+            change={`${pendingSignals.length} ${t.dashboard.pendingIdeas}`}
+            changeType="neutral"
+            icon={Activity}
+            subtitle={`${t.dashboard.max}: ${settings.max_positions}`}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Portfolio Positions */}
-        <div className="lg:col-span-2 terminal-border rounded-lg">
+        <div className="lg:col-span-2 terminal-border rounded-lg cursor-pointer" onClick={() => navigate('/positions')}>
           <div className="flex items-center justify-between border-b border-border p-4">
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <PieChart className="h-4 w-4 text-primary" />
@@ -155,7 +230,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {positions.length === 0 ? (
-                  <tr><td colSpan={5} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
+                  <tr><td colSpan={5} className="p-6 text-center text-muted-foreground text-xs font-mono">Sin posiciones abiertas</td></tr>
                 ) : positions.map((pos) => (
                   <tr key={pos.id} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
                     <td className="p-3">
@@ -183,18 +258,18 @@ export default function Dashboard() {
         {/* Right column */}
         <div className="space-y-6">
           {/* Risk Overview */}
-          <div className="terminal-border rounded-lg p-4 space-y-4">
+          <div className="terminal-border rounded-lg p-4 space-y-4 cursor-pointer" onClick={() => navigate('/risk')}>
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Shield className="h-4 w-4 text-primary" />
               {t.dashboard.riskOverview}
             </h2>
-            <ProgressBar value={riskMetrics.dailyRiskUsed} max={riskMetrics.dailyRiskLimit} label={t.dashboard.dailyRisk} />
-            <ProgressBar value={riskMetrics.weeklyRiskUsed} max={riskMetrics.weeklyRiskLimit} label={t.dashboard.weeklyRisk} />
-            <ProgressBar value={riskMetrics.currentDrawdown} max={riskMetrics.maxDrawdownLimit} label={t.dashboard.drawdown} />
+            <ProgressBar value={dailyRiskUsed} max={settings.max_daily_risk} label={t.dashboard.dailyRisk} />
+            <ProgressBar value={positions.length} max={settings.max_positions} label="Posiciones" />
+            <ProgressBar value={exposurePercent > 100 ? 100 : exposurePercent} max={100} label="Exposición" />
           </div>
 
           {/* Capital Summary */}
-          <div className="terminal-border rounded-lg p-4 space-y-3">
+          <div className="terminal-border rounded-lg p-4 space-y-3 cursor-pointer" onClick={() => navigate('/settings')}>
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-primary" />
               Capital & Riesgo
@@ -210,43 +285,56 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Alerts */}
-          <div className="terminal-border rounded-lg p-4 space-y-3">
+          {/* Alerts - from real agent analyses */}
+          <div className="terminal-border rounded-lg p-4 space-y-3 cursor-pointer" onClick={() => navigate('/agents')}>
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-warning" />
               {t.dashboard.activeAlerts}
             </h2>
-            {warnings.map((alert) => (
-              <div key={alert.id} className="rounded-md bg-warning/5 border border-warning/20 p-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-warning mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-xs font-medium text-foreground">{alert.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{alert.content}</p>
-                    <p className="text-[10px] font-mono text-muted-foreground mt-1">{alert.agent}</p>
+            {warnings.length === 0 ? (
+              <p className="text-xs text-muted-foreground font-mono">Sin alertas activas</p>
+            ) : warnings.map((alert) => {
+              const severity = getAgentSeverity(alert.agent_type, alert.content);
+              return (
+                <div key={alert.id} className={cn(
+                  "rounded-md p-3 border",
+                  severity === 'critical' ? "bg-destructive/5 border-destructive/20" :
+                  severity === 'warning' ? "bg-warning/5 border-warning/20" :
+                  "bg-accent/50 border-border"
+                )}>
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", severity === 'critical' ? 'text-destructive' : 'text-warning')} />
+                    <div>
+                      <p className="text-xs font-medium text-foreground">{extractTitle(alert.content)}</p>
+                      <p className="text-[10px] font-mono text-muted-foreground mt-1">
+                        {AGENT_LABELS[alert.agent_type] || alert.agent_type} • {new Date(alert.created_at).toLocaleTimeString(dateLocale)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Pending Ideas */}
-          <div className="terminal-border rounded-lg p-4 space-y-3">
+          {/* Pending Ideas - from real trade_signals */}
+          <div className="terminal-border rounded-lg p-4 space-y-3 cursor-pointer" onClick={() => navigate('/trade-ideas')}>
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Zap className="h-4 w-4 text-primary" />
               {t.dashboard.pendingTradeIdeas}
             </h2>
-            {pendingIdeas.map((idea) => (
-              <div key={idea.id} className="rounded-md bg-accent/50 border border-border p-3">
+            {pendingSignals.length === 0 ? (
+              <p className="text-xs text-muted-foreground font-mono">Sin ideas pendientes. Ejecuta los agentes para generar nuevas.</p>
+            ) : pendingSignals.map((signal) => (
+              <div key={signal.id} className="rounded-md bg-accent/50 border border-border p-3">
                 <div className="flex items-center justify-between">
-                  <div className="font-mono font-medium text-sm text-foreground">{idea.symbol}</div>
-                  <StatusBadge variant={idea.direction === 'long' ? 'profit' : 'loss'}>
-                    {idea.direction.toUpperCase()}
+                  <div className="font-mono font-medium text-sm text-foreground">{signal.symbol}</div>
+                  <StatusBadge variant={signal.direction === 'long' ? 'profit' : 'loss'}>
+                    {signal.direction.toUpperCase()}
                   </StatusBadge>
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">{idea.strategy} • R/R {formatNumber(idea.riskReward)}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{signal.strategy} • R/R {formatNumber(Number(signal.risk_reward))}</div>
                 <div className="mt-1 text-xs font-mono text-muted-foreground">
-                  {t.common.confidence}: {idea.confidence}%
+                  {t.common.confidence}: {signal.confidence}%
                 </div>
               </div>
             ))}
@@ -254,35 +342,44 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Agent Activity Feed */}
-      <div className="terminal-border rounded-lg">
+      {/* Agent Activity Feed - from real agent_analyses */}
+      <div className="terminal-border rounded-lg cursor-pointer" onClick={() => navigate('/agents')}>
         <div className="flex items-center justify-between border-b border-border p-4">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
             <Bot className="h-4 w-4 text-primary" />
             {t.dashboard.agentActivityFeed}
           </h2>
-          <span className="text-xs font-mono text-muted-foreground">{mockAgentOutputs.length} {t.dashboard.recentOutputs}</span>
+          <span className="text-xs font-mono text-muted-foreground">{agentOutputs.length} {t.dashboard.recentOutputs}</span>
         </div>
         <div className="divide-y divide-border/50">
-          {mockAgentOutputs.slice(0, 5).map((output) => (
-            <div key={output.id} className="p-4 hover:bg-accent/30 transition-colors">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <StatusBadge
-                    variant={output.severity === 'critical' ? 'loss' : output.severity === 'warning' ? 'warning' : 'info'}
-                    dot
-                  >
-                    {output.agent}
-                  </StatusBadge>
-                  <span className="text-sm font-medium text-foreground">{output.title}</span>
-                </div>
-                <span className="text-[10px] font-mono text-muted-foreground">
-                  {new Date(output.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{output.content}</p>
+          {agentOutputs.length === 0 ? (
+            <div className="p-6 text-center text-muted-foreground text-xs font-mono">
+              Sin actividad de agentes. Ve al Panel de Agentes para ejecutar análisis.
             </div>
-          ))}
+          ) : agentOutputs.slice(0, 5).map((output) => {
+            const severity = getAgentSeverity(output.agent_type, output.content);
+            return (
+              <div key={output.id} className="p-4 hover:bg-accent/30 transition-colors">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <StatusBadge
+                      variant={severity === 'critical' ? 'loss' : severity === 'warning' ? 'warning' : 'info'}
+                      dot
+                    >
+                      {AGENT_LABELS[output.agent_type] || output.agent_type}
+                    </StatusBadge>
+                    <span className="text-sm font-medium text-foreground">{extractTitle(output.content)}</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap ml-2">
+                    {new Date(output.created_at).toLocaleTimeString(dateLocale)}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                  {output.content.replace(/[#*_]/g, '').slice(0, 200)}...
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
