@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2, User, Key, Target, RotateCcw, Bell, Volume2, VolumeX } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2, User, Key, Target, RotateCcw, Bell, Volume2, VolumeX, Activity } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSettings, type UserSettings } from '@/hooks/useUserSettings';
@@ -29,6 +30,7 @@ const defaultWeights: ScoringWeights = {
 };
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useI18n();
   const { settings: savedSettings, loading } = useUserSettings();
@@ -231,6 +233,13 @@ export default function SettingsPage() {
           </h1>
           <p className="text-sm text-muted-foreground font-mono">Configuración de cuenta y parámetros</p>
         </div>
+        <button
+          onClick={() => navigate('/api-usage')}
+          className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-accent/50 hover:bg-accent rounded-md transition-colors text-foreground"
+        >
+          <Activity className="h-3.5 w-3.5 text-primary" />
+          API Usage Monitor
+        </button>
       </div>
 
       {/* Tabs */}

@@ -136,6 +136,39 @@ export type Database = {
         }
         Relationships: []
       }
+      api_usage_log: {
+        Row: {
+          action: string
+          created_at: string
+          error_message: string | null
+          id: string
+          response_time_ms: number | null
+          source: string
+          symbols_requested: number
+          symbols_returned: number
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          response_time_ms?: number | null
+          source: string
+          symbols_requested?: number
+          symbols_returned?: number
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          response_time_ms?: number | null
+          source?: string
+          symbols_requested?: number
+          symbols_returned?: number
+        }
+        Relationships: []
+      }
       market_features: {
         Row: {
           asset_type: string

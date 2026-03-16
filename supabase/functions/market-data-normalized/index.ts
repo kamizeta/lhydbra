@@ -390,6 +390,72 @@ async function fetchTwelveDataQuotes(symbols: string[], apiKey: string): Promise
   return results;
 }
 
+// ─── Finnhub Quote Fetcher ───
+async function fetchFinnhubQuotes(symbols: string[], apiKey: string): Promise<NormalizedQuote[]> {
+  if (!symbols.length || !apiKey) return [];
+  const results: NormalizedQuote[] = [];
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
+
+  // Finnhub free: 60 calls/min. Fetch in parallel batches of 10
+  const BATCH = 10;
+  for (let i = 0; i < symbols.length; i += BATCH) {
+    const batch = symbols.slice(i, i + BATCH);
+    const batchResults = await Promise.all(batch.map(async (symbol) => {
+      try {
+        const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const q = await res.json();
+        if (!q.c || q.c <= 0) return null;
+
+        const price = q.c;
+        const prevClose = q.pc || price;
+        const change = q.d || (price - prevClose);
+        const changePct = q.dp || (prevClose > 0 ? (change / prevClose) * 100 : 0);
+
+        return {
+          symbol,
+          name: symbol,
+          asset_type: etfSet.has(symbol) ? 'etf' : 'stock',
+          price,
+          open: q.o || price,
+          high: q.h || price,
+          low: q.l || price,
+          volume: 0,
+          change,
+          change_percent: changePct,
+          previous_close: prevClose,
+          is_market_open: true,
+          source: 'finnhub',
+          timestamp: new Date().toISOString(),
+        } as NormalizedQuote;
+      } catch (e) {
+        console.error(`Finnhub ${symbol}:`, e);
+        return null;
+      }
+    }));
+    results.push(...batchResults.filter((r): r is NormalizedQuote => r !== null));
+    if (i + BATCH < symbols.length) {
+      await new Promise(resolve => setTimeout(resolve, 1200));
+    }
+  }
+  return results;
+}
+
+// ─── API Usage Logger (fire-and-forget) ───
+function logApiUsage(db: ReturnType<typeof createClient>, source: string, action: string, requested: number, returned: number, timeMs: number, error?: string) {
+  db.from('api_usage_log').insert({
+    source,
+    action,
+    symbols_requested: requested,
+    symbols_returned: returned,
+    response_time_ms: timeMs,
+    error_message: error || null,
+  }).then(({ error: e }) => {
+    if (e) console.error('Usage log error:', e.message);
+  });
+}
+
 // ─── OHLCV Historical Fetcher (Twelve Data) ───
 async function fetchOHLCVHistory(symbol: string, timeframe: string, outputsize: number, apiKey: string): Promise<OHLCVBar[]> {
   const interval = timeframe === '1d' ? '1day' : timeframe === '1h' ? '1h' : timeframe === '4h' ? '4h' : '1day';
@@ -427,6 +493,7 @@ serve(async (req) => {
     const freeCryptoKey = Deno.env.get("FREE_CRYPTO_API_KEY");
     const fcsKey = Deno.env.get("FCS_API_KEY");
     const twelveKey = Deno.env.get("TWELVE_DATA_API_KEY");
+    const finnhubKey = Deno.env.get("FINNHUB_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const db = createClient(supabaseUrl, supabaseKey);
@@ -453,33 +520,54 @@ serve(async (req) => {
 
       // Fetch in parallel: crypto, forex/commodity, stocks+ETFs
       const allStockLike = [...stocks, ...etfs];
+      const t0 = Date.now();
       const [cryptoQ, forexQ, stockQ] = await Promise.all([
         freeCryptoKey ? fetchCryptoQuotes(crypto, freeCryptoKey) : [],
         fcsKey ? fetchFCSQuotes([...forex, ...commodity], fcsKey, 'forex') : [],
         fcsKey ? fetchFCSQuotes(allStockLike, fcsKey, 'stock') : [],
       ]);
+      const t1 = Date.now();
+
+      // Log primary sources
+      logApiUsage(db, 'freecryptoapi', 'quote', crypto.length, cryptoQ.length, t1 - t0);
+      logApiUsage(db, 'fcsapi-forex', 'quote', forex.length + commodity.length, forexQ.length, t1 - t0);
+      logApiUsage(db, 'fcsapi-stock', 'quote', allStockLike.length, stockQ.length, t1 - t0);
 
       const allQuotes = [...cryptoQ, ...forexQ, ...stockQ];
       const fetched = new Set(allQuotes.map(q => q.symbol));
 
-      // Fallback 1: Twelve Data for missing stocks/ETFs AND missing forex/commodities (batch of 8)
+      // Fallback 1: Twelve Data (batch of 8)
       const missingStockLike = allStockLike.filter(s => !fetched.has(s));
       const missingForex = [...forex, ...commodity].filter(s => !fetched.has(s));
       const missingForTwelve = [...missingStockLike, ...missingForex];
       if (twelveKey && missingForTwelve.length > 0) {
-        // Only fetch first batch (8 symbols) to stay within rate limits
         const twelveSymbols = missingForTwelve.slice(0, 8);
+        const t2 = Date.now();
         const tdQuotes = await fetchTwelveDataQuotes(twelveSymbols, twelveKey);
-        for (const q of tdQuotes) {
-          fetched.add(q.symbol);
-        }
+        logApiUsage(db, 'twelvedata', 'quote', twelveSymbols.length, tdQuotes.length, Date.now() - t2);
+        for (const q of tdQuotes) fetched.add(q.symbol);
         allQuotes.push(...tdQuotes);
       }
 
-      // Fallback 2: Yahoo batch for remaining missing stocks/ETFs (single request)
+      // Fallback 2: Finnhub for missing stocks/ETFs
+      const missingForFinnhub = allStockLike.filter(s => !fetched.has(s));
+      if (finnhubKey && missingForFinnhub.length > 0) {
+        const t3 = Date.now();
+        const fhQuotes = await fetchFinnhubQuotes(missingForFinnhub, finnhubKey);
+        logApiUsage(db, 'finnhub', 'quote', missingForFinnhub.length, fhQuotes.length, Date.now() - t3);
+        for (const q of fhQuotes) {
+          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
+          fetched.add(q.symbol);
+        }
+        allQuotes.push(...fhQuotes);
+      }
+
+      // Fallback 3: Yahoo batch (single request)
       const stillMissingStocks = allStockLike.filter(s => !fetched.has(s));
       if (stillMissingStocks.length > 0) {
+        const t4 = Date.now();
         const yBatch = await fetchYahooBatch(stillMissingStocks);
+        logApiUsage(db, 'yahoo-batch', 'quote', stillMissingStocks.length, yBatch.length, Date.now() - t4);
         for (const q of yBatch) {
           if (etfSet.has(q.symbol)) q.asset_type = 'etf';
           fetched.add(q.symbol);
@@ -487,10 +575,12 @@ serve(async (req) => {
         allQuotes.push(...yBatch);
       }
 
-      // Fallback 3: Yahoo chart for still-missing symbols (parallel batches of 5)
+      // Fallback 4: Yahoo chart (parallel batches of 5)
       const stillMissing = allStockLike.filter(s => !fetched.has(s));
       if (stillMissing.length > 0) {
+        const t5 = Date.now();
         const yChart = await fetchYahooChartParallel(stillMissing);
+        logApiUsage(db, 'yahoo-chart', 'quote', stillMissing.length, yChart.length, Date.now() - t5);
         for (const q of yChart) {
           if (etfSet.has(q.symbol)) q.asset_type = 'etf';
           fetched.add(q.symbol);
@@ -498,10 +588,11 @@ serve(async (req) => {
         allQuotes.push(...yChart);
       }
 
-      // Fallback 4: DB cache for anything still missing
+      // Fallback 5: DB cache for anything still missing
       const finalMissing = allStockLike.filter(s => !fetched.has(s));
       if (finalMissing.length > 0) {
         const dbQuotes = await fetchFromDBCache(finalMissing, db);
+        logApiUsage(db, 'db-cache', 'quote', finalMissing.length, dbQuotes.length, 0);
         allQuotes.push(...dbQuotes);
       }
 
