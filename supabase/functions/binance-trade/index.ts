@@ -1,6 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { hmac } from "https://deno.land/x/hmac@v2.0.1/mod.ts";
+
+async function hmacSha256(secret: string, message: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(message));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,8 +54,7 @@ serve(async (req) => {
 
     if (action === "test_connection") {
       const timestamp = Date.now();
-      const queryString = `timestamp=${timestamp}`;
-      const signature = hmac("sha256", apiSecret, queryString, "utf8", "hex");
+      const signature = await hmacSha256(apiSecret, queryString);
 
       const response = await fetch(`${BINANCE_API_URL}/api/v3/account?${queryString}&signature=${signature}`, {
         headers: { "X-MBX-APIKEY": apiKey },
@@ -84,7 +91,7 @@ serve(async (req) => {
         params += `&price=${price}&timeInForce=${timeInForce || "GTC"}`;
       }
 
-      const signature = hmac("sha256", apiSecret, params, "utf8", "hex");
+      const signature = await hmacSha256(apiSecret, params);
 
       const response = await fetch(`${BINANCE_API_URL}/api/v3/order?${params}&signature=${signature}`, {
         method: "POST",
