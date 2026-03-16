@@ -491,6 +491,75 @@ async function fetchAlphaVantageQuotes(symbols: string[], apiKey: string): Promi
   return results;
 }
 
+// ─── ExchangeRate-API (FREE, no key needed) — forex only ───
+// Updates once/day, no strict rate limit, returns all pairs in one call per base
+async function fetchExchangeRateAPI(symbols: string[]): Promise<NormalizedQuote[]> {
+  if (!symbols.length) return [];
+  const results: NormalizedQuote[] = [];
+  const baseMap = new Map<string, string[]>();
+  for (const s of symbols) {
+    const parts = s.split('/');
+    if (parts.length !== 2) continue;
+    const arr = baseMap.get(parts[0]) || [];
+    arr.push(s);
+    baseMap.set(parts[0], arr);
+  }
+  for (const [base, pairs] of baseMap) {
+    try {
+      const res = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.result !== 'success' || !data.rates) continue;
+      for (const pair of pairs) {
+        const quote = pair.split('/')[1];
+        const rate = data.rates[quote];
+        if (!rate || rate <= 0) continue;
+        results.push({
+          symbol: pair, name: pair, asset_type: 'forex',
+          price: rate, open: rate, high: rate, low: rate, volume: 0,
+          change: 0, change_percent: 0, previous_close: rate,
+          is_market_open: true, source: 'exchangerate-api', timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (e) { console.error(`ExchangeRate-API ${base}:`, e); }
+  }
+  return results;
+}
+
+// ─── Alpha Vantage Forex/Commodity Fetcher ───
+// CURRENCY_EXCHANGE_RATE: 1 pair/call, shares 25/day quota with stock quotes
+async function fetchAlphaVantageForex(symbols: string[], apiKey: string): Promise<NormalizedQuote[]> {
+  if (!symbols.length || !apiKey) return [];
+  const results: NormalizedQuote[] = [];
+  const batch = symbols.slice(0, 3);
+  for (const pair of batch) {
+    try {
+      const [from, to] = pair.split('/');
+      if (!from || !to) continue;
+      const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${from}&to_currency=${to}&apikey=${apiKey}`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const rate = data?.['Realtime Currency Exchange Rate'];
+      if (!rate) continue;
+      const price = parseFloat(rate['5. Exchange Rate'] || '0');
+      if (price <= 0) continue;
+      const isCommodity = pair.includes('XAU') || pair.includes('XAG');
+      results.push({
+        symbol: pair, name: `${from}/${to}`,
+        asset_type: isCommodity ? 'commodity' : 'forex',
+        price, open: price,
+        high: parseFloat(rate['9. Ask Price'] || String(price)),
+        low: parseFloat(rate['8. Bid Price'] || String(price)),
+        volume: 0, change: 0, change_percent: 0, previous_close: price,
+        is_market_open: true, source: 'alphavantage', timestamp: new Date().toISOString(),
+      });
+    } catch (e) { console.error(`AV forex ${pair}:`, e); }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return results;
+}
+
 // ─── API Usage Logger (fire-and-forget) ───
 function logApiUsage(db: ReturnType<typeof createClient>, source: string, action: string, requested: number, returned: number, timeMs: number, error?: string) {
   db.from('api_usage_log').insert({
