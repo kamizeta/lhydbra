@@ -96,11 +96,14 @@ export default function MarketExplorer() {
 
   const { data: liveAssets, isLoading, refetch } = useQuickQuotes();
   const { data: featuresMap } = useMarketFeaturesDB();
+  const { data: scoresMap } = useOpportunityScores();
   const runIntelligence = useRunDataIntelligence();
+  const runScoring = useRunOpportunityScoring();
 
   const assets = liveAssets && liveAssets.length > 0 ? liveAssets : mockAssets.map(a => ({ ...a, isMock: true }));
   const mockCount = assets.filter(a => a.isMock).length;
   const featuresCount = featuresMap ? Object.keys(featuresMap).length : 0;
+  const scoresCount = scoresMap ? Object.keys(scoresMap).length : 0;
 
   const filtered = assets
     .filter(a => typeFilter === 'all' || a.type === typeFilter)
@@ -108,6 +111,11 @@ export default function MarketExplorer() {
     .sort((a, b) => {
       const mul = sortDir === 'asc' ? 1 : -1;
       if (sortKey === 'symbol') return mul * a.symbol.localeCompare(b.symbol);
+      if (sortKey === 'score') {
+        const sa = scoresMap?.[a.symbol]?.total_score ?? 0;
+        const sb = scoresMap?.[b.symbol]?.total_score ?? 0;
+        return mul * (sa - sb);
+      }
       return mul * ((a[sortKey] as number) - (b[sortKey] as number));
     });
 
