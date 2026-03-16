@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart, Pencil, Check } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart, Pencil, Check, RefreshCw, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
@@ -37,6 +37,8 @@ export default function PositionsPage() {
   const [closingPosition, setClosingPosition] = useState<Position | null>(null);
   const [viewSignalId, setViewSignalId] = useState<string | null>(null);
   const [editingSlTp, setEditingSlTp] = useState<{ id: string; sl: string; tp: string } | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ changes: { action: string; symbol: string; detail: string }[]; synced_at: string } | null>(null);
   const [form, setForm] = useState({
     symbol: '', name: '', asset_type: 'stock', direction: 'long',
     quantity: 0, avg_entry: 0, stop_loss: 0, take_profit: 0, strategy: '',
@@ -108,6 +110,40 @@ export default function PositionsPage() {
     if (!error) { toast.success('Position deleted'); setPositions(prev => prev.filter(p => p.id !== id)); }
   };
 
+  const syncAlpaca = useCallback(async (paper = true) => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('alpaca-sync', {
+        body: { paper },
+      });
+      if (error || data?.error) {
+        toast.error(`Sync error: ${data?.error || error?.message}`);
+      } else {
+        const changes = data?.changes || [];
+        setSyncResult({ changes, synced_at: data?.synced_at });
+        if (changes.length > 0) {
+          toast.success(`Alpaca sync: ${changes.length} cambio(s) aplicados`);
+          loadPositions();
+        } else {
+          toast.info('Alpaca sync: todo sincronizado, sin cambios');
+        }
+      }
+    } catch (err) {
+      toast.error('Error al sincronizar con Alpaca');
+    }
+    setSyncing(false);
+  }, [user]);
+
+  // Auto-sync on mount
+  useEffect(() => {
+    if (user && positions.length >= 0 && !loading) {
+      // Delay auto-sync slightly to let positions load first
+      const timer = setTimeout(() => syncAlpaca(true), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, loading]);
+
   const handlePositionClosed = () => {
     setClosingPosition(null);
     loadPositions();
@@ -148,12 +184,51 @@ export default function PositionsPage() {
             )}
           </div>
         </div>
-        <button onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors">
-          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showForm ? 'Cancel' : 'New Position'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => syncAlpaca(true)}
+            disabled={syncing}
+            className="flex items-center gap-2 px-3 py-2 border border-border rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+            title="Sincronizar con Alpaca (Paper)"
+          >
+            {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {syncing ? 'Syncing...' : 'Sync Alpaca'}
+          </button>
+          <button onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors">
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showForm ? 'Cancel' : 'New Position'}
+          </button>
+        </div>
       </div>
+
+      {/* Sync results banner */}
+      {syncResult && syncResult.changes.length > 0 && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+              <RefreshCw className="h-3.5 w-3.5" /> Alpaca Sync — {syncResult.changes.length} cambio(s)
+            </span>
+            <button onClick={() => setSyncResult(null)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          {syncResult.changes.map((c, i) => (
+            <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
+              <span className={cn(
+                "px-1.5 py-0.5 rounded font-bold uppercase",
+                c.action === 'opened' ? "bg-profit/10 text-profit" :
+                c.action === 'closed' ? "bg-loss/10 text-loss" :
+                "bg-warning/10 text-warning"
+              )}>
+                {c.action}
+              </span>
+              <span className="text-foreground font-medium">{c.symbol}</span>
+              <span className="text-muted-foreground">{c.detail}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={addPosition} className="terminal-border rounded-lg p-4 space-y-3">
