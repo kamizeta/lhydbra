@@ -48,6 +48,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         take_profit: signal.take_profit,
         strategy: signal.strategy,
         status: 'open',
+        signal_id: signal.id,
       });
 
       if (error) {
