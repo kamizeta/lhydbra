@@ -31,11 +31,17 @@ interface AgentStore {
     marketData?: unknown,
     portfolioData?: unknown,
     tradeHistory?: unknown,
+    marketFeatures?: unknown,
+    opportunityScores?: unknown,
+    strategyPerformance?: unknown,
   ) => Promise<void>;
   runAllAgents: (
     marketData?: unknown,
     portfolioData?: unknown,
     tradeHistory?: unknown,
+    marketFeatures?: unknown,
+    opportunityScores?: unknown,
+    strategyPerformance?: unknown,
   ) => Promise<void>;
 }
 
@@ -90,6 +96,9 @@ async function streamAgent(
   portfolioData: unknown,
   tradeHistory: unknown,
   onChunk: (fullContent: string) => void,
+  marketFeatures?: unknown,
+  opportunityScores?: unknown,
+  strategyPerformance?: unknown,
 ): Promise<string> {
   const resp = await fetch(AGENT_URL, {
     method: 'POST',
@@ -97,7 +106,7 @@ async function streamAgent(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ agent, marketData, portfolioData, tradeHistory, language }),
+    body: JSON.stringify({ agent, marketData, portfolioData, tradeHistory, language, marketFeatures, opportunityScores, strategyPerformance }),
   });
 
   if (!resp.ok) {
@@ -180,7 +189,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       },
     })),
 
-  runAgent: async (agent, marketData, portfolioData, tradeHistory) => {
+  runAgent: async (agent, marketData, portfolioData, tradeHistory, marketFeatures, opportunityScores, strategyPerformance) => {
     const { language } = get();
     let sessionId = get().sessionId;
     if (!sessionId) {
@@ -211,6 +220,9 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
             },
           }));
         },
+        marketFeatures,
+        opportunityScores,
+        strategyPerformance,
       );
 
       set((state) => ({
@@ -243,7 +255,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     }
   },
 
-  runAllAgents: async (marketData, portfolioData, tradeHistory) => {
+  runAllAgents: async (marketData, portfolioData, tradeHistory, marketFeatures, opportunityScores, strategyPerformance) => {
     // New session for full run
     const sessionId = crypto.randomUUID();
     set({ sessionId });
@@ -259,7 +271,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     ];
 
     for (const agent of agentOrder) {
-      await get().runAgent(agent, marketData, portfolioData, tradeHistory);
+      await get().runAgent(agent, marketData, portfolioData, tradeHistory, marketFeatures, opportunityScores, strategyPerformance);
       await new Promise((r) => setTimeout(r, 1500));
     }
   },

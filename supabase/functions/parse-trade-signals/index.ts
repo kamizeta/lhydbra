@@ -20,7 +20,6 @@ serve(async (req) => {
       });
     }
 
-    // Get auth token from request
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -36,7 +35,7 @@ serve(async (req) => {
       });
     }
 
-    const { orderPreparatorOutput, marketData, language } = await req.json();
+    const { orderPreparatorOutput, language } = await req.json();
 
     if (!orderPreparatorOutput) {
       return new Response(JSON.stringify({ error: "No order preparator output provided" }), {
@@ -45,38 +44,13 @@ serve(async (req) => {
     }
 
     const langMap: Record<string, string> = {
-      es: "Respond ONLY with the JSON array, no extra text. Field values (reasoning, agentAnalysis) must be in Spanish.",
-      pt: "Respond ONLY with the JSON array, no extra text. Field values (reasoning, agentAnalysis) must be in Portuguese.",
-      fr: "Respond ONLY with the JSON array, no extra text. Field values (reasoning, agentAnalysis) must be in French.",
-      en: "Respond ONLY with the JSON array, no extra text.",
+      es: "Field values (reasoning, agentAnalysis) must be in Spanish.",
+      pt: "Field values (reasoning, agentAnalysis) must be in Portuguese.",
+      fr: "Field values (reasoning, agentAnalysis) must be in French.",
+      en: "",
     };
 
-    const extractPrompt = `You are a JSON extractor. Given the AI agent's order preparator output below, extract ALL trade signals/ideas into a JSON array.
-
-Each object must have exactly these fields:
-- symbol (string, e.g. "BTC/USD", "AAPL")
-- name (string, full asset name)
-- asset_type (string: "crypto", "stock", "etf", or "commodity")
-- direction (string: "long" or "short")
-- strategy (string, strategy name)
-- entry_price (number)
-- stop_loss (number)
-- take_profit (number)
-- risk_reward (number, the R:R ratio)
-- position_size (number or null)
-- risk_percent (number or null)
-- confidence (integer 0-100, estimate from the analysis tone)
-- reasoning (string, brief reasoning)
-- agent_analysis (string, key analysis points)
-
-If no valid trade signals can be extracted, return an empty array [].
-
-${langMap[language] || langMap["en"]}
-
---- ORDER PREPARATOR OUTPUT ---
-${orderPreparatorOutput}
---- END ---`;
-
+    // Use tool calling for structured extraction
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -85,7 +59,60 @@ ${orderPreparatorOutput}
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
-        messages: [{ role: "user", content: extractPrompt }],
+        messages: [
+          {
+            role: "system",
+            content: `You are a trade signal extractor. Extract ALL trade signals from the order preparator output. ${langMap[language] || ""}`,
+          },
+          {
+            role: "user",
+            content: `Extract all trade signals from this output:\n\n${orderPreparatorOutput}`,
+          },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "save_trade_signals",
+              description: "Save extracted trade signals to the database.",
+              parameters: {
+                type: "object",
+                properties: {
+                  signals: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        symbol: { type: "string", description: "Trading symbol e.g. BTC/USD, AAPL" },
+                        name: { type: "string", description: "Full asset name" },
+                        asset_type: { type: "string", enum: ["crypto", "stock", "etf", "commodity", "forex"] },
+                        direction: { type: "string", enum: ["long", "short"] },
+                        strategy: { type: "string", description: "Strategy name" },
+                        strategy_family: { type: "string", enum: ["trend_following", "momentum", "mean_reversion", "breakout", "volatility", "swing"], description: "Strategy family category" },
+                        entry_price: { type: "number" },
+                        stop_loss: { type: "number" },
+                        take_profit: { type: "number" },
+                        risk_reward: { type: "number", description: "Risk/Reward ratio" },
+                        position_size: { type: "number", description: "Position size in units" },
+                        risk_percent: { type: "number", description: "Risk percentage of capital" },
+                        confidence: { type: "integer", description: "Confidence 0-100" },
+                        reasoning: { type: "string", description: "Brief reasoning for the trade" },
+                        agent_analysis: { type: "string", description: "Key analysis points with indicator values" },
+                        opportunity_score: { type: "number", description: "Opportunity score if mentioned" },
+                        market_regime: { type: "string", description: "Market regime at time of signal" },
+                      },
+                      required: ["symbol", "name", "asset_type", "direction", "strategy", "entry_price", "stop_loss", "take_profit", "risk_reward", "confidence", "reasoning"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ["signals"],
+                additionalProperties: false,
+              },
+            },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: "save_trade_signals" } },
         stream: false,
       }),
     });
@@ -99,26 +126,30 @@ ${orderPreparatorOutput}
     }
 
     const aiResult = await response.json();
-    const rawContent = aiResult.choices?.[0]?.message?.content || "[]";
     
-    // Extract JSON from possible markdown code blocks
-    let jsonStr = rawContent.trim();
-    if (jsonStr.startsWith("```")) {
-      jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
-    let signals: any[];
-    try {
-      signals = JSON.parse(jsonStr);
-    } catch {
-      console.error("Failed to parse AI output as JSON:", jsonStr);
-      return new Response(JSON.stringify({ error: "Failed to parse trade signals", raw: jsonStr }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Extract from tool call response
+    let signals: any[] = [];
+    const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
+    if (toolCall?.function?.arguments) {
+      try {
+        const args = typeof toolCall.function.arguments === "string"
+          ? JSON.parse(toolCall.function.arguments)
+          : toolCall.function.arguments;
+        signals = args.signals || [];
+      } catch (e) {
+        console.error("Failed to parse tool call arguments:", e);
+        // Fallback: try legacy content extraction
+        const rawContent = aiResult.choices?.[0]?.message?.content || "[]";
+        let jsonStr = rawContent.trim();
+        if (jsonStr.startsWith("```")) {
+          jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+        }
+        try { signals = JSON.parse(jsonStr); } catch { signals = []; }
+      }
     }
 
     if (!Array.isArray(signals) || signals.length === 0) {
-      return new Response(JSON.stringify({ signals: [], message: "No signals extracted" }), {
+      return new Response(JSON.stringify({ signals: [], count: 0, message: "No signals extracted" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -131,6 +162,7 @@ ${orderPreparatorOutput}
       asset_type: s.asset_type || "stock",
       direction: s.direction || "long",
       strategy: s.strategy || "AI Generated",
+      strategy_family: s.strategy_family || null,
       entry_price: Number(s.entry_price) || 0,
       stop_loss: Number(s.stop_loss) || 0,
       take_profit: Number(s.take_profit) || 0,
@@ -140,6 +172,8 @@ ${orderPreparatorOutput}
       confidence: Math.min(100, Math.max(0, Number(s.confidence) || 50)),
       reasoning: s.reasoning || null,
       agent_analysis: s.agent_analysis || null,
+      opportunity_score: s.opportunity_score ? Number(s.opportunity_score) : null,
+      market_regime: s.market_regime || null,
       status: "pending",
     }));
 
