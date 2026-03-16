@@ -18,6 +18,7 @@ export default function AppLayout() {
   const { t } = useI18n();
   const { user, signOut } = useAuth();
   useRegimeAlerts();
+  usePositionAlerts();
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
