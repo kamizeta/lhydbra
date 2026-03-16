@@ -213,7 +213,7 @@ export default function PositionsPage() {
                         <div className="text-xs text-muted-foreground">{pos.name}</div>
                       </div>
                       {pos.signal_id && (
-                        <Lightbulb className="h-3 w-3 text-primary/60" title="Originada de idea de trade" />
+                        <Lightbulb className="h-3 w-3 text-primary/60" />
                       )}
                     </div>
                   </td>
