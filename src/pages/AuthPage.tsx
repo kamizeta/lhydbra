@@ -15,6 +15,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
@@ -26,6 +27,18 @@ export default function AuthPage() {
       setError(result.error.message || 'Google sign-in failed');
     }
     setGoogleLoading(false);
+  };
+
+  const handleAppleSignIn = async () => {
+    setAppleLoading(true);
+    setError('');
+    const result = await lovable.auth.signInWithOAuth('apple', {
+      redirect_uri: window.location.origin,
+    });
+    if (result?.error) {
+      setError(result.error.message || 'Apple sign-in failed');
+    }
+    setAppleLoading(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
