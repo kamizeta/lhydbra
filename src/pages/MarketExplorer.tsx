@@ -383,44 +383,60 @@ export default function MarketExplorer() {
           <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
             <Target className="h-3.5 w-3.5 text-warning" /> Top Opportunities
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {Object.values(scoresMap)
               .sort((a, b) => b.total_score - a.total_score)
               .slice(0, 6)
-              .map(s => (
-                <div key={s.symbol} className={cn(
-                  "rounded-lg p-3 border",
-                  s.total_score >= 70 ? "border-profit/30 bg-profit/5" :
-                  s.total_score >= 50 ? "border-warning/30 bg-warning/5" :
-                  "border-loss/30 bg-loss/5"
-                )}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono font-bold text-foreground text-sm">{s.symbol}</span>
-                    <span className={cn(
-                      "font-mono font-bold text-lg",
-                      s.total_score >= 70 ? "text-profit" : s.total_score >= 50 ? "text-warning" : "text-loss"
-                    )}>{s.total_score}</span>
+              .map(s => {
+                const feat = featuresMap?.[s.symbol];
+                const regimeLabel = feat?.market_regime
+                  ? (feat.market_regime === 'trending_bullish' ? '🐂 Bull' : feat.market_regime === 'trending_bearish' ? '🐻 Bear' : feat.market_regime === 'pre_breakout' ? '💥 Breakout' : feat.market_regime === 'bull_market' ? '🟢 Bull Mkt' : feat.market_regime === 'bear_market' ? '🔴 Bear Mkt' : feat.market_regime === 'volatile' ? '⚡ Vol' : feat.market_regime === 'oversold' ? '❄️ Oversold' : feat.market_regime === 'overbought' ? '🔥 Overbought' : '↔ Range')
+                  : null;
+
+                return (
+                  <div key={s.symbol} className={cn(
+                    "rounded-lg p-3 border space-y-2",
+                    s.total_score >= 70 ? "border-profit/30 bg-profit/5" :
+                    s.total_score >= 50 ? "border-warning/30 bg-warning/5" :
+                    "border-border bg-muted/30"
+                  )}>
+                    {/* Header: Symbol + Score */}
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-foreground text-sm">{s.symbol}</span>
+                      <span className={cn(
+                        "font-mono font-bold text-xl leading-none",
+                        s.total_score >= 70 ? "text-profit" : s.total_score >= 50 ? "text-warning" : "text-loss"
+                      )}>{s.total_score}</span>
+                    </div>
+
+                    {/* Direction + Strategy */}
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn(
+                        "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                        s.direction === 'long' ? "bg-profit/20 text-profit" : s.direction === 'short' ? "bg-loss/20 text-loss" : "bg-muted text-muted-foreground"
+                      )}>
+                        {s.direction?.toUpperCase() || '—'}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground truncate">{s.strategy_family || '—'}</span>
+                    </div>
+
+                    {/* Regime */}
+                    {regimeLabel && (
+                      <div className="text-[10px] text-muted-foreground">{regimeLabel}</div>
+                    )}
+
+                    {/* Score bar */}
+                    <div className="w-full h-1 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all",
+                          s.total_score >= 70 ? "bg-profit" : s.total_score >= 50 ? "bg-warning" : "bg-loss"
+                        )}
+                        style={{ width: `${Math.min(100, s.total_score)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className={cn("text-[10px] font-mono", s.direction === 'long' ? "text-profit" : s.direction === 'short' ? "text-loss" : "text-muted-foreground")}>
-                    {s.direction.toUpperCase()} • {s.strategy_family}
-                  </div>
-                  <div className="mt-2 grid grid-cols-4 gap-0.5">
-                    {[
-                      { v: s.structure_score, l: 'STR' },
-                      { v: s.momentum_score, l: 'MOM' },
-                      { v: s.rr_score, l: 'R:R' },
-                      { v: s.volatility_score, l: 'VOL' },
-                    ].map(d => (
-                      <div key={d.l} className="text-center">
-                        <div className="text-[8px] text-muted-foreground">{d.l}</div>
-                        <div className={cn("text-[10px] font-mono font-medium",
-                          d.v >= 65 ? "text-profit" : d.v >= 45 ? "text-foreground" : "text-loss"
-                        )}>{d.v}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
         </div>
       )}
