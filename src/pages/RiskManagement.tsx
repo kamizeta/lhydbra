@@ -195,7 +195,7 @@ export default function RiskManagement() {
               {firstPos ? (
                 <>
                   <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">{t.common.entry}</span>
+                    <span className="text-muted-foreground">{t.common.entry} ({firstPos.symbol})</span>
                     <span className="font-mono text-foreground">{formatCurrency(entryPrice)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
@@ -204,7 +204,7 @@ export default function RiskManagement() {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">{t.riskMgmt.riskPerShare}</span>
-                    <span className="font-mono text-foreground">{formatCurrency(riskPerShare)}</span>
+                    <span className="font-mono text-foreground">{formatCurrency(riskPerUnit)}</span>
                   </div>
                 </>
               ) : (
@@ -217,7 +217,7 @@ export default function RiskManagement() {
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium text-foreground">{t.riskMgmt.positionSize}</span>
                 <span className="text-xl font-bold font-mono text-primary">
-                  {positionSize > 0 ? `${positionSize} ${t.riskMgmt.shares}` : '—'}
+                  {positionSize > 0 ? `${positionSize} ${isFractional ? t.riskMgmt.units || 'units' : t.riskMgmt.shares}` : '—'}
                 </span>
               </div>
               {positionSize > 0 && (
