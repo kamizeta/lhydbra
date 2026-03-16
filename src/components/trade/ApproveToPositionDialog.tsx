@@ -370,7 +370,10 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
               <div className="flex items-center justify-between">
                 <label className="text-[10px] text-muted-foreground font-mono uppercase">Cantidad / Tamaño</label>
                 <button
-                  onClick={() => setQuantity(idealSizeDisplay)}
+                  onClick={() => {
+                    setQuantity(idealSizeDisplay);
+                    setQuantityTouched(true);
+                  }}
                   className="text-[10px] text-primary hover:underline font-mono"
                 >
                   Usar ideal: {idealSizeDisplay}
@@ -380,7 +383,10 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
                 type="number"
                 step="any"
                 value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
+                onChange={(e) => {
+                  setQuantity(Number(e.target.value));
+                  setQuantityTouched(true);
+                }}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
             </div>
