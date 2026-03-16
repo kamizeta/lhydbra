@@ -226,21 +226,25 @@ serve(async (req) => {
         else stocks.push(s);
       }
 
-      // Fetch in parallel
-      const [cryptoQ, forexQ, stockQ, yahooQ] = await Promise.all([
+      // Fetch in parallel: ETFs go through FCS stock endpoint first (same as stocks)
+      const allStockLike = [...stocks, ...etfs];
+      const [cryptoQ, forexQ, stockQ] = await Promise.all([
         freeCryptoKey ? fetchCryptoQuotes(crypto, freeCryptoKey) : [],
         fcsKey ? fetchFCSQuotes([...forex, ...commodity], fcsKey, 'forex') : [],
-        fcsKey ? fetchFCSQuotes(stocks, fcsKey, 'stock') : [],
-        fetchYahooQuotes([...etfs]),
+        fcsKey ? fetchFCSQuotes(allStockLike, fcsKey, 'stock') : [],
       ]);
 
-      const allQuotes = [...cryptoQ, ...forexQ, ...stockQ, ...yahooQ];
+      const allQuotes = [...cryptoQ, ...forexQ, ...stockQ];
       const fetched = new Set(allQuotes.map(q => q.symbol));
 
-      // Fallback: Yahoo for missing stocks
-      const missingStocks = stocks.filter(s => !fetched.has(s));
-      if (missingStocks.length > 0) {
-        const yFallback = await fetchYahooQuotes(missingStocks);
+      // Fallback: Yahoo for missing stocks AND ETFs
+      const missingStockLike = allStockLike.filter(s => !fetched.has(s));
+      if (missingStockLike.length > 0) {
+        const yFallback = await fetchYahooQuotes(missingStockLike);
+        // Fix asset_type for ETFs from Yahoo
+        for (const q of yFallback) {
+          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
+        }
         allQuotes.push(...yFallback);
       }
 
