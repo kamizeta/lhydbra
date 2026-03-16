@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, X, ArrowRight, Shield, AlertTriangle } from "lucide-react";
+import { Check, X, ArrowRight, Shield, AlertTriangle, Wifi, WifiOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserSettings } from "@/hooks/useUserSettings";
