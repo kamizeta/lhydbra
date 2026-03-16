@@ -48,11 +48,12 @@ export default function AgentsPanel() {
   const [viewMode, setViewMode] = useState<ViewMode>('panel');
   const [selectedAgent, setSelectedAgent] = useState<AgentType | null>(null);
   const { data: liveAssets } = useQuickQuotes();
-  const { results, runningAgent, runAgent, runAllAgents, setLanguage } = useAgentStore();
+  const { results, runningAgent, runAgent, runAllAgents, setLanguage, resumeLatestRun } = useAgentStore();
   const { settings } = useUserSettings();
 
   useEffect(() => { setLanguage(language); }, [language, setLanguage]);
   useEffect(() => { if (runningAgent && !selectedAgent) setSelectedAgent(runningAgent); }, [runningAgent, selectedAgent]);
+  useEffect(() => { resumeLatestRun(); }, [resumeLatestRun]);
 
   const [positions, setPositions] = useState<any[]>([]);
   const [closedTrades, setClosedTrades] = useState<any[]>([]);
