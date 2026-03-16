@@ -141,7 +141,7 @@ export default function PositionsPage() {
             <p className="text-sm text-muted-foreground font-mono">{positions.length} {t.common.active}</p>
             {positions.length > 0 && (
               <span className={cn("text-sm font-mono font-bold", totalPnL >= 0 ? "text-profit" : "text-loss")}>
-                PnL Total: {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL)}
+                PnL Total: {totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)}
               </span>
             )}
           </div>
@@ -206,20 +206,20 @@ export default function PositionsPage() {
 
       {/* Positions Table */}
       <div className="terminal-border rounded-lg overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-fixed">
           <thead>
-            <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
-              <th className="text-left p-3">{t.common.asset}</th>
-              <th className="text-center p-3">Dir</th>
-              <th className="text-right p-3">Qty</th>
-              <th className="text-right p-3">{t.common.entry}</th>
-              <th className="text-right p-3">Capital</th>
-              <th className="text-right p-3">Actual</th>
-              <th className="text-right p-3">PnL</th>
-              <th className="text-right p-3">SL</th>
-              <th className="text-right p-3">TP</th>
-              <th className="text-right p-3">{t.common.strategy}</th>
-              <th className="text-center p-3">Actions</th>
+            <tr className="border-b border-border text-[10px] text-muted-foreground uppercase tracking-wider">
+              <th className="text-left p-2 w-[14%]">{t.common.asset}</th>
+              <th className="text-center p-2 w-[7%]">Dir</th>
+              <th className="text-right p-2 w-[7%]">Qty</th>
+              <th className="text-right p-2 w-[9%]">{t.common.entry}</th>
+              <th className="text-right p-2 w-[9%]">Capital</th>
+              <th className="text-right p-2 w-[9%]">Actual</th>
+              <th className="text-right p-2 w-[11%]">PnL</th>
+              <th className="text-right p-2 w-[8%]">SL</th>
+              <th className="text-right p-2 w-[8%]">TP</th>
+              <th className="text-right p-2 w-[8%]">{t.common.strategy}</th>
+              <th className="text-center p-2 w-[10%]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -237,43 +237,43 @@ export default function PositionsPage() {
                   (hitSl || hitTp) ? "bg-warning/15 border-warning/40" : "hover:bg-accent/30"
                 )}
                   onClick={() => pos.signal_id && setViewSignalId(pos.signal_id)}>
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      <div>
-                        <div className="font-mono font-medium text-foreground">{pos.symbol}</div>
-                        <div className="text-xs text-muted-foreground">{pos.name}</div>
+                  <td className="p-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="min-w-0">
+                        <div className="font-mono font-medium text-foreground text-xs truncate">{pos.symbol}</div>
+                        <div className="text-[10px] text-muted-foreground truncate">{pos.name}</div>
                       </div>
-                      {pos.signal_id && <Lightbulb className="h-3 w-3 text-primary/60" />}
+                      {pos.signal_id && <Lightbulb className="h-3 w-3 text-primary/60 shrink-0" />}
                       {(hitSl || hitTp) && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-warning bg-warning/20 text-warning text-[10px] font-bold whitespace-nowrap">
-                          <AlertTriangle className="h-3 w-3" />
-                          {hitSl ? 'SL alcanzado' : 'TP alcanzado'}
+                        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded border border-warning bg-warning/20 text-warning text-[9px] font-bold whitespace-nowrap shrink-0">
+                          <AlertTriangle className="h-2.5 w-2.5" />
+                          {hitSl ? 'SL' : 'TP'}
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="text-center p-3">
+                  <td className="text-center p-2">
                     <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
                       {pos.direction === 'long' ? <TrendingUp className="h-3 w-3 inline" /> : <TrendingDown className="h-3 w-3 inline" />}
                       {' '}{pos.direction.toUpperCase()}
                     </StatusBadge>
                   </td>
-                  <td className="text-right p-3 font-mono text-foreground">{pos.quantity}</td>
-                  <td className="text-right p-3 font-mono text-foreground">{formatCurrency(pos.avg_entry)}</td>
-                  <td className="text-right p-3 font-mono text-muted-foreground">{formatCurrency(capitalUsed)}</td>
-                  <td className="text-right p-3 font-mono">
+                  <td className="text-right p-2 font-mono text-xs text-foreground">{pos.quantity.toFixed(2)}</td>
+                  <td className="text-right p-2 font-mono text-xs text-foreground">${pos.avg_entry.toFixed(2)}</td>
+                  <td className="text-right p-2 font-mono text-xs text-muted-foreground">${capitalUsed.toFixed(2)}</td>
+                  <td className="text-right p-2 font-mono text-xs">
                     {pnlData ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <span className="text-foreground">{formatCurrency(pnlData.currentPrice)}</span>
-                        {pnlData.isMock && <AlertTriangle className="h-3 w-3 text-muted-foreground" />}
+                      <div className="flex items-center justify-end gap-0.5">
+                        <span className="text-foreground">${pnlData.currentPrice.toFixed(2)}</span>
+                        {pnlData.isMock && <AlertTriangle className="h-2.5 w-2.5 text-muted-foreground" />}
                       </div>
                     ) : <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td className="text-right p-3 font-mono">
+                  <td className="text-right p-2 font-mono text-xs">
                     {pnlData ? (
                       <div>
                         <span className={cn("font-bold", pnlData.pnl >= 0 ? "text-profit" : "text-loss")}>
-                          {pnlData.pnl >= 0 ? '+' : ''}{formatCurrency(pnlData.pnl)}
+                          {pnlData.pnl >= 0 ? '+' : ''}${pnlData.pnl.toFixed(2)}
                         </span>
                         <div className={cn("text-[10px]", pnlData.pnlPercent >= 0 ? "text-profit" : "text-loss")}>
                           {pnlData.pnlPercent >= 0 ? '+' : ''}{pnlData.pnlPercent.toFixed(2)}%
@@ -281,50 +281,50 @@ export default function PositionsPage() {
                       </div>
                     ) : <span className="text-muted-foreground text-[10px]">Sin precio</span>}
                   </td>
-                  <td className="text-right p-3 font-mono" onClick={e => e.stopPropagation()}>
+                  <td className="text-right p-2 font-mono text-xs" onClick={e => e.stopPropagation()}>
                     {isEditing ? (
                       <input type="number" step="any" value={editingSlTp.sl}
                         onChange={e => setEditingSlTp(prev => prev ? { ...prev, sl: e.target.value } : null)}
-                        className="w-20 px-1 py-0.5 bg-background border border-border rounded text-xs text-loss font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
+                        className="w-16 px-1 py-0.5 bg-background border border-border rounded text-[10px] text-loss font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
                     ) : (
                       <span className={cn(hitSl ? "text-warning font-bold" : "text-loss")}>
-                        {pos.stop_loss ? formatCurrency(Number(pos.stop_loss)) : '—'}
+                        {pos.stop_loss ? `$${Number(pos.stop_loss).toFixed(2)}` : '—'}
                       </span>
                     )}
                   </td>
-                  <td className="text-right p-3 font-mono" onClick={e => e.stopPropagation()}>
+                  <td className="text-right p-2 font-mono text-xs" onClick={e => e.stopPropagation()}>
                     {isEditing ? (
                       <input type="number" step="any" value={editingSlTp.tp}
                         onChange={e => setEditingSlTp(prev => prev ? { ...prev, tp: e.target.value } : null)}
-                        className="w-20 px-1 py-0.5 bg-background border border-border rounded text-xs text-profit font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
+                        className="w-16 px-1 py-0.5 bg-background border border-border rounded text-[10px] text-profit font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
                     ) : (
                       <span className={cn(hitTp ? "text-warning font-bold" : "text-profit")}>
-                        {pos.take_profit ? formatCurrency(Number(pos.take_profit)) : '—'}
+                        {pos.take_profit ? `$${Number(pos.take_profit).toFixed(2)}` : '—'}
                       </span>
                     )}
                   </td>
-                  <td className="text-right p-3"><StatusBadge variant="info">{pos.strategy || '—'}</StatusBadge></td>
-                  <td className="text-center p-3" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-center gap-1">
+                  <td className="text-right p-2"><StatusBadge variant="info">{pos.strategy || '—'}</StatusBadge></td>
+                  <td className="text-center p-2" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-center gap-0.5">
                       {isEditing ? (
                         <button onClick={saveSlTp}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-profit/10 text-profit hover:bg-profit/20 transition-colors text-[10px] font-bold">
-                          <Check className="h-3 w-3" /> Guardar
+                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-profit/10 text-profit hover:bg-profit/20 transition-colors text-[10px] font-bold">
+                          <Check className="h-3 w-3" /> OK
                         </button>
                       ) : (
                         <button onClick={() => setEditingSlTp({ id: pos.id, sl: pos.stop_loss?.toString() || '', tp: pos.take_profit?.toString() || '' })}
-                          className="p-1 text-muted-foreground hover:text-primary transition-colors" title="Editar SL/TP">
-                          <Pencil className="h-3.5 w-3.5" />
+                          className="p-0.5 text-muted-foreground hover:text-primary transition-colors" title="Editar SL/TP">
+                          <Pencil className="h-3 w-3" />
                         </button>
                       )}
                       <button onClick={() => setClosingPosition(pos)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-md bg-loss/10 text-loss hover:bg-loss/20 transition-colors text-[10px] font-bold"
+                        className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-loss/10 text-loss hover:bg-loss/20 transition-colors text-[10px] font-bold"
                         title="Cerrar posición">
-                        <DollarSign className="h-3 w-3" /> Cerrar
+                        <DollarSign className="h-3 w-3" />
                       </button>
                       <button onClick={() => deletePosition(pos.id)}
-                        className="p-1 text-muted-foreground hover:text-loss transition-colors" title="Delete">
-                        <Trash2 className="h-3.5 w-3.5" />
+                        className="p-0.5 text-muted-foreground hover:text-loss transition-colors" title="Delete">
+                        <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
                   </td>
