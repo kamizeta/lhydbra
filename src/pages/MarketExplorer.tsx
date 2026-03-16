@@ -35,6 +35,7 @@ export default function MarketExplorer() {
     { label: t.common.crypto, value: 'crypto' },
     { label: t.common.stocks, value: 'stock' },
     { label: t.common.etfs, value: 'etf' },
+    { label: t.common.forex, value: 'forex' },
     { label: t.common.commodities, value: 'commodity' },
   ];
 
@@ -42,6 +43,7 @@ export default function MarketExplorer() {
     crypto: t.common.crypto,
     stock: t.common.stocks,
     etf: t.common.etfs,
+    forex: t.common.forex,
     commodity: t.common.commodities,
   };
 
