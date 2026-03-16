@@ -98,11 +98,31 @@ const pollRunStatus = async (
     set({ runningAgent: null, activeRunId: null });
 
     if (snapshot.failed) {
-      toast({
-        title: 'La ejecución terminó con errores',
-        description: snapshot.run?.error_message || 'Revisa la salida de los agentes.',
-        variant: 'destructive',
-      });
+      const errMsg = snapshot.run?.error_message || '';
+      const is402 = errMsg.includes('402') || errMsg.toLowerCase().includes('credit');
+      const is429 = errMsg.includes('429') || errMsg.toLowerCase().includes('rate limit');
+
+      if (is402) {
+        toast({
+          title: '⚠️ Créditos de AI agotados',
+          description: 'Tu uso de Lovable AI se agotó. Recarga en Settings → Workspace → Usage. Esto es independiente de tus créditos del editor.',
+          variant: 'destructive',
+          duration: 15000,
+        });
+      } else if (is429) {
+        toast({
+          title: '⏳ Límite de velocidad alcanzado',
+          description: 'Demasiadas solicitudes de AI. Espera unos segundos e intenta de nuevo.',
+          variant: 'destructive',
+          duration: 10000,
+        });
+      } else {
+        toast({
+          title: 'La ejecución terminó con errores',
+          description: errMsg || 'Revisa la salida de los agentes.',
+          variant: 'destructive',
+        });
+      }
       return;
     }
 
