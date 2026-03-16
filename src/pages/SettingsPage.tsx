@@ -232,6 +232,13 @@ export default function SettingsPage() {
           </h1>
           <p className="text-sm text-muted-foreground font-mono">Configuración de cuenta y parámetros</p>
         </div>
+        <button
+          onClick={() => navigate('/api-usage')}
+          className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-accent/50 hover:bg-accent rounded-md transition-colors text-foreground"
+        >
+          <Activity className="h-3.5 w-3.5 text-primary" />
+          API Usage Monitor
+        </button>
       </div>
 
       {/* Tabs */}
