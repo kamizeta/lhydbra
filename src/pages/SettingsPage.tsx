@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2, User, Key, Target, RotateCcw } from 'lucide-react';
+import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2, User, Key, Target, RotateCcw, Bell, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSettings, type UserSettings } from '@/hooks/useUserSettings';
+import { useNotifications, type NotificationPreferences } from '@/hooks/useNotifications';
 import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-type Tab = 'risk' | 'scoring' | 'profile' | 'binance';
+type Tab = 'risk' | 'scoring' | 'profile' | 'binance' | 'notifications';
 
 interface ScoringWeights {
   structure_weight: number;
