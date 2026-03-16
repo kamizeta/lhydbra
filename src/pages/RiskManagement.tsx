@@ -217,7 +217,7 @@ export default function RiskManagement() {
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium text-foreground">{t.riskMgmt.positionSize}</span>
                 <span className="text-xl font-bold font-mono text-primary">
-                  {positionSize > 0 ? `${positionSize} ${isFractional ? t.riskMgmt.units || 'units' : t.riskMgmt.shares}` : '—'}
+                  {positionSize > 0 ? `${positionSize} ${isFractional ? 'units' : t.riskMgmt.shares}` : '—'}
                 </span>
               </div>
               {positionSize > 0 && (
