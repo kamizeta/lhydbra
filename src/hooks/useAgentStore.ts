@@ -31,11 +31,17 @@ interface AgentStore {
     marketData?: unknown,
     portfolioData?: unknown,
     tradeHistory?: unknown,
+    marketFeatures?: unknown,
+    opportunityScores?: unknown,
+    strategyPerformance?: unknown,
   ) => Promise<void>;
   runAllAgents: (
     marketData?: unknown,
     portfolioData?: unknown,
     tradeHistory?: unknown,
+    marketFeatures?: unknown,
+    opportunityScores?: unknown,
+    strategyPerformance?: unknown,
   ) => Promise<void>;
 }
 
