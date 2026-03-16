@@ -42,6 +42,7 @@ function ProtectedRoutes() {
         <Route path="/portfolio" element={<PortfolioPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/api-usage" element={<ApiUsagePage />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
