@@ -98,7 +98,7 @@ async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'fore
 
   const results: NormalizedQuote[] = [];
   const seen = new Set<string>();
-  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB']);
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
   const requestUrls = endpoint === 'stock'
     ? [
         // First try without exchange filter because many ETFs trade on ARCA/BATS and were being excluded.
@@ -319,9 +319,9 @@ serve(async (req) => {
 
       // Classify symbols
       const crypto: string[] = [], forex: string[] = [], commodity: string[] = [], stocks: string[] = [], etfs: string[] = [];
-      const forexSet = new Set(['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','NZD/USD','EUR/GBP','EUR/JPY','GBP/JPY']);
+      const forexSet = new Set(['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','NZD/USD','EUR/GBP','EUR/JPY','GBP/JPY','USD/MXN','EUR/CHF','AUD/JPY']);
       const commoditySet = new Set(['XAU/USD','XAG/USD','CL','NG','HG']);
-      const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB']);
+      const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
 
       for (const s of (symbols as string[])) {
         if (s.includes('/USD') && !forexSet.has(s) && !commoditySet.has(s)) crypto.push(s);

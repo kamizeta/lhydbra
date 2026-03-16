@@ -18,9 +18,9 @@ export default function AppLayout() {
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
     { to: "/market", icon: BarChart3, label: t.nav.market },
+    { to: "/portfolio", icon: Briefcase, label: "Portafolio" },
     { to: "/agents", icon: Bot, label: t.nav.agents },
     { to: "/trade-ideas", icon: Lightbulb, label: t.nav.tradeIdeas },
-    { to: "/portfolio", icon: Briefcase, label: "Portafolio" },
     { to: "/settings", icon: Settings, label: "Settings" },
   ];
 
