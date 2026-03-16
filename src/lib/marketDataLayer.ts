@@ -59,14 +59,30 @@ export interface MarketFeatures {
   computed_at: string;
 }
 
-// ─── API Layer ───
+// ─── Request deduplication ───
+const inflightRequests = new Map<string, Promise<Record<string, NormalizedQuote>>>();
+
+// ─── Central Orchestrator: ALL market data goes through here ───
 
 export async function fetchNormalizedQuotes(symbols: string[]): Promise<Record<string, NormalizedQuote>> {
-  const { data, error } = await supabase.functions.invoke('market-data-normalized', {
-    body: { action: 'quotes', symbols },
-  });
-  if (error) throw new Error(`Normalized quotes error: ${error.message}`);
-  return (data || {}) as Record<string, NormalizedQuote>;
+  const key = `quotes:${symbols.sort().join(',')}`;
+
+  // Deduplicate: if this exact request is already in-flight, wait for it
+  const existing = inflightRequests.get(key);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const { data, error } = await supabase.functions.invoke('market-data-normalized', {
+      body: { action: 'quotes', symbols },
+    });
+    if (error) throw new Error(`Normalized quotes error: ${error.message}`);
+    return (data || {}) as Record<string, NormalizedQuote>;
+  })();
+
+  inflightRequests.set(key, promise);
+  promise.finally(() => inflightRequests.delete(key));
+
+  return promise;
 }
 
 export async function fetchOHLCV(symbol: string, timeframe = '1d', outputsize = 50): Promise<OHLCVBar[]> {
@@ -91,4 +107,31 @@ export async function computeIndicators(symbols: string[], timeframe = '1d'): Pr
   });
   if (error) throw new Error(`Compute indicators error: ${error.message}`);
   return data?.features || {};
+}
+
+// ─── Realtime subscription for market_cache updates ───
+export function subscribeToMarketCache(
+  onUpdate: (payload: { symbol: string; price: number; change_percent: number }) => void
+) {
+  const channel = supabase
+    .channel('market-cache-updates')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'market_cache' },
+      (payload) => {
+        const row = payload.new as Record<string, unknown>;
+        if (row.symbol && row.price) {
+          onUpdate({
+            symbol: row.symbol as string,
+            price: Number(row.price),
+            change_percent: Number(row.change_percent || 0),
+          });
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }

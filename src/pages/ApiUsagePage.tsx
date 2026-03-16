@@ -39,6 +39,8 @@ const SOURCE_COLORS: Record<string, string> = {
   "yahoo-batch": "bg-red-500/20 text-red-400 border-red-500/30",
   "yahoo-chart": "bg-pink-500/20 text-pink-400 border-pink-500/30",
   "db-cache": "bg-muted text-muted-foreground border-border",
+  "db-cache-hit": "bg-green-500/20 text-green-400 border-green-500/30",
+  "mem-cache": "bg-teal-500/20 text-teal-400 border-teal-500/30",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -52,7 +54,9 @@ const SOURCE_LABELS: Record<string, string> = {
   alphavantage: "Alpha Vantage",
   "yahoo-batch": "Yahoo Batch",
   "yahoo-chart": "Yahoo Chart",
-  "db-cache": "DB Cache",
+  "db-cache": "DB Cache (ohlcv)",
+  "db-cache-hit": "✅ Cache Hit (market_cache)",
+  "mem-cache": "⚡ Memory Cache",
 };
 
 const SOURCE_LIMITS: Record<string, string> = {
@@ -66,7 +70,9 @@ const SOURCE_LIMITS: Record<string, string> = {
   alphavantage: "25 req/día · reset 24h · 1 sym = 1 req",
   "yahoo-batch": "Sin límite oficial · rate-limited por IP · N sym/req",
   "yahoo-chart": "Sin límite oficial · rate-limited por IP · 1 sym/req",
-  "db-cache": "Sin límite · caché local DB",
+  "db-cache": "Sin límite · caché ohlcv 48h",
+  "db-cache-hit": "Sin límite · market_cache TTL 2min · 0 API calls",
+  "mem-cache": "Sin límite · in-memory 55s · 0 API calls",
 };
 
 export default function ApiUsagePage() {
@@ -115,6 +121,12 @@ export default function ApiUsagePage() {
   const totalCalls = stats.reduce((s, r) => s + r.totalCalls, 0);
   const totalReturned = stats.reduce((s, r) => s + r.totalReturned, 0);
 
+  // Cache efficiency metrics
+  const cacheHitCalls = stats.filter(s => s.source === 'db-cache-hit' || s.source === 'mem-cache').reduce((s, r) => s + r.totalReturned, 0);
+  const apiCalls = stats.filter(s => !['db-cache-hit', 'mem-cache', 'db-cache'].includes(s.source)).reduce((s, r) => s + r.totalCalls, 0);
+  const cacheHitPercent = totalReturned > 0 ? Math.round((cacheHitCalls / totalReturned) * 100) : 0;
+  const requestsSaved = cacheHitCalls;
+
   // Last 20 logs for activity feed
   const recentLogs = usageLogs?.slice(0, 20) || [];
 
@@ -151,7 +163,7 @@ export default function ApiUsagePage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card className="bg-card border-border">
           <CardContent className="pt-4 pb-3 px-4">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Calls</p>
@@ -162,6 +174,18 @@ export default function ApiUsagePage() {
           <CardContent className="pt-4 pb-3 px-4">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Symbols Returned</p>
             <p className="text-2xl font-bold text-foreground">{totalReturned.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border border-green-500/30">
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-[10px] uppercase tracking-wider text-green-400">Cache Hit %</p>
+            <p className="text-2xl font-bold text-green-400">{cacheHitPercent}%</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border border-green-500/30">
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-[10px] uppercase tracking-wider text-green-400">Requests Saved</p>
+            <p className="text-2xl font-bold text-green-400">{requestsSaved.toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">

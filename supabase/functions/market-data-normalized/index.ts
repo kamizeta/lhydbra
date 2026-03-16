@@ -21,6 +21,82 @@ function memSet(key: string, data: unknown) {
   memCache.set(key, { data, ts: Date.now() });
 }
 
+// ─── Request coalescing: prevent duplicate concurrent fetches ───
+const inflightRequests = new Map<string, Promise<NormalizedQuote[]>>();
+
+function coalesce(key: string, fn: () => Promise<NormalizedQuote[]>): Promise<NormalizedQuote[]> {
+  const existing = inflightRequests.get(key);
+  if (existing) return existing;
+  const promise = fn().finally(() => inflightRequests.delete(key));
+  inflightRequests.set(key, promise);
+  return promise;
+}
+
+// ─── DB Cache Layer ───
+async function getFromDBCache(symbols: string[], db: ReturnType<typeof createClient>): Promise<{ cached: NormalizedQuote[]; missing: string[] }> {
+  if (!symbols.length) return { cached: [], missing: [] };
+  const { data } = await db
+    .from('market_cache')
+    .select('*')
+    .in('symbol', symbols)
+    .gt('expires_at', new Date().toISOString());
+
+  const cached: NormalizedQuote[] = [];
+  const foundSymbols = new Set<string>();
+
+  for (const row of (data || [])) {
+    foundSymbols.add(row.symbol);
+    cached.push({
+      symbol: row.symbol,
+      name: row.raw_data?.name || row.symbol,
+      asset_type: row.asset_class,
+      price: Number(row.price),
+      open: Number(row.open_price || row.price),
+      high: Number(row.high_price || row.price),
+      low: Number(row.low_price || row.price),
+      volume: Number(row.volume || 0),
+      change: Number(row.change_val || 0),
+      change_percent: Number(row.change_percent || 0),
+      previous_close: Number(row.previous_close || row.price),
+      is_market_open: row.is_market_open ?? true,
+      source: `cache:${row.provider}`,
+      timestamp: row.updated_at,
+    });
+  }
+
+  const missing = symbols.filter(s => !foundSymbols.has(s));
+  return { cached, missing };
+}
+
+async function persistToDBCache(quotes: NormalizedQuote[], db: ReturnType<typeof createClient>, ttlMinutes = 2) {
+  if (!quotes.length) return;
+  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
+  const rows = quotes.filter(q => !q.source.startsWith('cache:')).map(q => ({
+    symbol: q.symbol,
+    asset_class: q.asset_type,
+    provider: q.source,
+    price: q.price,
+    open_price: q.open,
+    high_price: q.high,
+    low_price: q.low,
+    volume: q.volume,
+    change_val: q.change,
+    change_percent: q.change_percent,
+    previous_close: q.previous_close,
+    is_market_open: q.is_market_open,
+    raw_data: { name: q.name },
+    updated_at: new Date().toISOString(),
+    expires_at: expiresAt,
+    request_count: 1,
+  }));
+
+  if (rows.length > 0) {
+    db.from('market_cache').upsert(rows, { onConflict: 'symbol' }).then(({ error }) => {
+      if (error) console.error('market_cache upsert error:', error.message);
+    });
+  }
+}
+
 interface OHLCVBar {
   symbol: string;
   timeframe: string;
@@ -726,7 +802,151 @@ async function fetchOHLCVHistory(symbol: string, timeframe: string, outputsize: 
   }
 }
 
-// ─── Main Handler ───
+// ─── Fetch ONLY missing symbols from APIs (called after DB cache check) ───
+interface FetchKeys {
+  freeCryptoKey: string | undefined;
+  fcsKey: string | undefined;
+  twelveKey: string | undefined;
+  finnhubKey: string | undefined;
+  alphaVantageKey: string | undefined;
+  db: ReturnType<typeof createClient>;
+}
+
+async function fetchMissingQuotes(symbols: string[], keys: FetchKeys): Promise<NormalizedQuote[]> {
+  const { freeCryptoKey, fcsKey, twelveKey, finnhubKey, alphaVantageKey, db } = keys;
+
+  // Classify
+  const crypto: string[] = [], forex: string[] = [], commodity: string[] = [], stocks: string[] = [], etfs: string[] = [];
+  const forexSet = new Set(['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','NZD/USD','EUR/GBP','EUR/JPY','GBP/JPY','USD/MXN','EUR/CHF','AUD/JPY']);
+  const commoditySet = new Set(['XAU/USD','XAG/USD','CL','NG','HG']);
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
+
+  for (const s of symbols) {
+    if (s.includes('/USD') && !forexSet.has(s) && !commoditySet.has(s)) crypto.push(s);
+    else if (forexSet.has(s)) forex.push(s);
+    else if (commoditySet.has(s)) commodity.push(s);
+    else if (etfSet.has(s)) etfs.push(s);
+    else stocks.push(s);
+  }
+
+  const allStockLike = [...stocks, ...etfs];
+  const t0 = Date.now();
+
+  // Primary: parallel fetch
+  const [cryptoQ, forexQ, stockQ] = await Promise.all([
+    freeCryptoKey ? fetchCryptoQuotes(crypto, freeCryptoKey) : [],
+    fcsKey ? fetchFCSQuotes([...forex, ...commodity], fcsKey, 'forex') : [],
+    fcsKey ? fetchFCSQuotes(allStockLike, fcsKey, 'stock') : [],
+  ]);
+  const t1 = Date.now();
+
+  logApiUsage(db, 'freecryptoapi', 'quote', crypto.length, cryptoQ.length, t1 - t0);
+  logApiUsage(db, 'fcsapi-forex', 'quote', forex.length + commodity.length, forexQ.length, t1 - t0);
+  logApiUsage(db, 'fcsapi-stock', 'quote', allStockLike.length, stockQ.length, t1 - t0);
+
+  const allQuotes = [...cryptoQ, ...forexQ, ...stockQ];
+  const fetched = new Set(allQuotes.map(q => q.symbol));
+
+  // Fallback 1: Twelve Data (batch 8)
+  const missingForTwelve = [...allStockLike, ...forex, ...commodity].filter(s => !fetched.has(s));
+  if (twelveKey && missingForTwelve.length > 0) {
+    const batch = missingForTwelve.slice(0, 8);
+    const t2 = Date.now();
+    const tdQ = await fetchTwelveDataQuotes(batch, twelveKey);
+    logApiUsage(db, 'twelvedata', 'quote', batch.length, tdQ.length, Date.now() - t2);
+    for (const q of tdQ) fetched.add(q.symbol);
+    allQuotes.push(...tdQ);
+  }
+
+  // Fallback 2: Alpaca (stocks batch + crypto)
+  const missingStocks = allStockLike.filter(s => !fetched.has(s));
+  if (missingStocks.length > 0) {
+    const tA = Date.now();
+    const aq = await fetchAlpacaSnapshots(missingStocks);
+    logApiUsage(db, 'alpaca', 'quote-stock', missingStocks.length, aq.length, Date.now() - tA);
+    for (const q of aq) { if (etfSet.has(q.symbol)) q.asset_type = 'etf'; fetched.add(q.symbol); }
+    allQuotes.push(...aq);
+  }
+  const missingCrypto = crypto.filter(s => !fetched.has(s));
+  if (missingCrypto.length > 0) {
+    const tAC = Date.now();
+    const acq = await fetchAlpacaCryptoSnapshots(missingCrypto);
+    logApiUsage(db, 'alpaca', 'quote-crypto', missingCrypto.length, acq.length, Date.now() - tAC);
+    for (const q of acq) fetched.add(q.symbol);
+    allQuotes.push(...acq);
+  }
+
+  // Fallback 3: ExchangeRate-API (forex, free)
+  const missingFx = forex.filter(s => !fetched.has(s));
+  if (missingFx.length > 0) {
+    const t3 = Date.now();
+    const erQ = await fetchExchangeRateAPI(missingFx);
+    logApiUsage(db, 'exchangerate-api', 'quote', missingFx.length, erQ.length, Date.now() - t3);
+    for (const q of erQ) fetched.add(q.symbol);
+    allQuotes.push(...erQ);
+  }
+
+  // Fallback 4: Alpha Vantage FX/Commodity
+  const missingFXC = [...forex, ...commodity].filter(s => !fetched.has(s));
+  if (alphaVantageKey && missingFXC.length > 0) {
+    const t4 = Date.now();
+    const avQ = await fetchAlphaVantageForex(missingFXC, alphaVantageKey);
+    logApiUsage(db, 'alphavantage', 'quote-forex', missingFXC.length, avQ.length, Date.now() - t4);
+    for (const q of avQ) fetched.add(q.symbol);
+    allQuotes.push(...avQ);
+  }
+
+  // Fallback 5: Finnhub (stocks)
+  const missingFH = allStockLike.filter(s => !fetched.has(s));
+  if (finnhubKey && missingFH.length > 0) {
+    const t5 = Date.now();
+    const fhQ = await fetchFinnhubQuotes(missingFH, finnhubKey);
+    logApiUsage(db, 'finnhub', 'quote', missingFH.length, fhQ.length, Date.now() - t5);
+    for (const q of fhQ) { if (etfSet.has(q.symbol)) q.asset_type = 'etf'; fetched.add(q.symbol); }
+    allQuotes.push(...fhQ);
+  }
+
+  // Fallback 6: Alpha Vantage stocks (max 5)
+  const missingAV = allStockLike.filter(s => !fetched.has(s));
+  if (alphaVantageKey && missingAV.length > 0) {
+    const t6 = Date.now();
+    const avSQ = await fetchAlphaVantageQuotes(missingAV.slice(0, 5), alphaVantageKey);
+    logApiUsage(db, 'alphavantage', 'quote-stock', Math.min(missingAV.length, 5), avSQ.length, Date.now() - t6);
+    for (const q of avSQ) { if (etfSet.has(q.symbol)) q.asset_type = 'etf'; fetched.add(q.symbol); }
+    allQuotes.push(...avSQ);
+  }
+
+  // Fallback 7: Yahoo batch
+  const missingY = allStockLike.filter(s => !fetched.has(s));
+  if (missingY.length > 0) {
+    const t7 = Date.now();
+    const yQ = await fetchYahooBatch(missingY);
+    logApiUsage(db, 'yahoo-batch', 'quote', missingY.length, yQ.length, Date.now() - t7);
+    for (const q of yQ) { if (etfSet.has(q.symbol)) q.asset_type = 'etf'; fetched.add(q.symbol); }
+    allQuotes.push(...yQ);
+  }
+
+  // Fallback 8: Yahoo chart
+  const missingYC = allStockLike.filter(s => !fetched.has(s));
+  if (missingYC.length > 0) {
+    const t8 = Date.now();
+    const ycQ = await fetchYahooChartParallel(missingYC);
+    logApiUsage(db, 'yahoo-chart', 'quote', missingYC.length, ycQ.length, Date.now() - t8);
+    for (const q of ycQ) { if (etfSet.has(q.symbol)) q.asset_type = 'etf'; fetched.add(q.symbol); }
+    allQuotes.push(...ycQ);
+  }
+
+  // Fallback 9: OHLCV DB cache (48h)
+  const finalMissing = symbols.filter(s => !fetched.has(s));
+  if (finalMissing.length > 0) {
+    const dbQ = await fetchFromDBCache(finalMissing, db);
+    logApiUsage(db, 'db-cache', 'quote', finalMissing.length, dbQ.length, 0);
+    allQuotes.push(...dbQ);
+  }
+
+  return allQuotes;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -745,166 +965,46 @@ serve(async (req) => {
 
     // ─── ACTION: quotes ───
     if (action === 'quotes') {
-      const cacheKey = `nq:${(symbols as string[]).sort().join(',')}`;
+      const allSymbols = symbols as string[];
+      const cacheKey = `nq:${allSymbols.sort().join(',')}`;
       const cached = memGet(cacheKey);
-      if (cached) return jsonResponse(cached);
-
-      // Classify symbols
-      const crypto: string[] = [], forex: string[] = [], commodity: string[] = [], stocks: string[] = [], etfs: string[] = [];
-      const forexSet = new Set(['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','NZD/USD','EUR/GBP','EUR/JPY','GBP/JPY','USD/MXN','EUR/CHF','AUD/JPY']);
-      const commoditySet = new Set(['XAU/USD','XAG/USD','CL','NG','HG']);
-      const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
-
-      for (const s of (symbols as string[])) {
-        if (s.includes('/USD') && !forexSet.has(s) && !commoditySet.has(s)) crypto.push(s);
-        else if (forexSet.has(s)) forex.push(s);
-        else if (commoditySet.has(s)) commodity.push(s);
-        else if (etfSet.has(s)) etfs.push(s);
-        else stocks.push(s);
+      if (cached) {
+        logApiUsage(db, 'mem-cache', 'quote', allSymbols.length, allSymbols.length, 0);
+        return jsonResponse(cached);
       }
 
-      // Fetch in parallel: crypto, forex/commodity, stocks+ETFs
-      const allStockLike = [...stocks, ...etfs];
-      const t0 = Date.now();
-      const [cryptoQ, forexQ, stockQ] = await Promise.all([
-        freeCryptoKey ? fetchCryptoQuotes(crypto, freeCryptoKey) : [],
-        fcsKey ? fetchFCSQuotes([...forex, ...commodity], fcsKey, 'forex') : [],
-        fcsKey ? fetchFCSQuotes(allStockLike, fcsKey, 'stock') : [],
-      ]);
-      const t1 = Date.now();
-
-      // Log primary sources
-      logApiUsage(db, 'freecryptoapi', 'quote', crypto.length, cryptoQ.length, t1 - t0);
-      logApiUsage(db, 'fcsapi-forex', 'quote', forex.length + commodity.length, forexQ.length, t1 - t0);
-      logApiUsage(db, 'fcsapi-stock', 'quote', allStockLike.length, stockQ.length, t1 - t0);
-
-      const allQuotes = [...cryptoQ, ...forexQ, ...stockQ];
-      const fetched = new Set(allQuotes.map(q => q.symbol));
-
-      // Fallback 1: Twelve Data (batch of 8)
-      const missingStockLike = allStockLike.filter(s => !fetched.has(s));
-      const missingForex = [...forex, ...commodity].filter(s => !fetched.has(s));
-      const missingForTwelve = [...missingStockLike, ...missingForex];
-      if (twelveKey && missingForTwelve.length > 0) {
-        const twelveSymbols = missingForTwelve.slice(0, 8);
-        const t2 = Date.now();
-        const tdQuotes = await fetchTwelveDataQuotes(twelveSymbols, twelveKey);
-        logApiUsage(db, 'twelvedata', 'quote', twelveSymbols.length, tdQuotes.length, Date.now() - t2);
-        for (const q of tdQuotes) fetched.add(q.symbol);
-        allQuotes.push(...tdQuotes);
+      // ── STEP 1: Check DB cache for valid (non-expired) data ──
+      const { cached: dbCached, missing: dbMissing } = await getFromDBCache(allSymbols, db);
+      const cacheHits = dbCached.length;
+      if (cacheHits > 0) {
+        logApiUsage(db, 'db-cache-hit', 'quote', allSymbols.length, cacheHits, 0);
       }
 
-      // Fallback 2: Alpaca snapshots for missing stocks/ETFs (200 req/min, batch)
-      const missingForAlpaca = allStockLike.filter(s => !fetched.has(s));
-      if (missingForAlpaca.length > 0) {
-        const tAlp = Date.now();
-        const alpQuotes = await fetchAlpacaSnapshots(missingForAlpaca);
-        logApiUsage(db, 'alpaca', 'quote-stock', missingForAlpaca.length, alpQuotes.length, Date.now() - tAlp);
-        for (const q of alpQuotes) {
-          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
-          fetched.add(q.symbol);
-        }
-        allQuotes.push(...alpQuotes);
+      // If everything is cached, return immediately
+      if (dbMissing.length === 0) {
+        const quotesMap: Record<string, NormalizedQuote> = {};
+        for (const q of dbCached) quotesMap[q.symbol] = q;
+        memSet(cacheKey, quotesMap);
+        return jsonResponse(quotesMap);
       }
 
-      // Fallback 2b: Alpaca crypto for missing crypto
-      const missingCrypto = crypto.filter(s => !fetched.has(s));
-      if (missingCrypto.length > 0) {
-        const tAlpC = Date.now();
-        const alpCryptoQ = await fetchAlpacaCryptoSnapshots(missingCrypto);
-        logApiUsage(db, 'alpaca', 'quote-crypto', missingCrypto.length, alpCryptoQ.length, Date.now() - tAlpC);
-        for (const q of alpCryptoQ) fetched.add(q.symbol);
-        allQuotes.push(...alpCryptoQ);
-      }
+      // ── STEP 2: Only fetch MISSING symbols from APIs (with coalescing) ──
+      const freshQuotes = await coalesce(`fetch:${dbMissing.sort().join(',')}`, async () => {
+        return await fetchMissingQuotes(dbMissing, { freeCryptoKey, fcsKey, twelveKey, finnhubKey, alphaVantageKey, db });
+      });
 
-      // Fallback 3: ExchangeRate-API for missing forex (FREE, no key)
-      const missingForexAfterTD = [...forex].filter(s => !fetched.has(s));
-      if (missingForexAfterTD.length > 0) {
-        const t25 = Date.now();
-        const erQuotes = await fetchExchangeRateAPI(missingForexAfterTD);
-        logApiUsage(db, 'exchangerate-api', 'quote', missingForexAfterTD.length, erQuotes.length, Date.now() - t25);
-        for (const q of erQuotes) fetched.add(q.symbol);
-        allQuotes.push(...erQuotes);
-      }
-
-      // Fallback 4: Alpha Vantage forex/commodity for remaining pairs
-      const missingFXCommodity = [...forex, ...commodity].filter(s => !fetched.has(s));
-      if (alphaVantageKey && missingFXCommodity.length > 0) {
-        const t26 = Date.now();
-        const avFxQuotes = await fetchAlphaVantageForex(missingFXCommodity, alphaVantageKey);
-        logApiUsage(db, 'alphavantage', 'quote-forex', missingFXCommodity.length, avFxQuotes.length, Date.now() - t26);
-        for (const q of avFxQuotes) fetched.add(q.symbol);
-        allQuotes.push(...avFxQuotes);
-      }
-
-      // Fallback 5: Finnhub for missing stocks/ETFs
-      const missingForFinnhub = allStockLike.filter(s => !fetched.has(s));
-      if (finnhubKey && missingForFinnhub.length > 0) {
-        const t3 = Date.now();
-        const fhQuotes = await fetchFinnhubQuotes(missingForFinnhub, finnhubKey);
-        logApiUsage(db, 'finnhub', 'quote', missingForFinnhub.length, fhQuotes.length, Date.now() - t3);
-        for (const q of fhQuotes) {
-          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
-          fetched.add(q.symbol);
-        }
-        allQuotes.push(...fhQuotes);
-      }
-
-      // Fallback 5: Alpha Vantage stocks (max 5, 25/day limit shared)
-      const missingForAV = allStockLike.filter(s => !fetched.has(s));
-      if (alphaVantageKey && missingForAV.length > 0) {
-        const t35 = Date.now();
-        const avQuotes = await fetchAlphaVantageQuotes(missingForAV.slice(0, 5), alphaVantageKey);
-        logApiUsage(db, 'alphavantage', 'quote-stock', Math.min(missingForAV.length, 5), avQuotes.length, Date.now() - t35);
-        for (const q of avQuotes) {
-          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
-          fetched.add(q.symbol);
-        }
-        allQuotes.push(...avQuotes);
-      }
-
-      // Fallback 6: Yahoo batch (single request)
-      const stillMissingStocks = allStockLike.filter(s => !fetched.has(s));
-      if (stillMissingStocks.length > 0) {
-        const t4 = Date.now();
-        const yBatch = await fetchYahooBatch(stillMissingStocks);
-        logApiUsage(db, 'yahoo-batch', 'quote', stillMissingStocks.length, yBatch.length, Date.now() - t4);
-        for (const q of yBatch) {
-          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
-          fetched.add(q.symbol);
-        }
-        allQuotes.push(...yBatch);
-      }
-
-      // Fallback 7: Yahoo chart (parallel batches of 5)
-      const stillMissing = allStockLike.filter(s => !fetched.has(s));
-      if (stillMissing.length > 0) {
-        const t5 = Date.now();
-        const yChart = await fetchYahooChartParallel(stillMissing);
-        logApiUsage(db, 'yahoo-chart', 'quote', stillMissing.length, yChart.length, Date.now() - t5);
-        for (const q of yChart) {
-          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
-          fetched.add(q.symbol);
-        }
-        allQuotes.push(...yChart);
-      }
-
-      // Fallback 8: DB cache for anything still missing
-      const finalMissing = [...allStockLike, ...forex, ...commodity].filter(s => !fetched.has(s));
-      if (finalMissing.length > 0) {
-        const dbQuotes = await fetchFromDBCache(finalMissing, db);
-        logApiUsage(db, 'db-cache', 'quote', finalMissing.length, dbQuotes.length, 0);
-        allQuotes.push(...dbQuotes);
-      }
-
-      // Build map
+      // ── STEP 3: Merge cached + fresh, persist, return ──
+      const allQuotes = [...dbCached, ...freshQuotes];
       const quotesMap: Record<string, NormalizedQuote> = {};
       for (const q of allQuotes) quotesMap[q.symbol] = q;
 
       memSet(cacheKey, quotesMap);
 
+      // Persist fresh quotes to DB cache (fire-and-forget, 2min TTL)
+      persistToDBCache(freshQuotes, db, 2);
+
       // Persist latest bars to ohlcv_cache (fire-and-forget)
-      const bars = allQuotes.filter(q => q.source !== 'db-cache').map(q => ({
+      const bars = freshQuotes.filter(q => !q.source.startsWith('cache:')).map(q => ({
         symbol: q.symbol,
         timeframe: '1d',
         open: q.open,

@@ -169,6 +169,72 @@ export type Database = {
         }
         Relationships: []
       }
+      market_cache: {
+        Row: {
+          ask: number | null
+          asset_class: string
+          bid: number | null
+          change_percent: number | null
+          change_val: number | null
+          expires_at: string
+          high_price: number | null
+          id: string
+          is_market_open: boolean | null
+          low_price: number | null
+          open_price: number | null
+          previous_close: number | null
+          price: number
+          provider: string
+          raw_data: Json | null
+          request_count: number | null
+          symbol: string
+          updated_at: string
+          volume: number | null
+        }
+        Insert: {
+          ask?: number | null
+          asset_class?: string
+          bid?: number | null
+          change_percent?: number | null
+          change_val?: number | null
+          expires_at?: string
+          high_price?: number | null
+          id?: string
+          is_market_open?: boolean | null
+          low_price?: number | null
+          open_price?: number | null
+          previous_close?: number | null
+          price: number
+          provider?: string
+          raw_data?: Json | null
+          request_count?: number | null
+          symbol: string
+          updated_at?: string
+          volume?: number | null
+        }
+        Update: {
+          ask?: number | null
+          asset_class?: string
+          bid?: number | null
+          change_percent?: number | null
+          change_val?: number | null
+          expires_at?: string
+          high_price?: number | null
+          id?: string
+          is_market_open?: boolean | null
+          low_price?: number | null
+          open_price?: number | null
+          previous_close?: number | null
+          price?: number
+          provider?: string
+          raw_data?: Json | null
+          request_count?: number | null
+          symbol?: string
+          updated_at?: string
+          volume?: number | null
+        }
+        Relationships: []
+      }
       market_features: {
         Row: {
           asset_type: string
