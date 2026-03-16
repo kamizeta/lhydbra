@@ -41,6 +41,101 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_run_results: {
+        Row: {
+          agent_type: string
+          completed_at: string | null
+          content: string
+          created_at: string
+          error_message: string | null
+          id: string
+          run_id: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_type: string
+          completed_at?: string | null
+          content?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          run_id: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_type?: string
+          completed_at?: string | null
+          content?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          run_id?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_run_results_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          current_agent: string | null
+          error_message: string | null
+          id: string
+          input_payload: Json
+          language: string
+          requested_agents: string[]
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          current_agent?: string | null
+          error_message?: string | null
+          id?: string
+          input_payload?: Json
+          language?: string
+          requested_agents?: string[]
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          current_agent?: string | null
+          error_message?: string | null
+          id?: string
+          input_payload?: Json
+          language?: string
+          requested_agents?: string[]
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       market_features: {
         Row: {
           asset_type: string
