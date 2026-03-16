@@ -1,12 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchNormalizedQuotes, type NormalizedQuote } from '@/lib/marketDataLayer';
-import { fetchQuotes, ALL_SYMBOLS, quoteToAsset, type TwelveDataQuote } from '@/lib/twelveData';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useCallback, useRef } from 'react';
+import { fetchNormalizedQuotes, subscribeToMarketCache, type NormalizedQuote } from '@/lib/marketDataLayer';
+import { ALL_SYMBOLS } from '@/lib/twelveData';
 import { mockAssets, type Asset, type AssetType } from '@/lib/mockData';
 import { useAutoRefresh } from '@/hooks/useAutoRefresh';
 
 const ALL_SYMBOL_IDS = ALL_SYMBOLS.map(s => s.tdSymbol);
 
-// Convert NormalizedQuote → Asset (new pipeline)
+// Convert NormalizedQuote → Asset
 function normalizedToAsset(q: NormalizedQuote, info: { symbol: string; name: string; type: AssetType }): Asset {
   const changePct = q.change_percent;
   let trend: 'uptrend' | 'downtrend' | 'sideways' = 'sideways';
@@ -39,49 +40,45 @@ function normalizedToAsset(q: NormalizedQuote, info: { symbol: string; name: str
 
 export function useMarketData() {
   const autoRefreshEnabled = useAutoRefresh((s) => s.enabled);
+  const queryClient = useQueryClient();
+  const unsubRef = useRef<(() => void) | null>(null);
+
+  // Subscribe to Realtime updates from market_cache
+  useEffect(() => {
+    const unsub = subscribeToMarketCache((update) => {
+      // Patch the cached query data with realtime price updates
+      queryClient.setQueryData<Asset[]>(['market-data'], (old) => {
+        if (!old) return old;
+        return old.map(asset => {
+          if (asset.symbol === update.symbol || asset.symbol.replace('/', '') === update.symbol) {
+            return { ...asset, price: update.price, changePercent: update.change_percent };
+          }
+          return asset;
+        });
+      });
+    });
+    unsubRef.current = unsub;
+    return () => unsub();
+  }, [queryClient]);
+
   return useQuery({
     queryKey: ['market-data'],
     queryFn: async (): Promise<Asset[]> => {
-      // Try new normalized pipeline first
-      try {
-        const quotes = await fetchNormalizedQuotes(ALL_SYMBOL_IDS);
-        if (Object.keys(quotes).length > 0) {
-          const assets: Asset[] = [];
-          const liveSymbols = new Set<string>();
-
-          for (const symbolInfo of ALL_SYMBOLS) {
-            const q = quotes[symbolInfo.tdSymbol] || quotes[symbolInfo.symbol];
-            if (q && q.price > 0) {
-              assets.push(normalizedToAsset(q, symbolInfo));
-              liveSymbols.add(symbolInfo.symbol);
-            }
-          }
-
-          for (const mock of mockAssets) {
-            if (!liveSymbols.has(mock.symbol)) {
-              assets.push({ ...mock, isMock: true });
-            }
-          }
-
-          return assets;
-        }
-      } catch (e) {
-        console.warn('Normalized pipeline failed, falling back to legacy:', e);
-      }
-
-      // Fallback: legacy hybrid pipeline
-      const quotes = await fetchQuotes(ALL_SYMBOL_IDS);
+      // Single pipeline: ALL data goes through market-data-normalized
+      // which handles: mem-cache → DB cache → API fallbacks
+      const quotes = await fetchNormalizedQuotes(ALL_SYMBOL_IDS);
       const assets: Asset[] = [];
       const liveSymbols = new Set<string>();
 
       for (const symbolInfo of ALL_SYMBOLS) {
-        const quote = (quotes[symbolInfo.tdSymbol] || quotes[symbolInfo.symbol]) as TwelveDataQuote | undefined;
-        if (quote && quote.close && parseFloat(quote.close) > 0) {
-          assets.push(quoteToAsset(quote, symbolInfo));
+        const q = quotes[symbolInfo.tdSymbol] || quotes[symbolInfo.symbol];
+        if (q && q.price > 0) {
+          assets.push(normalizedToAsset(q, symbolInfo));
           liveSymbols.add(symbolInfo.symbol);
         }
       }
 
+      // Fill remaining with mock data
       for (const mock of mockAssets) {
         if (!liveSymbols.has(mock.symbol)) {
           assets.push({ ...mock, isMock: true });
@@ -91,7 +88,7 @@ export function useMarketData() {
       return assets;
     },
     staleTime: 60_000,
-    refetchInterval: autoRefreshEnabled ? 60_000 : false,
+    refetchInterval: autoRefreshEnabled ? 90_000 : false, // Increased from 60s → 90s (cache handles freshness)
     retry: 2,
   });
 }
@@ -106,43 +103,14 @@ export function useQuickQuotes(assetTypes?: AssetType[]) {
         : ALL_SYMBOLS;
 
       const symbols = filtered.map(s => s.tdSymbol);
-
-      // Try normalized first
-      try {
-        const quotes = await fetchNormalizedQuotes(symbols);
-        if (Object.keys(quotes).length > 0) {
-          const assets: Asset[] = [];
-          const liveSymbols = new Set<string>();
-
-          for (const symbolInfo of filtered) {
-            const q = quotes[symbolInfo.tdSymbol] || quotes[symbolInfo.symbol];
-            if (q && q.price > 0) {
-              assets.push(normalizedToAsset(q, symbolInfo));
-              liveSymbols.add(symbolInfo.symbol);
-            }
-          }
-
-          for (const mock of mockAssets) {
-            if (!liveSymbols.has(mock.symbol) && (!assetTypes || assetTypes.includes(mock.type))) {
-              assets.push({ ...mock, isMock: true });
-            }
-          }
-
-          return assets;
-        }
-      } catch (e) {
-        console.warn('Normalized quick-quotes failed, fallback:', e);
-      }
-
-      // Fallback: legacy
-      const quotes = await fetchQuotes(symbols);
+      const quotes = await fetchNormalizedQuotes(symbols);
       const assets: Asset[] = [];
       const liveSymbols = new Set<string>();
 
       for (const symbolInfo of filtered) {
-        const quote = (quotes[symbolInfo.tdSymbol] || quotes[symbolInfo.symbol]) as TwelveDataQuote | undefined;
-        if (quote && quote.close && parseFloat(quote.close) > 0) {
-          assets.push(quoteToAsset(quote, symbolInfo));
+        const q = quotes[symbolInfo.tdSymbol] || quotes[symbolInfo.symbol];
+        if (q && q.price > 0) {
+          assets.push(normalizedToAsset(q, symbolInfo));
           liveSymbols.add(symbolInfo.symbol);
         }
       }
@@ -156,7 +124,7 @@ export function useQuickQuotes(assetTypes?: AssetType[]) {
       return assets;
     },
     staleTime: 60_000,
-    refetchInterval: autoRefreshEnabled ? 60_000 : false,
+    refetchInterval: autoRefreshEnabled ? 90_000 : false,
     retry: 2,
   });
 }
