@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X, AlertTriangle, Brain, Zap, Activity, BarChart3, Shield } from "lucide-react";
+import { Search, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X, AlertTriangle, Brain, Zap, Activity, BarChart3, Shield, Target } from "lucide-react";
 import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolume } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import { useMarketFeaturesDB, useRunDataIntelligence } from "@/hooks/useDataIntelligence";
+import { useOpportunityScores, useRunOpportunityScoring } from "@/hooks/useOpportunityScores";
 import { ALL_SYMBOLS } from "@/lib/twelveData";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
@@ -10,7 +11,7 @@ import { useI18n } from "@/i18n";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { toast } from "@/hooks/use-toast";
 
-type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength';
+type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength' | 'score';
 
 // ─── Regime Badge Component ───
 function RegimeBadge({ regime, confidence }: { regime: string; confidence: number }) {
@@ -95,11 +96,14 @@ export default function MarketExplorer() {
 
   const { data: liveAssets, isLoading, refetch } = useQuickQuotes();
   const { data: featuresMap } = useMarketFeaturesDB();
+  const { data: scoresMap } = useOpportunityScores();
   const runIntelligence = useRunDataIntelligence();
+  const runScoring = useRunOpportunityScoring();
 
   const assets = liveAssets && liveAssets.length > 0 ? liveAssets : mockAssets.map(a => ({ ...a, isMock: true }));
   const mockCount = assets.filter(a => a.isMock).length;
   const featuresCount = featuresMap ? Object.keys(featuresMap).length : 0;
+  const scoresCount = scoresMap ? Object.keys(scoresMap).length : 0;
 
   const filtered = assets
     .filter(a => typeFilter === 'all' || a.type === typeFilter)
@@ -107,6 +111,11 @@ export default function MarketExplorer() {
     .sort((a, b) => {
       const mul = sortDir === 'asc' ? 1 : -1;
       if (sortKey === 'symbol') return mul * a.symbol.localeCompare(b.symbol);
+      if (sortKey === 'score') {
+        const sa = scoresMap?.[a.symbol]?.total_score ?? 0;
+        const sb = scoresMap?.[b.symbol]?.total_score ?? 0;
+        return mul * (sa - sb);
+      }
       return mul * ((a[sortKey] as number) - (b[sortKey] as number));
     });
 
@@ -184,6 +193,11 @@ export default function MarketExplorer() {
               <Brain className="h-3 w-3 mr-1" />{featuresCount} features
             </StatusBadge>
           )}
+          {scoresCount > 0 && (
+            <StatusBadge variant="warning" dot>
+              <Target className="h-3 w-3 mr-1" />{scoresCount} scores
+            </StatusBadge>
+          )}
           <button
             onClick={() => autoRefresh.toggle()}
             className={cn(
@@ -234,6 +248,30 @@ export default function MarketExplorer() {
         >
           <Activity className="h-3.5 w-3.5" />
           {showFeatures ? 'Features ON' : 'Features OFF'}
+        </button>
+
+        <button
+          onClick={() => {
+            toast({ title: "🎯 Opportunity Scoring", description: "Calculando scores para todos los activos con features..." });
+            runScoring.mutate(undefined, {
+              onSuccess: (data) => {
+                toast({ title: "✅ Scores calculados", description: `${data.count} activos puntuados` });
+              },
+              onError: (err) => {
+                toast({ title: "❌ Error", description: err.message, variant: "destructive" });
+              },
+            });
+          }}
+          disabled={runScoring.isPending || featuresCount === 0}
+          className={cn(
+            "rounded-lg px-4 py-2.5 text-sm font-medium flex items-center gap-2 transition-all",
+            "bg-gradient-to-r from-warning/80 to-warning text-warning-foreground",
+            "hover:from-warning hover:to-warning/90 hover:shadow-lg hover:shadow-warning/20",
+            "disabled:opacity-50 disabled:cursor-not-allowed"
+          )}
+        >
+          {runScoring.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Target className="h-4 w-4" />}
+          {runScoring.isPending ? 'Scoring...' : '🎯 Run Opportunity Score'}
         </button>
 
         {runIntelligence.isPending && (
@@ -302,6 +340,54 @@ export default function MarketExplorer() {
         </div>
       )}
 
+      {/* Top Opportunities */}
+      {scoresMap && scoresCount > 0 && (
+        <div className="terminal-border rounded-lg p-4">
+          <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Target className="h-3.5 w-3.5 text-warning" /> Top Opportunities
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {Object.values(scoresMap)
+              .sort((a, b) => b.total_score - a.total_score)
+              .slice(0, 6)
+              .map(s => (
+                <div key={s.symbol} className={cn(
+                  "rounded-lg p-3 border",
+                  s.total_score >= 70 ? "border-profit/30 bg-profit/5" :
+                  s.total_score >= 50 ? "border-warning/30 bg-warning/5" :
+                  "border-loss/30 bg-loss/5"
+                )}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-mono font-bold text-foreground text-sm">{s.symbol}</span>
+                    <span className={cn(
+                      "font-mono font-bold text-lg",
+                      s.total_score >= 70 ? "text-profit" : s.total_score >= 50 ? "text-warning" : "text-loss"
+                    )}>{s.total_score}</span>
+                  </div>
+                  <div className={cn("text-[10px] font-mono", s.direction === 'long' ? "text-profit" : s.direction === 'short' ? "text-loss" : "text-muted-foreground")}>
+                    {s.direction.toUpperCase()} • {s.strategy_family}
+                  </div>
+                  <div className="mt-2 grid grid-cols-4 gap-0.5">
+                    {[
+                      { v: s.structure_score, l: 'STR' },
+                      { v: s.momentum_score, l: 'MOM' },
+                      { v: s.rr_score, l: 'R:R' },
+                      { v: s.volatility_score, l: 'VOL' },
+                    ].map(d => (
+                      <div key={d.l} className="text-center">
+                        <div className="text-[8px] text-muted-foreground">{d.l}</div>
+                        <div className={cn("text-[10px] font-mono font-medium",
+                          d.v >= 65 ? "text-profit" : d.v >= 45 ? "text-foreground" : "text-loss"
+                        )}>{d.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Market stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {(['crypto', 'stock', 'etf', 'forex', 'commodity'] as AssetType[]).map(type => {
@@ -352,16 +438,18 @@ export default function MarketExplorer() {
                   </>
                 )}
                 <SortHeader label="RS" sortKey="relativeStrength" />
+                <SortHeader label="Score" sortKey="score" />
               </tr>
             </thead>
             <tbody>
               {filtered.map(asset => {
                 const features = featuresMap?.[asset.symbol];
+                const score = scoresMap?.[asset.symbol];
                 return (
                   <tr key={asset.symbol} className={cn(
-                    "border-b border-border/50 transition-colors",
+                    "border-b border-border/50 transition-colors group",
                     asset.isMock
-                      ? "bg-purple-500/5 hover:bg-purple-500/10 border-l-2 border-l-purple-500/50"
+                      ? "hover:bg-accent/20"
                       : features ? "hover:bg-accent/30" : "hover:bg-accent/20"
                   )}>
                     <td className="p-3">
@@ -458,6 +546,28 @@ export default function MarketExplorer() {
                       <span className={cn("font-mono font-medium", asset.relativeStrength > 70 ? "text-profit" : asset.relativeStrength < 40 ? "text-loss" : "text-foreground")}>
                         {asset.relativeStrength}
                       </span>
+                    </td>
+                    <td className="text-center p-3">
+                      {score ? (
+                        <div className="flex flex-col items-center">
+                          <div className={cn(
+                            "rounded-full px-2.5 py-1 text-xs font-mono font-bold",
+                            score.total_score >= 70 ? "bg-profit/15 text-profit" :
+                            score.total_score >= 50 ? "bg-warning/15 text-warning" :
+                            "bg-loss/15 text-loss"
+                          )}>
+                            {score.total_score}
+                          </div>
+                          <span className={cn("text-[9px] font-mono mt-0.5",
+                            score.direction === 'long' ? "text-profit" :
+                            score.direction === 'short' ? "text-loss" : "text-muted-foreground"
+                          )}>
+                            {score.direction.toUpperCase()}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/50">—</span>
+                      )}
                     </td>
                   </tr>
                 );
