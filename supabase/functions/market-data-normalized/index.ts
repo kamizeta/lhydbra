@@ -7,9 +7,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// In-memory cache for hot data
+// In-memory cache — match client staleTime (60s)
 const memCache = new Map<string, { data: unknown; ts: number }>();
-const MEM_TTL = 30_000; // 30s in-memory
+const MEM_TTL = 55_000; // 55s (just under client 60s staleTime)
 
 function memGet(key: string) {
   const e = memCache.get(key);
@@ -21,7 +21,6 @@ function memSet(key: string, data: unknown) {
   memCache.set(key, { data, ts: Date.now() });
 }
 
-// ─── Normalized OHLCV bar ───
 interface OHLCVBar {
   symbol: string;
   timeframe: string;
@@ -35,7 +34,6 @@ interface OHLCVBar {
   asset_type: string;
 }
 
-// ─── Quote (current price snapshot) ───
 interface NormalizedQuote {
   symbol: string;
   name: string;
@@ -101,9 +99,7 @@ async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'fore
   const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
   const requestUrls = endpoint === 'stock'
     ? [
-        // First try without exchange filter because many ETFs trade on ARCA/BATS and were being excluded.
         `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&access_key=${apiKey}`,
-        // Fallback to explicit US exchanges in case the provider needs narrowing.
         `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&exchange=NASDAQ,NYSE,AMEX,ARCA,BATS&access_key=${apiKey}`,
       ]
     : [
@@ -129,7 +125,6 @@ async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'fore
         if (close <= 0) continue;
 
         const isETF = endpoint === 'stock' && etfSet.has(matched);
-        // FCS sometimes returns obviously bad placeholder-like ETF prices (0.1, 0.31, 2, etc).
         if (isETF && close < 5) continue;
 
         const change = parseFloat(String(item.ch || 0));
@@ -169,70 +164,20 @@ async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'fore
   return results;
 }
 
-async function fetchYahooChartQuotes(symbols: string[]): Promise<NormalizedQuote[]> {
-  const results: NormalizedQuote[] = [];
-
-  for (const symbol of symbols) {
-    try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0',
-          'Accept': 'application/json,text/plain,*/*',
-        },
-      });
-      if (!res.ok) {
-        await new Promise(resolve => setTimeout(resolve, 150));
-        continue;
-      }
-
-      const data = await res.json();
-      const meta = data?.chart?.result?.[0]?.meta;
-      if (!meta?.regularMarketPrice) {
-        await new Promise(resolve => setTimeout(resolve, 150));
-        continue;
-      }
-
-      const price = Number(meta.regularMarketPrice);
-      const previousClose = Number(meta.previousClose || meta.chartPreviousClose || price);
-      const change = price - previousClose;
-      const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0;
-
-      results.push({
-        symbol,
-        name: meta.shortName || meta.longName || symbol,
-        asset_type: 'stock',
-        price,
-        open: Number(meta.regularMarketOpen || price),
-        high: Number(meta.regularMarketDayHigh || price),
-        low: Number(meta.regularMarketDayLow || price),
-        volume: Number(meta.regularMarketVolume || 0),
-        change,
-        change_percent: changePercent,
-        previous_close: previousClose,
-        is_market_open: meta.marketState === 'REGULAR',
-        source: 'yahoo-chart',
-        timestamp: new Date().toISOString(),
-      });
-    } catch (e) {
-      console.error(`Yahoo chart ${symbol}:`, e);
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 150));
-  }
-
-  return results;
-}
-
-async function fetchYahooQuotes(symbols: string[]): Promise<NormalizedQuote[]> {
+// Yahoo batch endpoint — single request for many symbols
+async function fetchYahooBatch(symbols: string[]): Promise<NormalizedQuote[]> {
   if (!symbols.length) return [];
-
   const results: NormalizedQuote[] = [];
-  const fetched = new Set<string>();
 
   try {
-    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols.join(','))}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume,regularMarketPreviousClose,shortName,longName,exchange`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    // Use v6 quote endpoint (more reliable than v7)
+    const url = `https://query1.finance.yahoo.com/v6/finance/quote?symbols=${encodeURIComponent(symbols.join(','))}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+      },
+    });
 
     if (res.ok) {
       const data = await res.json();
@@ -251,20 +196,126 @@ async function fetchYahooQuotes(symbols: string[]): Promise<NormalizedQuote[]> {
           change_percent: q.regularMarketChangePercent || 0,
           previous_close: q.regularMarketPreviousClose || q.regularMarketPrice,
           is_market_open: q.marketState === 'REGULAR',
-          source: 'yahoo',
+          source: 'yahoo-batch',
           timestamp: new Date().toISOString(),
         });
-        fetched.add(q.symbol);
       }
     }
   } catch (e) {
-    console.error('Yahoo quote:', e);
+    console.error('Yahoo batch:', e);
   }
 
-  const missingSymbols = symbols.filter(symbol => !fetched.has(symbol));
-  if (missingSymbols.length > 0) {
-    const chartFallback = await fetchYahooChartQuotes(missingSymbols);
-    results.push(...chartFallback);
+  return results;
+}
+
+// Yahoo chart API — parallel batches of 5 symbols
+async function fetchYahooChartParallel(symbols: string[]): Promise<NormalizedQuote[]> {
+  if (!symbols.length) return [];
+  const results: NormalizedQuote[] = [];
+  const BATCH = 5;
+
+  for (let i = 0; i < symbols.length; i += BATCH) {
+    const batch = symbols.slice(i, i + BATCH);
+
+    const batchResults = await Promise.all(batch.map(async (symbol) => {
+      try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json',
+          },
+        });
+        if (!res.ok) return null;
+
+        const data = await res.json();
+        const meta = data?.chart?.result?.[0]?.meta;
+        if (!meta?.regularMarketPrice) return null;
+
+        const price = Number(meta.regularMarketPrice);
+        const previousClose = Number(meta.previousClose || meta.chartPreviousClose || price);
+        const change = price - previousClose;
+        const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0;
+
+        return {
+          symbol,
+          name: meta.shortName || meta.longName || symbol,
+          asset_type: 'stock' as const,
+          price,
+          open: Number(meta.regularMarketOpen || price),
+          high: Number(meta.regularMarketDayHigh || price),
+          low: Number(meta.regularMarketDayLow || price),
+          volume: Number(meta.regularMarketVolume || 0),
+          change,
+          change_percent: changePercent,
+          previous_close: previousClose,
+          is_market_open: meta.marketState === 'REGULAR',
+          source: 'yahoo-chart',
+          timestamp: new Date().toISOString(),
+        } as NormalizedQuote;
+      } catch (e) {
+        console.error(`Yahoo chart ${symbol}:`, e);
+        return null;
+      }
+    }));
+
+    results.push(...batchResults.filter((r): r is NormalizedQuote => r !== null));
+
+    // Small delay between batches to avoid rate limiting
+    if (i + BATCH < symbols.length) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  }
+
+  return results;
+}
+
+// ─── DB cache fallback for stocks/ETFs ───
+async function fetchFromDBCache(symbols: string[], db: ReturnType<typeof createClient>): Promise<NormalizedQuote[]> {
+  if (!symbols.length) return [];
+  const results: NormalizedQuote[] = [];
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
+
+  try {
+    const { data } = await db
+      .from('ohlcv_cache')
+      .select('*')
+      .in('symbol', symbols)
+      .eq('timeframe', '1d')
+      .order('timestamp', { ascending: false });
+
+    if (!data) return [];
+
+    // Get latest bar per symbol
+    const latest = new Map<string, typeof data[0]>();
+    for (const row of data) {
+      if (!latest.has(row.symbol)) latest.set(row.symbol, row);
+    }
+
+    for (const [symbol, row] of latest) {
+      // Only use if less than 48h old
+      const age = Date.now() - new Date(row.fetched_at || row.timestamp).getTime();
+      if (age > 48 * 60 * 60 * 1000) continue;
+
+      results.push({
+        symbol,
+        name: symbol,
+        asset_type: etfSet.has(symbol) ? 'etf' : (row.asset_type || 'stock'),
+        price: row.close,
+        open: row.open,
+        high: row.high,
+        low: row.low,
+        volume: row.volume,
+        change: row.close - row.open,
+        change_percent: row.open > 0 ? ((row.close - row.open) / row.open) * 100 : 0,
+        previous_close: row.open,
+        is_market_open: false,
+        source: 'db-cache',
+        timestamp: row.timestamp,
+      });
+    }
+  } catch (e) {
+    console.error('DB cache fallback:', e);
   }
 
   return results;
@@ -331,7 +382,7 @@ serve(async (req) => {
         else stocks.push(s);
       }
 
-      // Fetch in parallel: ETFs go through FCS stock endpoint first (same as stocks)
+      // Fetch in parallel: crypto, forex/commodity, stocks+ETFs
       const allStockLike = [...stocks, ...etfs];
       const [cryptoQ, forexQ, stockQ] = await Promise.all([
         freeCryptoKey ? fetchCryptoQuotes(crypto, freeCryptoKey) : [],
@@ -342,15 +393,33 @@ serve(async (req) => {
       const allQuotes = [...cryptoQ, ...forexQ, ...stockQ];
       const fetched = new Set(allQuotes.map(q => q.symbol));
 
-      // Fallback: Yahoo for missing stocks AND ETFs
+      // Fallback 1: Yahoo batch for ALL missing stocks/ETFs (single request)
       const missingStockLike = allStockLike.filter(s => !fetched.has(s));
       if (missingStockLike.length > 0) {
-        const yFallback = await fetchYahooQuotes(missingStockLike);
-        // Fix asset_type for ETFs from Yahoo
-        for (const q of yFallback) {
+        const yBatch = await fetchYahooBatch(missingStockLike);
+        for (const q of yBatch) {
           if (etfSet.has(q.symbol)) q.asset_type = 'etf';
+          fetched.add(q.symbol);
         }
-        allQuotes.push(...yFallback);
+        allQuotes.push(...yBatch);
+      }
+
+      // Fallback 2: Yahoo chart for still-missing symbols (parallel batches of 5)
+      const stillMissing = allStockLike.filter(s => !fetched.has(s));
+      if (stillMissing.length > 0) {
+        const yChart = await fetchYahooChartParallel(stillMissing);
+        for (const q of yChart) {
+          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
+          fetched.add(q.symbol);
+        }
+        allQuotes.push(...yChart);
+      }
+
+      // Fallback 3: DB cache for anything still missing
+      const finalMissing = allStockLike.filter(s => !fetched.has(s));
+      if (finalMissing.length > 0) {
+        const dbQuotes = await fetchFromDBCache(finalMissing, db);
+        allQuotes.push(...dbQuotes);
       }
 
       // Build map
@@ -360,7 +429,7 @@ serve(async (req) => {
       memSet(cacheKey, quotesMap);
 
       // Persist latest bars to ohlcv_cache (fire-and-forget)
-      const bars = allQuotes.map(q => ({
+      const bars = allQuotes.filter(q => q.source !== 'db-cache').map(q => ({
         symbol: q.symbol,
         timeframe: '1d',
         open: q.open,
@@ -382,13 +451,12 @@ serve(async (req) => {
       return jsonResponse(quotesMap);
     }
 
-    // ─── ACTION: ohlcv ─── (historical OHLCV)
+    // ─── ACTION: ohlcv ───
     if (action === 'ohlcv') {
       const symbol = (symbols as string[])[0];
       const tf = timeframe || '1d';
       const size = outputsize || 50;
 
-      // Check DB cache first
       const { data: cached } = await db
         .from('ohlcv_cache')
         .select('*')
@@ -401,11 +469,9 @@ serve(async (req) => {
         return jsonResponse({ symbol, timeframe: tf, bars: cached });
       }
 
-      // Fetch from Twelve Data
       if (twelveKey) {
         const bars = await fetchOHLCVHistory(symbol, tf, size, twelveKey);
         if (bars.length > 0) {
-          // Persist
           db.from('ohlcv_cache').upsert(
             bars.map(b => ({ ...b, fetched_at: new Date().toISOString() })),
             { onConflict: 'symbol,timeframe,timestamp' }
@@ -419,7 +485,7 @@ serve(async (req) => {
       return jsonResponse({ symbol, timeframe: tf, bars: cached || [] });
     }
 
-    // ─── ACTION: features ─── (get computed features)
+    // ─── ACTION: features ───
     if (action === 'features') {
       const { data } = await db
         .from('market_features')
