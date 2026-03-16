@@ -212,21 +212,21 @@ export default function Dashboard() {
       )}
 
       {/* Top metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
         <div className="cursor-pointer" onClick={() => navigate('/settings')}>
-          <MetricCard label={t.dashboard.portfolioValue} value={formatCurrency(portfolioValue)} change={`Capital inicial: ${formatCurrency(settings.initial_capital)} | PnL: ${totalRealizedPnl >= 0 ? '+' : ''}${formatCurrency(totalRealizedPnl)} | PnL Abierto: ${unrealizedPnl >= 0 ? '+' : ''}${formatCurrency(unrealizedPnl)}`} changeType={totalRealizedPnl + unrealizedPnl >= 0 ? "positive" : "negative"} icon={DollarSign} />
+          <MetricCard label="Portfolio" value={formatCurrency(portfolioValue)} change={`PnL ${totalRealizedPnl >= 0 ? '+' : ''}${formatCurrency(totalRealizedPnl)}`} changeType={totalRealizedPnl + unrealizedPnl >= 0 ? "positive" : "negative"} icon={DollarSign} />
         </div>
         <div className="cursor-pointer" onClick={() => navigate('/portfolio')}>
-          <MetricCard label={t.dashboard.dailyPnl} value={totalRealizedPnl >= 0 ? `+${formatCurrency(totalRealizedPnl)}` : formatCurrency(totalRealizedPnl)} change={`${pnlPercent >= 0 ? '+' : ''}${formatNumber(pnlPercent)}% total`} changeType={totalRealizedPnl >= 0 ? "positive" : "negative"} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} />
+          <MetricCard label="PnL" value={totalRealizedPnl >= 0 ? `+${formatCurrency(totalRealizedPnl)}` : formatCurrency(totalRealizedPnl)} change={`${pnlPercent >= 0 ? '+' : ''}${formatNumber(pnlPercent)}%`} changeType={totalRealizedPnl >= 0 ? "positive" : "negative"} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} />
         </div>
         <div className="cursor-pointer relative" onClick={() => setShowRiskDetail(!showRiskDetail)}>
-          <MetricCard label={t.dashboard.riskUsed} value={`${formatNumber(dailyRiskUsed)}%`} change={`${settings.max_daily_risk}% ${t.dashboard.ofDailyLimit}`} changeType="neutral" icon={Shield} subtitle={`Exposición: ${formatCurrency(totalExposure)}`} />
+          <MetricCard label="Riesgo" value={`${formatNumber(dailyRiskUsed)}%`} change={`${exposurePercent.toFixed(0)}% exp`} changeType="neutral" icon={Shield} />
           <div className="absolute top-2 right-2 text-muted-foreground">
-            {showRiskDetail ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {showRiskDetail ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </div>
         </div>
         <div className="cursor-pointer" onClick={() => navigate('/portfolio')}>
-          <MetricCard label={t.dashboard.activePositions} value={`${positions.length}`} change={`${pendingSignals.length} ${t.dashboard.pendingIdeas}`} changeType="neutral" icon={Activity} subtitle={`${t.dashboard.max}: ${settings.max_positions}`} />
+          <MetricCard label="Posiciones" value={`${positions.length}/${settings.max_positions}`} change={`${pendingSignals.length} ideas`} changeType="neutral" icon={Activity} />
         </div>
       </div>
 
