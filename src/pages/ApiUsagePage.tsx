@@ -39,6 +39,8 @@ const SOURCE_COLORS: Record<string, string> = {
   "yahoo-batch": "bg-red-500/20 text-red-400 border-red-500/30",
   "yahoo-chart": "bg-pink-500/20 text-pink-400 border-pink-500/30",
   "db-cache": "bg-muted text-muted-foreground border-border",
+  "db-cache-hit": "bg-green-500/20 text-green-400 border-green-500/30",
+  "mem-cache": "bg-teal-500/20 text-teal-400 border-teal-500/30",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
