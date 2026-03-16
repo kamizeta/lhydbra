@@ -141,7 +141,7 @@ export default function PositionsPage() {
             <p className="text-sm text-muted-foreground font-mono">{positions.length} {t.common.active}</p>
             {positions.length > 0 && (
               <span className={cn("text-sm font-mono font-bold", totalPnL >= 0 ? "text-profit" : "text-loss")}>
-                PnL Total: {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL)}
+                PnL Total: {totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)}
               </span>
             )}
           </div>
