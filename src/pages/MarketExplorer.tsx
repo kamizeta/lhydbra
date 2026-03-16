@@ -433,6 +433,11 @@ export default function MarketExplorer() {
                             NO REAL
                           </span>
                         )}
+                        {!asset.isMock && asset.source?.includes('yahoo') && (
+                          <span className="shrink-0 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold px-1.5 py-0.5 uppercase tracking-wider border border-blue-500/30">
+                            YAHOO
+                          </span>
+                        )}
                         <StatusBadge variant={
                           asset.type === 'crypto' ? 'info' :
                           asset.type === 'stock' ? 'primary' :

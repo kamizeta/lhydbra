@@ -22,6 +22,7 @@ export interface Asset {
   momentum: number;
   relativeStrength: number;
   isMock?: boolean;
+  source?: string;
 }
 
 export interface PortfolioPosition {
