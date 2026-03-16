@@ -58,6 +58,7 @@ const SOURCE_LIMITS: Record<string, string> = {
   "fcsapi-forex": "500 req/h · reset cada 1h · 1 req = N symbols",
   "fcsapi-stock": "500 req/h · reset cada 1h · 1 req = N symbols",
   twelvedata: "8 credits/min · reset 1 min · 800/día · 1 sym = 1 credit",
+  "exchangerate-api": "Ilimitado · sin key · actualiza 1x/día · forex only",
   finnhub: "60 req/min · reset 1 min · 1 sym = 1 req",
   alphavantage: "25 req/día · reset 24h · 1 sym = 1 req",
   "yahoo-batch": "Sin límite oficial · rate-limited por IP · N sym/req",
