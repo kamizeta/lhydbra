@@ -390,10 +390,10 @@ export default function Dashboard() {
           </div>
 
           {/* Capital & Risk Summary */}
-          <div className="terminal-border rounded-lg p-4 space-y-3 cursor-pointer" onClick={() => navigate('/settings')}>
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-primary" />
-              Capital & Riesgo
+          <div className="terminal-border rounded-lg p-3 space-y-2 cursor-pointer" onClick={() => navigate('/settings')}>
+            <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
+              <DollarSign className="h-3.5 w-3.5 text-primary" />
+              Capital
             </h2>
             <div className="space-y-2 text-xs font-mono">
               <div className="flex justify-between"><span className="text-muted-foreground">Capital Inicial</span><span className="text-foreground">{formatCurrency(settings.initial_capital)}</span></div>
