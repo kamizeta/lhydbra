@@ -1,13 +1,57 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Filter, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X, AlertTriangle } from "lucide-react";
-import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolume, formatMarketCap } from "@/lib/mockData";
+import { Search, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X, AlertTriangle, Brain, Zap, Activity, BarChart3, Shield } from "lucide-react";
+import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolume } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
+import { useMarketFeaturesDB, useRunDataIntelligence } from "@/hooks/useDataIntelligence";
+import { ALL_SYMBOLS } from "@/lib/twelveData";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { toast } from "@/hooks/use-toast";
 
 type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength';
+
+// ─── Regime Badge Component ───
+function RegimeBadge({ regime, confidence }: { regime: string; confidence: number }) {
+  const config: Record<string, { label: string; variant: 'profit' | 'loss' | 'warning' | 'info' | 'neutral' | 'primary' }> = {
+    trending_bullish: { label: '🐂 Bull Trend', variant: 'profit' },
+    trending_bearish: { label: '🐻 Bear Trend', variant: 'loss' },
+    bull_market: { label: '🟢 Bull Market', variant: 'profit' },
+    bear_market: { label: '🔴 Bear Market', variant: 'loss' },
+    ranging: { label: '↔ Ranging', variant: 'neutral' },
+    volatile: { label: '⚡ Volatile', variant: 'warning' },
+    pre_breakout: { label: '💥 Pre-Breakout', variant: 'info' },
+    compression: { label: '🔋 Compression', variant: 'info' },
+    overbought: { label: '🔥 Overbought', variant: 'warning' },
+    oversold: { label: '❄️ Oversold', variant: 'info' },
+    capitulation: { label: '💀 Capitulation', variant: 'loss' },
+    euphoria: { label: '🎉 Euphoria', variant: 'warning' },
+    undefined: { label: '—', variant: 'neutral' },
+  };
+
+  const c = config[regime] || config.undefined;
+  return (
+    <div className="flex items-center gap-1">
+      <StatusBadge variant={c.variant}>{c.label}</StatusBadge>
+      {confidence > 0 && (
+        <span className="text-[10px] font-mono text-muted-foreground">{Math.round(confidence)}%</span>
+      )}
+    </div>
+  );
+}
+
+function VolatilityBadge({ regime }: { regime: string }) {
+  const config: Record<string, { label: string; color: string }> = {
+    high: { label: 'HIGH', color: 'text-loss' },
+    elevated: { label: 'ELEV', color: 'text-warning' },
+    normal: { label: 'NORM', color: 'text-muted-foreground' },
+    low: { label: 'LOW', color: 'text-profit' },
+    compressed: { label: 'COMP', color: 'text-info' },
+  };
+  const c = config[regime] || config.normal;
+  return <span className={cn("font-mono text-xs font-medium", c.color)}>{c.label}</span>;
+}
 
 export default function MarketExplorer() {
   const { t } = useI18n();
@@ -25,10 +69,12 @@ export default function MarketExplorer() {
     }
     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
   }, [autoRefresh.enabled]);
+
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<AssetType | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('relativeStrength');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [showFeatures, setShowFeatures] = useState(true);
 
   const typeFilters: { label: string; value: AssetType | 'all' }[] = [
     { label: t.common.all, value: 'all' },
@@ -47,9 +93,13 @@ export default function MarketExplorer() {
     commodity: t.common.commodities,
   };
 
-  const { data: liveAssets, isLoading, isError, refetch } = useQuickQuotes();
+  const { data: liveAssets, isLoading, refetch } = useQuickQuotes();
+  const { data: featuresMap } = useMarketFeaturesDB();
+  const runIntelligence = useRunDataIntelligence();
+
   const assets = liveAssets && liveAssets.length > 0 ? liveAssets : mockAssets.map(a => ({ ...a, isMock: true }));
   const mockCount = assets.filter(a => a.isMock).length;
+  const featuresCount = featuresMap ? Object.keys(featuresMap).length : 0;
 
   const filtered = assets
     .filter(a => typeFilter === 'all' || a.type === typeFilter)
@@ -63,6 +113,27 @@ export default function MarketExplorer() {
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('desc'); }
+  };
+
+  const handleRunIntelligence = () => {
+    // Get symbols for the current filter
+    const symbolsToAnalyze = typeFilter === 'all'
+      ? ALL_SYMBOLS.slice(0, 8).map(s => s.tdSymbol) // Limit to 8 due to rate limits
+      : ALL_SYMBOLS.filter(s => s.type === typeFilter).slice(0, 8).map(s => s.tdSymbol);
+
+    toast({ title: "🧠 Data Intelligence", description: `Analizando ${symbolsToAnalyze.length} activos... Esto puede tomar ~${Math.ceil(symbolsToAnalyze.length / 4) * 15}s` });
+
+    runIntelligence.mutate(symbolsToAnalyze, {
+      onSuccess: (data) => {
+        toast({
+          title: "✅ Análisis completado",
+          description: `${data.processed}/${data.total} activos procesados${data.errors ? ` (${data.errors.length} errores)` : ''}`,
+        });
+      },
+      onError: (err) => {
+        toast({ title: "❌ Error", description: err.message, variant: "destructive" });
+      },
+    });
   };
 
   const TrendIcon = ({ trend }: { trend: string }) => {
@@ -89,10 +160,11 @@ export default function MarketExplorer() {
         <div className="flex items-center gap-3 rounded-lg border border-purple-500/30 bg-purple-500/10 px-4 py-3">
           <AlertTriangle className="h-4 w-4 text-purple-400 shrink-0" />
           <p className="text-sm text-purple-300">
-            <span className="font-bold">{mockCount} activos</span> muestran datos <span className="font-bold uppercase">no reales</span> (mock/demo). Los precios marcados en <span className="text-purple-400 font-bold">morado</span> no reflejan el mercado actual.
+            <span className="font-bold">{mockCount} activos</span> muestran datos <span className="font-bold uppercase">no reales</span> (mock/demo).
           </p>
         </div>
       )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t.market.title}</h1>
@@ -107,8 +179,10 @@ export default function MarketExplorer() {
           {!isLoading && liveAssets && liveAssets.length > 0 && (
             <StatusBadge variant="profit" dot>{t.common.live}</StatusBadge>
           )}
-          {!isLoading && (!liveAssets || liveAssets.length === 0) && (
-            <StatusBadge variant="warning" dot>{t.common.mockData}</StatusBadge>
+          {featuresCount > 0 && (
+            <StatusBadge variant="info" dot>
+              <Brain className="h-3 w-3 mr-1" />{featuresCount} features
+            </StatusBadge>
           )}
           <button
             onClick={() => autoRefresh.toggle()}
@@ -129,6 +203,49 @@ export default function MarketExplorer() {
         </div>
       </div>
 
+      {/* Data Intelligence Controls */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={handleRunIntelligence}
+          disabled={runIntelligence.isPending}
+          className={cn(
+            "rounded-lg px-4 py-2.5 text-sm font-medium flex items-center gap-2 transition-all",
+            "bg-gradient-to-r from-primary/80 to-primary text-primary-foreground",
+            "hover:from-primary hover:to-primary/90 hover:shadow-lg hover:shadow-primary/20",
+            "disabled:opacity-50 disabled:cursor-not-allowed"
+          )}
+        >
+          {runIntelligence.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Brain className="h-4 w-4" />
+          )}
+          {runIntelligence.isPending ? 'Analizando...' : '🧠 Run Data Intelligence'}
+        </button>
+
+        <button
+          onClick={() => setShowFeatures(!showFeatures)}
+          className={cn(
+            "rounded-md px-3 py-2 text-xs font-medium flex items-center gap-1.5 transition-colors",
+            showFeatures
+              ? "bg-info/15 text-info border border-info/30"
+              : "bg-secondary text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Activity className="h-3.5 w-3.5" />
+          {showFeatures ? 'Features ON' : 'Features OFF'}
+        </button>
+
+        {runIntelligence.isPending && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="h-1.5 w-24 rounded-full bg-secondary overflow-hidden">
+              <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }} />
+            </div>
+            <span className="font-mono">Fetching OHLCV + Computing indicators...</span>
+          </div>
+        )}
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="relative flex-1 min-w-[240px] max-w-md">
@@ -141,10 +258,7 @@ export default function MarketExplorer() {
             className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-8 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
           {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
+            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
               <X className="h-4 w-4" />
             </button>
           )}
@@ -166,6 +280,27 @@ export default function MarketExplorer() {
           ))}
         </div>
       </div>
+
+      {/* Market Regime Summary */}
+      {featuresMap && featuresCount > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {(() => {
+            const regimes: Record<string, number> = {};
+            Object.values(featuresMap).forEach(f => {
+              const r = f.market_regime || 'undefined';
+              regimes[r] = (regimes[r] || 0) + 1;
+            });
+            return Object.entries(regimes)
+              .sort((a, b) => b[1] - a[1])
+              .map(([regime, count]) => (
+                <div key={regime} className="terminal-border rounded-lg p-3 flex items-center justify-between">
+                  <RegimeBadge regime={regime} confidence={0} />
+                  <span className="text-sm font-mono font-bold text-foreground">{count}</span>
+                </div>
+              ));
+          })()}
+        </div>
+      )}
 
       {/* Market stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -193,75 +328,140 @@ export default function MarketExplorer() {
                 <th className="text-left p-3">{t.common.asset}</th>
                 <SortHeader label={t.common.price} sortKey="price" />
                 <SortHeader label="24h %" sortKey="changePercent" />
-                <SortHeader label={t.market.volume} sortKey="volume" />
                 <th className="text-center p-3">{t.market.trend}</th>
                 <SortHeader label="RSI" sortKey="rsi" />
                 <th className="text-center p-3">MACD</th>
                 <SortHeader label={t.market.momentum} sortKey="momentum" />
+                {showFeatures && (
+                  <>
+                    <th className="text-center p-3">
+                      <div className="flex items-center justify-center gap-1">
+                        <Brain className="h-3 w-3" /> Regime
+                      </div>
+                    </th>
+                    <th className="text-center p-3">
+                      <div className="flex items-center justify-center gap-1">
+                        <Zap className="h-3 w-3" /> Vol
+                      </div>
+                    </th>
+                    <th className="text-center p-3">
+                      <div className="flex items-center justify-center gap-1">
+                        <Shield className="h-3 w-3" /> S/R
+                      </div>
+                    </th>
+                  </>
+                )}
                 <SortHeader label="RS" sortKey="relativeStrength" />
-                <th className="text-center p-3">{t.market.volatility}</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(asset => (
-                <tr key={asset.symbol} className={cn(
-                  "border-b border-border/50 transition-colors",
-                  asset.isMock
-                    ? "bg-purple-500/5 hover:bg-purple-500/10 border-l-2 border-l-purple-500/50"
-                    : "hover:bg-accent/30"
-                )}>
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      {asset.isMock && (
-                        <span className="shrink-0 rounded bg-purple-500/20 text-purple-400 text-[10px] font-bold px-1.5 py-0.5 uppercase tracking-wider border border-purple-500/30">
-                          NO REAL
-                        </span>
-                      )}
-                      <StatusBadge variant={
-                        asset.type === 'crypto' ? 'info' :
-                        asset.type === 'stock' ? 'primary' :
-                        asset.type === 'etf' ? 'neutral' :
-                        asset.type === 'forex' ? 'profit' : 'warning'
-                      }>
-                        {asset.type === 'commodity' ? 'CMD' : asset.type === 'forex' ? 'FX' : asset.type.toUpperCase()}
-                      </StatusBadge>
-                      <div>
-                        <div className={cn("font-mono font-medium", asset.isMock ? "text-purple-400" : "text-foreground")}>{asset.symbol}</div>
-                        <div className="text-xs text-muted-foreground">{asset.name}</div>
+              {filtered.map(asset => {
+                const features = featuresMap?.[asset.symbol];
+                return (
+                  <tr key={asset.symbol} className={cn(
+                    "border-b border-border/50 transition-colors",
+                    asset.isMock
+                      ? "bg-purple-500/5 hover:bg-purple-500/10 border-l-2 border-l-purple-500/50"
+                      : features ? "hover:bg-accent/30" : "hover:bg-accent/20"
+                  )}>
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        {asset.isMock && (
+                          <span className="shrink-0 rounded bg-purple-500/20 text-purple-400 text-[10px] font-bold px-1.5 py-0.5 uppercase tracking-wider border border-purple-500/30">
+                            NO REAL
+                          </span>
+                        )}
+                        <StatusBadge variant={
+                          asset.type === 'crypto' ? 'info' :
+                          asset.type === 'stock' ? 'primary' :
+                          asset.type === 'etf' ? 'neutral' :
+                          asset.type === 'forex' ? 'profit' : 'warning'
+                        }>
+                          {asset.type === 'commodity' ? 'CMD' : asset.type === 'forex' ? 'FX' : asset.type.toUpperCase()}
+                        </StatusBadge>
+                        <div>
+                          <div className={cn("font-mono font-medium", asset.isMock ? "text-purple-400" : "text-foreground")}>{asset.symbol}</div>
+                          <div className="text-xs text-muted-foreground">{asset.name}</div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="text-right p-3 font-mono text-foreground">{formatCurrency(asset.price, asset.price < 1 ? 4 : 2)}</td>
-                  <td className="text-right p-3">
-                    <span className={cn("font-mono font-medium", asset.changePercent >= 0 ? "text-profit" : "text-loss")}>
-                      {asset.changePercent >= 0 ? '+' : ''}{formatNumber(asset.changePercent)}%
-                    </span>
-                  </td>
-                  <td className="text-right p-3 font-mono text-muted-foreground">{formatVolume(asset.volume)}</td>
-                  <td className="text-center p-3"><TrendIcon trend={asset.trend} /></td>
-                  <td className="text-right p-3">
-                    <span className={cn("font-mono", asset.rsi > 70 ? "text-loss" : asset.rsi < 30 ? "text-profit" : "text-foreground")}>
-                      {asset.rsi}
-                    </span>
-                  </td>
-                  <td className="text-center p-3">
-                    <StatusBadge variant={asset.macdSignal === 'bullish' ? 'profit' : asset.macdSignal === 'bearish' ? 'loss' : 'neutral'}>
-                      {asset.macdSignal === 'bullish' ? '▲' : asset.macdSignal === 'bearish' ? '▼' : '—'}
-                    </StatusBadge>
-                  </td>
-                  <td className="text-right p-3 font-mono text-foreground">{asset.momentum}</td>
-                  <td className="text-right p-3">
-                    <span className={cn("font-mono font-medium", asset.relativeStrength > 70 ? "text-profit" : asset.relativeStrength < 40 ? "text-loss" : "text-foreground")}>
-                      {asset.relativeStrength}
-                    </span>
-                  </td>
-                  <td className="text-center p-3">
-                    <span className={cn("font-mono text-xs", asset.volatility > 5 ? "text-loss" : asset.volatility > 3 ? "text-warning" : "text-muted-foreground")}>
-                      {formatNumber(asset.volatility)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="text-right p-3 font-mono text-foreground">{formatCurrency(asset.price, asset.price < 1 ? 4 : 2)}</td>
+                    <td className="text-right p-3">
+                      <span className={cn("font-mono font-medium", asset.changePercent >= 0 ? "text-profit" : "text-loss")}>
+                        {asset.changePercent >= 0 ? '+' : ''}{formatNumber(asset.changePercent)}%
+                      </span>
+                    </td>
+                    <td className="text-center p-3">
+                      {features ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <TrendIcon trend={features.trend_direction} />
+                          <span className="text-[10px] font-mono text-muted-foreground">{Math.round(features.trend_strength)}</span>
+                        </div>
+                      ) : (
+                        <TrendIcon trend={asset.trend} />
+                      )}
+                    </td>
+                    <td className="text-right p-3">
+                      <span className={cn("font-mono",
+                        (features?.rsi_14 ?? asset.rsi) > 70 ? "text-loss" :
+                        (features?.rsi_14 ?? asset.rsi) < 30 ? "text-profit" : "text-foreground"
+                      )}>
+                        {features?.rsi_14 != null ? Math.round(features.rsi_14) : asset.rsi}
+                      </span>
+                    </td>
+                    <td className="text-center p-3">
+                      {features?.macd != null && features?.macd_signal != null ? (
+                        <StatusBadge variant={features.macd > features.macd_signal ? 'profit' : 'loss'}>
+                          {features.macd > features.macd_signal ? '▲' : '▼'}
+                        </StatusBadge>
+                      ) : (
+                        <StatusBadge variant={asset.macdSignal === 'bullish' ? 'profit' : asset.macdSignal === 'bearish' ? 'loss' : 'neutral'}>
+                          {asset.macdSignal === 'bullish' ? '▲' : asset.macdSignal === 'bearish' ? '▼' : '—'}
+                        </StatusBadge>
+                      )}
+                    </td>
+                    <td className="text-right p-3 font-mono text-foreground">
+                      {features?.momentum_score != null ? Math.round(features.momentum_score) : asset.momentum}
+                    </td>
+                    {showFeatures && (
+                      <>
+                        <td className="text-center p-3">
+                          {features ? (
+                            <RegimeBadge regime={features.market_regime} confidence={features.regime_confidence} />
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">—</span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {features ? (
+                            <VolatilityBadge regime={features.volatility_regime} />
+                          ) : (
+                            <span className={cn("font-mono text-xs", asset.volatility > 5 ? "text-loss" : asset.volatility > 3 ? "text-warning" : "text-muted-foreground")}>
+                              {formatNumber(asset.volatility)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="text-center p-3">
+                          {features?.support_level && features?.resistance_level ? (
+                            <div className="text-[10px] font-mono leading-tight">
+                              <span className="text-profit">R:{formatCurrency(features.resistance_level, features.resistance_level < 10 ? 4 : 0)}</span>
+                              <br />
+                              <span className="text-loss">S:{formatCurrency(features.support_level, features.support_level < 10 ? 4 : 0)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">—</span>
+                          )}
+                        </td>
+                      </>
+                    )}
+                    <td className="text-right p-3">
+                      <span className={cn("font-mono font-medium", asset.relativeStrength > 70 ? "text-profit" : asset.relativeStrength < 40 ? "text-loss" : "text-foreground")}>
+                        {asset.relativeStrength}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
