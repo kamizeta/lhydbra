@@ -36,7 +36,6 @@ async function fetchCryptoData(symbols: string[], apiKey: string) {
 
   const result: Record<string, unknown> = {};
 
-  // FreeCryptoAPI: fetch one symbol at a time (unlimited, no rate limit)
   await Promise.all(bases.map(async (base) => {
     try {
       const url = `https://api.freecryptoapi.com/v1/getData?symbol=${base}`;
@@ -122,7 +121,115 @@ async function fetchFCSForex(symbols: string[], apiKey: string) {
   return result;
 }
 
-// ──────────────── Twelve Data (stocks, ETFs, fallback) ────────────────
+// ──────────────── Yahoo Finance (stocks & ETFs) ────────────────
+async function fetchYahooFinanceQuotes(symbols: string[]) {
+  if (!symbols.length) return {};
+  const cacheKey = `yahoo:${symbols.sort().join(',')}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached as Record<string, unknown>;
+
+  const result: Record<string, unknown> = {};
+
+  try {
+    const symbolsStr = symbols.join(',');
+    // Yahoo Finance v8 quote endpoint - no API key needed
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolsStr)}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume,regularMarketPreviousClose,shortName,longName,exchange`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Yahoo Finance HTTP error: ${response.status}`);
+      // Try alternative endpoint
+      return await fetchYahooFinanceFallback(symbols);
+    }
+
+    const data = await response.json();
+    const quotes = data?.quoteResponse?.result || [];
+
+    for (const q of quotes) {
+      const sym = q.symbol;
+      if (!sym) continue;
+      const price = q.regularMarketPrice || 0;
+      if (price <= 0) continue;
+
+      result[sym] = {
+        symbol: sym,
+        name: q.longName || q.shortName || sym,
+        exchange: q.exchange || 'NASDAQ',
+        currency: q.currency || 'USD',
+        open: String(q.regularMarketOpen || price),
+        high: String(q.regularMarketDayHigh || price),
+        low: String(q.regularMarketDayLow || price),
+        close: String(price),
+        volume: String(q.regularMarketVolume || 0),
+        previous_close: String(q.regularMarketPreviousClose || price),
+        change: String(q.regularMarketChange || 0),
+        percent_change: String(q.regularMarketChangePercent || 0),
+        is_market_open: q.marketState === 'REGULAR',
+        _source: 'yahoo',
+      };
+    }
+  } catch (e) {
+    console.error('Yahoo Finance error:', e);
+    return await fetchYahooFinanceFallback(symbols);
+  }
+
+  setCache(cacheKey, result);
+  return result;
+}
+
+// Fallback: fetch individual quotes via Yahoo Finance v8 chart endpoint
+async function fetchYahooFinanceFallback(symbols: string[]) {
+  const result: Record<string, unknown> = {};
+
+  await Promise.all(symbols.map(async (sym) => {
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1d`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (!meta || !meta.regularMarketPrice) return;
+
+      const price = meta.regularMarketPrice;
+      const prevClose = meta.previousClose || meta.chartPreviousClose || price;
+      const change = price - prevClose;
+      const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
+
+      result[sym] = {
+        symbol: sym,
+        name: meta.shortName || meta.longName || sym,
+        exchange: meta.exchangeName || 'NASDAQ',
+        currency: meta.currency || 'USD',
+        open: String(meta.regularMarketOpen || price),
+        high: String(meta.regularMarketDayHigh || price),
+        low: String(meta.regularMarketDayLow || price),
+        close: String(price),
+        volume: String(meta.regularMarketVolume || 0),
+        previous_close: String(prevClose),
+        change: String(change),
+        percent_change: String(changePct),
+        is_market_open: meta.marketState === 'REGULAR',
+        _source: 'yahoo-chart',
+      };
+    } catch (e) {
+      console.error(`Yahoo chart fallback error for ${sym}:`, e);
+    }
+  }));
+
+  return result;
+}
+
+// ──────────────── Twelve Data (technical indicators only) ────────────────
 async function fetchTwelveDataBatch(symbols: string[], apiKey: string) {
   if (!symbols.length) return {};
   const cacheKey = `td:${symbols.sort().join(',')}`;
@@ -144,29 +251,6 @@ async function fetchTwelveDataBatch(symbols: string[], apiKey: string) {
   return result as Record<string, unknown>;
 }
 
-// Fetch multiple batches of 8 symbols from Twelve Data
-async function fetchTwelveDataMultiBatch(symbols: string[], apiKey: string) {
-  const results: Record<string, unknown> = {};
-  const batchSize = 8;
-  
-  // Process batches sequentially to respect rate limits
-  for (let i = 0; i < symbols.length; i += batchSize) {
-    const batch = symbols.slice(i, i + batchSize);
-    try {
-      const data = await fetchTwelveDataBatch(batch, apiKey);
-      Object.assign(results, data);
-    } catch (e) {
-      console.error(`Twelve Data batch error for ${batch.join(',')}:`, e);
-    }
-    // Small delay between batches to avoid rate limits
-    if (i + batchSize < symbols.length) {
-      await new Promise(r => setTimeout(r, 200));
-    }
-  }
-  
-  return results;
-}
-
 // ──────────────── Main handler ────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -183,60 +267,56 @@ serve(async (req) => {
     const allResults: Record<string, unknown> = {};
     const errors: string[] = [];
 
-    // 1. Fetch crypto from FreeCryptoAPI (unlimited, no rate limit)
-    if (cryptoSymbols?.length > 0) {
-      let cryptoFetched = false;
-      try {
-        if (freeCryptoKey) {
-          const data = await fetchCryptoData(cryptoSymbols, freeCryptoKey);
-          if (Object.keys(data).length > 0) {
-            Object.assign(allResults, data);
-            cryptoFetched = true;
-          }
-        }
-      } catch (e) {
-        errors.push(`Crypto: ${e instanceof Error ? e.message : 'Unknown error'}`);
-      }
-      if (!cryptoFetched && twelveDataKey) {
-        try {
-          const data = await fetchTwelveDataBatch(cryptoSymbols.slice(0, 4), twelveDataKey);
-          Object.assign(allResults, data);
-        } catch (_) { /* silent */ }
-      }
+    // Run all fetches in parallel for maximum speed
+    const fetchPromises: Promise<void>[] = [];
+
+    // 1. Crypto from FreeCryptoAPI (unlimited)
+    if (cryptoSymbols?.length > 0 && freeCryptoKey) {
+      fetchPromises.push(
+        fetchCryptoData(cryptoSymbols, freeCryptoKey)
+          .then(data => { Object.assign(allResults, data); })
+          .catch(e => { errors.push(`Crypto: ${e instanceof Error ? e.message : 'Unknown'}`); })
+      );
     }
 
-    // 2. Fetch forex pairs from FCS API (free tier supports forex)
+    // 2. Forex & Commodities from FCS API
     const allForex = [...(forexSymbols || []), ...(commoditySymbols || [])];
-    if (allForex.length > 0) {
-      try {
-        if (fcsKey) {
-          const data = await fetchFCSForex(allForex, fcsKey);
-          Object.assign(allResults, data);
-        } else if (twelveDataKey) {
-          const data = await fetchTwelveDataBatch(allForex.slice(0, 4), twelveDataKey);
-          Object.assign(allResults, data);
-        }
-      } catch (e) {
-        errors.push(`Forex/Commodities: ${e instanceof Error ? e.message : 'Unknown error'}`);
-        if (twelveDataKey) {
-          try {
-            const data = await fetchTwelveDataBatch(allForex.slice(0, 4), twelveDataKey);
-            Object.assign(allResults, data);
-          } catch (_) { /* silent */ }
-        }
-      }
+    if (allForex.length > 0 && fcsKey) {
+      fetchPromises.push(
+        fetchFCSForex(allForex, fcsKey)
+          .then(data => { Object.assign(allResults, data); })
+          .catch(e => { errors.push(`Forex/Commodities: ${e instanceof Error ? e.message : 'Unknown'}`); })
+      );
     }
 
-    // 3. Fetch stocks + ETFs from Twelve Data (multi-batch for large lists)
+    // 3. Stocks + ETFs from Yahoo Finance (NO rate limit, NO API key needed)
     const allStocks = [...(stockSymbols || []), ...(etfSymbols || [])];
-    if (allStocks.length > 0 && twelveDataKey) {
-      try {
-        const data = await fetchTwelveDataMultiBatch(allStocks, twelveDataKey);
-        Object.assign(allResults, data);
-      } catch (e) {
-        errors.push(`Stocks: ${e instanceof Error ? e.message : 'Unknown error'}`);
-      }
+    if (allStocks.length > 0) {
+      fetchPromises.push(
+        fetchYahooFinanceQuotes(allStocks)
+          .then(data => {
+            Object.assign(allResults, data);
+            // If Yahoo failed for some symbols, try Twelve Data as backup
+            const missing = allStocks.filter(s => !data[s]);
+            if (missing.length > 0 && twelveDataKey) {
+              return fetchTwelveDataBatch(missing.slice(0, 8), twelveDataKey)
+                .then(tdData => { Object.assign(allResults, tdData); })
+                .catch(() => {});
+            }
+          })
+          .catch(e => {
+            errors.push(`Stocks/ETFs: ${e instanceof Error ? e.message : 'Unknown'}`);
+            // Fallback to Twelve Data if Yahoo completely fails
+            if (twelveDataKey) {
+              return fetchTwelveDataBatch(allStocks.slice(0, 8), twelveDataKey)
+                .then(data => { Object.assign(allResults, data); })
+                .catch(() => {});
+            }
+          })
+      );
     }
+
+    await Promise.all(fetchPromises);
 
     return new Response(JSON.stringify({ data: allResults, errors: errors.length > 0 ? errors : undefined }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
