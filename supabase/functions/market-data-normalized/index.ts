@@ -849,162 +849,18 @@ serve(async (req) => {
         return await fetchMissingQuotes(dbMissing, { freeCryptoKey, fcsKey, twelveKey, finnhubKey, alphaVantageKey, db });
       });
 
-      // Classify symbols
-      const crypto: string[] = [], forex: string[] = [], commodity: string[] = [], stocks: string[] = [], etfs: string[] = [];
-      const forexSet = new Set(['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','NZD/USD','EUR/GBP','EUR/JPY','GBP/JPY','USD/MXN','EUR/CHF','AUD/JPY']);
-      const commoditySet = new Set(['XAU/USD','XAG/USD','CL','NG','HG']);
-      const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
-
-      for (const s of (symbols as string[])) {
-        if (s.includes('/USD') && !forexSet.has(s) && !commoditySet.has(s)) crypto.push(s);
-        else if (forexSet.has(s)) forex.push(s);
-        else if (commoditySet.has(s)) commodity.push(s);
-        else if (etfSet.has(s)) etfs.push(s);
-        else stocks.push(s);
-      }
-
-      // Fetch in parallel: crypto, forex/commodity, stocks+ETFs
-      const allStockLike = [...stocks, ...etfs];
-      const t0 = Date.now();
-      const [cryptoQ, forexQ, stockQ] = await Promise.all([
-        freeCryptoKey ? fetchCryptoQuotes(crypto, freeCryptoKey) : [],
-        fcsKey ? fetchFCSQuotes([...forex, ...commodity], fcsKey, 'forex') : [],
-        fcsKey ? fetchFCSQuotes(allStockLike, fcsKey, 'stock') : [],
-      ]);
-      const t1 = Date.now();
-
-      // Log primary sources
-      logApiUsage(db, 'freecryptoapi', 'quote', crypto.length, cryptoQ.length, t1 - t0);
-      logApiUsage(db, 'fcsapi-forex', 'quote', forex.length + commodity.length, forexQ.length, t1 - t0);
-      logApiUsage(db, 'fcsapi-stock', 'quote', allStockLike.length, stockQ.length, t1 - t0);
-
-      const allQuotes = [...cryptoQ, ...forexQ, ...stockQ];
-      const fetched = new Set(allQuotes.map(q => q.symbol));
-
-      // Fallback 1: Twelve Data (batch of 8)
-      const missingStockLike = allStockLike.filter(s => !fetched.has(s));
-      const missingForex = [...forex, ...commodity].filter(s => !fetched.has(s));
-      const missingForTwelve = [...missingStockLike, ...missingForex];
-      if (twelveKey && missingForTwelve.length > 0) {
-        const twelveSymbols = missingForTwelve.slice(0, 8);
-        const t2 = Date.now();
-        const tdQuotes = await fetchTwelveDataQuotes(twelveSymbols, twelveKey);
-        logApiUsage(db, 'twelvedata', 'quote', twelveSymbols.length, tdQuotes.length, Date.now() - t2);
-        for (const q of tdQuotes) fetched.add(q.symbol);
-        allQuotes.push(...tdQuotes);
-      }
-
-      // Fallback 2: Alpaca snapshots for missing stocks/ETFs (200 req/min, batch)
-      const missingForAlpaca = allStockLike.filter(s => !fetched.has(s));
-      if (missingForAlpaca.length > 0) {
-        const tAlp = Date.now();
-        const alpQuotes = await fetchAlpacaSnapshots(missingForAlpaca);
-        logApiUsage(db, 'alpaca', 'quote-stock', missingForAlpaca.length, alpQuotes.length, Date.now() - tAlp);
-        for (const q of alpQuotes) {
-          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
-          fetched.add(q.symbol);
-        }
-        allQuotes.push(...alpQuotes);
-      }
-
-      // Fallback 2b: Alpaca crypto for missing crypto
-      const missingCrypto = crypto.filter(s => !fetched.has(s));
-      if (missingCrypto.length > 0) {
-        const tAlpC = Date.now();
-        const alpCryptoQ = await fetchAlpacaCryptoSnapshots(missingCrypto);
-        logApiUsage(db, 'alpaca', 'quote-crypto', missingCrypto.length, alpCryptoQ.length, Date.now() - tAlpC);
-        for (const q of alpCryptoQ) fetched.add(q.symbol);
-        allQuotes.push(...alpCryptoQ);
-      }
-
-      // Fallback 3: ExchangeRate-API for missing forex (FREE, no key)
-      const missingForexAfterTD = [...forex].filter(s => !fetched.has(s));
-      if (missingForexAfterTD.length > 0) {
-        const t25 = Date.now();
-        const erQuotes = await fetchExchangeRateAPI(missingForexAfterTD);
-        logApiUsage(db, 'exchangerate-api', 'quote', missingForexAfterTD.length, erQuotes.length, Date.now() - t25);
-        for (const q of erQuotes) fetched.add(q.symbol);
-        allQuotes.push(...erQuotes);
-      }
-
-      // Fallback 4: Alpha Vantage forex/commodity for remaining pairs
-      const missingFXCommodity = [...forex, ...commodity].filter(s => !fetched.has(s));
-      if (alphaVantageKey && missingFXCommodity.length > 0) {
-        const t26 = Date.now();
-        const avFxQuotes = await fetchAlphaVantageForex(missingFXCommodity, alphaVantageKey);
-        logApiUsage(db, 'alphavantage', 'quote-forex', missingFXCommodity.length, avFxQuotes.length, Date.now() - t26);
-        for (const q of avFxQuotes) fetched.add(q.symbol);
-        allQuotes.push(...avFxQuotes);
-      }
-
-      // Fallback 5: Finnhub for missing stocks/ETFs
-      const missingForFinnhub = allStockLike.filter(s => !fetched.has(s));
-      if (finnhubKey && missingForFinnhub.length > 0) {
-        const t3 = Date.now();
-        const fhQuotes = await fetchFinnhubQuotes(missingForFinnhub, finnhubKey);
-        logApiUsage(db, 'finnhub', 'quote', missingForFinnhub.length, fhQuotes.length, Date.now() - t3);
-        for (const q of fhQuotes) {
-          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
-          fetched.add(q.symbol);
-        }
-        allQuotes.push(...fhQuotes);
-      }
-
-      // Fallback 5: Alpha Vantage stocks (max 5, 25/day limit shared)
-      const missingForAV = allStockLike.filter(s => !fetched.has(s));
-      if (alphaVantageKey && missingForAV.length > 0) {
-        const t35 = Date.now();
-        const avQuotes = await fetchAlphaVantageQuotes(missingForAV.slice(0, 5), alphaVantageKey);
-        logApiUsage(db, 'alphavantage', 'quote-stock', Math.min(missingForAV.length, 5), avQuotes.length, Date.now() - t35);
-        for (const q of avQuotes) {
-          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
-          fetched.add(q.symbol);
-        }
-        allQuotes.push(...avQuotes);
-      }
-
-      // Fallback 6: Yahoo batch (single request)
-      const stillMissingStocks = allStockLike.filter(s => !fetched.has(s));
-      if (stillMissingStocks.length > 0) {
-        const t4 = Date.now();
-        const yBatch = await fetchYahooBatch(stillMissingStocks);
-        logApiUsage(db, 'yahoo-batch', 'quote', stillMissingStocks.length, yBatch.length, Date.now() - t4);
-        for (const q of yBatch) {
-          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
-          fetched.add(q.symbol);
-        }
-        allQuotes.push(...yBatch);
-      }
-
-      // Fallback 7: Yahoo chart (parallel batches of 5)
-      const stillMissing = allStockLike.filter(s => !fetched.has(s));
-      if (stillMissing.length > 0) {
-        const t5 = Date.now();
-        const yChart = await fetchYahooChartParallel(stillMissing);
-        logApiUsage(db, 'yahoo-chart', 'quote', stillMissing.length, yChart.length, Date.now() - t5);
-        for (const q of yChart) {
-          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
-          fetched.add(q.symbol);
-        }
-        allQuotes.push(...yChart);
-      }
-
-      // Fallback 8: DB cache for anything still missing
-      const finalMissing = [...allStockLike, ...forex, ...commodity].filter(s => !fetched.has(s));
-      if (finalMissing.length > 0) {
-        const dbQuotes = await fetchFromDBCache(finalMissing, db);
-        logApiUsage(db, 'db-cache', 'quote', finalMissing.length, dbQuotes.length, 0);
-        allQuotes.push(...dbQuotes);
-      }
-
-      // Build map
+      // ── STEP 3: Merge cached + fresh, persist, return ──
+      const allQuotes = [...dbCached, ...freshQuotes];
       const quotesMap: Record<string, NormalizedQuote> = {};
       for (const q of allQuotes) quotesMap[q.symbol] = q;
 
       memSet(cacheKey, quotesMap);
 
+      // Persist fresh quotes to DB cache (fire-and-forget, 2min TTL)
+      persistToDBCache(freshQuotes, db, 2);
+
       // Persist latest bars to ohlcv_cache (fire-and-forget)
-      const bars = allQuotes.filter(q => q.source !== 'db-cache').map(q => ({
+      const bars = freshQuotes.filter(q => !q.source.startsWith('cache:')).map(q => ({
         symbol: q.symbol,
         timeframe: '1d',
         open: q.open,
