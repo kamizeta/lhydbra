@@ -821,9 +821,33 @@ serve(async (req) => {
 
     // ─── ACTION: quotes ───
     if (action === 'quotes') {
-      const cacheKey = `nq:${(symbols as string[]).sort().join(',')}`;
+      const allSymbols = symbols as string[];
+      const cacheKey = `nq:${allSymbols.sort().join(',')}`;
       const cached = memGet(cacheKey);
-      if (cached) return jsonResponse(cached);
+      if (cached) {
+        logApiUsage(db, 'mem-cache', 'quote', allSymbols.length, allSymbols.length, 0);
+        return jsonResponse(cached);
+      }
+
+      // ── STEP 1: Check DB cache for valid (non-expired) data ──
+      const { cached: dbCached, missing: dbMissing } = await getFromDBCache(allSymbols, db);
+      const cacheHits = dbCached.length;
+      if (cacheHits > 0) {
+        logApiUsage(db, 'db-cache-hit', 'quote', allSymbols.length, cacheHits, 0);
+      }
+
+      // If everything is cached, return immediately
+      if (dbMissing.length === 0) {
+        const quotesMap: Record<string, NormalizedQuote> = {};
+        for (const q of dbCached) quotesMap[q.symbol] = q;
+        memSet(cacheKey, quotesMap);
+        return jsonResponse(quotesMap);
+      }
+
+      // ── STEP 2: Only fetch MISSING symbols from APIs (with coalescing) ──
+      const freshQuotes = await coalesce(`fetch:${dbMissing.sort().join(',')}`, async () => {
+        return await fetchMissingQuotes(dbMissing, { freeCryptoKey, fcsKey, twelveKey, finnhubKey, alphaVantageKey, db });
+      });
 
       // Classify symbols
       const crypto: string[] = [], forex: string[] = [], commodity: string[] = [], stocks: string[] = [], etfs: string[] = [];
