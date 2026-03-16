@@ -30,6 +30,7 @@ const defaultWeights: ScoringWeights = {
 };
 
 export default function SettingsPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useI18n();
   const { settings: savedSettings, loading } = useUserSettings();
