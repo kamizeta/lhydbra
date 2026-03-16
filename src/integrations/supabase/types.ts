@@ -343,6 +343,39 @@ export type Database = {
         }
         Relationships: []
       }
+      regime_changes: {
+        Row: {
+          asset_type: string
+          detected_at: string
+          id: string
+          new_regime: string
+          previous_regime: string
+          regime_confidence: number | null
+          seen_by_user: boolean
+          symbol: string
+        }
+        Insert: {
+          asset_type?: string
+          detected_at?: string
+          id?: string
+          new_regime: string
+          previous_regime: string
+          regime_confidence?: number | null
+          seen_by_user?: boolean
+          symbol: string
+        }
+        Update: {
+          asset_type?: string
+          detected_at?: string
+          id?: string
+          new_regime?: string
+          previous_regime?: string
+          regime_confidence?: number | null
+          seen_by_user?: boolean
+          symbol?: string
+        }
+        Relationships: []
+      }
       scoring_weights: {
         Row: {
           created_at: string

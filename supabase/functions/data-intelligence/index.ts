@@ -312,8 +312,30 @@ serve(async (req) => {
           results[symbol] = features;
           processed++;
 
-          // 4. Persist to market_features
+          // 4. Detect regime change before upserting
+          const { data: oldFeature } = await db
+            .from('market_features')
+            .select('market_regime')
+            .eq('symbol', symbol)
+            .eq('timeframe', timeframe)
+            .single();
+
+          const oldRegime = oldFeature?.market_regime;
+          const newRegime = regime.regime;
+
+          // 5. Persist to market_features
           await db.from('market_features').upsert(features, { onConflict: 'symbol,timeframe' });
+
+          // 6. Log regime change if different
+          if (oldRegime && oldRegime !== newRegime && oldRegime !== 'undefined') {
+            await db.from('regime_changes').insert({
+              symbol,
+              asset_type: assetType,
+              previous_regime: oldRegime,
+              new_regime: newRegime,
+              regime_confidence: regime.confidence,
+            });
+          }
 
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Unknown';

@@ -9,11 +9,13 @@ import { useI18n } from "@/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import LanguageSelector from "@/components/LanguageSelector";
 import lhydbraLogo from "@/assets/lhydbra-logo.png";
+import { useRegimeAlerts } from "@/hooks/useRegimeAlerts";
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const { t } = useI18n();
   const { user, signOut } = useAuth();
+  useRegimeAlerts();
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
