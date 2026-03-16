@@ -52,11 +52,22 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
   const [existingSymbolExposure, setExistingSymbolExposure] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
-  // Calculate ideal position size
+  // Calculate ideal position size (capped by risk, concentration & leverage limits)
   const riskPerUnit = Math.abs(entryPrice - signal.stop_loss);
   const dollarRisk = settings.current_capital * (settings.risk_per_trade / 100);
   const isFractional = signal.asset_type === 'crypto' || signal.asset_type === 'forex';
-  const idealSize = riskPerUnit > 0 ? dollarRisk / riskPerUnit : 0;
+  const riskBasedSize = riskPerUnit > 0 ? dollarRisk / riskPerUnit : 0;
+
+  // Cap by max single asset concentration
+  const maxAssetValue = Math.max(0, (settings.current_capital * settings.max_single_asset / 100) - existingSymbolExposure);
+  const concentrationCap = entryPrice > 0 ? maxAssetValue / entryPrice : Infinity;
+
+  // Cap by max leverage (total exposure)
+  const maxTotalExposure = settings.current_capital * settings.max_leverage;
+  const availableExposure = Math.max(0, maxTotalExposure - existingExposure);
+  const leverageCap = entryPrice > 0 ? availableExposure / entryPrice : Infinity;
+
+  const idealSize = Math.min(riskBasedSize, concentrationCap, leverageCap);
   const idealSizeDisplay = isFractional ? parseFloat(idealSize.toFixed(6)) : Math.floor(idealSize);
 
   // Auto-set quantity to ideal on first load
