@@ -195,9 +195,19 @@ export default function MarketExplorer() {
             </thead>
             <tbody>
               {filtered.map(asset => (
-                <tr key={asset.symbol} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
+                <tr key={asset.symbol} className={cn(
+                  "border-b border-border/50 transition-colors",
+                  asset.isMock
+                    ? "bg-purple-500/5 hover:bg-purple-500/10 border-l-2 border-l-purple-500/50"
+                    : "hover:bg-accent/30"
+                )}>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
+                      {asset.isMock && (
+                        <span className="shrink-0 rounded bg-purple-500/20 text-purple-400 text-[10px] font-bold px-1.5 py-0.5 uppercase tracking-wider border border-purple-500/30">
+                          NO REAL
+                        </span>
+                      )}
                       <StatusBadge variant={
                         asset.type === 'crypto' ? 'info' :
                         asset.type === 'stock' ? 'primary' :
@@ -207,7 +217,7 @@ export default function MarketExplorer() {
                         {asset.type === 'commodity' ? 'CMD' : asset.type === 'forex' ? 'FX' : asset.type.toUpperCase()}
                       </StatusBadge>
                       <div>
-                        <div className="font-mono font-medium text-foreground">{asset.symbol}</div>
+                        <div className={cn("font-mono font-medium", asset.isMock ? "text-purple-400" : "text-foreground")}>{asset.symbol}</div>
                         <div className="text-xs text-muted-foreground">{asset.name}</div>
                       </div>
                     </div>
