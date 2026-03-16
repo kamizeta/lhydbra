@@ -50,6 +50,9 @@ function ProtectedRoutes() {
         <Route path="/journal" element={<Journal />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/positions" element={<PositionsPage />} />
+        <Route path="/radar" element={<OpportunityRadar />} />
+        <Route path="/lab" element={<StrategyLab />} />
+        <Route path="/center" element={<ControlCenter />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
