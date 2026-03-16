@@ -390,12 +390,13 @@ export default function MarketExplorer() {
                   </>
                 )}
                 <SortHeader label="RS" sortKey="relativeStrength" />
+                <SortHeader label="Score" sortKey="score" />
               </tr>
             </thead>
             <tbody>
               {filtered.map(asset => {
                 const features = featuresMap?.[asset.symbol];
-                return (
+                const score = scoresMap?.[asset.symbol];
                   <tr key={asset.symbol} className={cn(
                     "border-b border-border/50 transition-colors",
                     asset.isMock
