@@ -560,6 +560,132 @@ async function fetchAlphaVantageForex(symbols: string[], apiKey: string): Promis
   return results;
 }
 
+// ─── Alpaca Markets Snapshot Fetcher ───
+// Free tier: 200 req/min, 15min delayed. Batch endpoint for US stocks.
+async function fetchAlpacaSnapshots(symbols: string[]): Promise<NormalizedQuote[]> {
+  if (!symbols.length) return [];
+  const apiKeyId = Deno.env.get("ALPACA_API_KEY_ID");
+  const apiSecret = Deno.env.get("ALPACA_API_SECRET_KEY");
+  if (!apiKeyId || !apiSecret) return [];
+
+  const results: NormalizedQuote[] = [];
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
+
+  try {
+    // Alpaca data API — snapshots endpoint (batch)
+    const url = `https://data.alpaca.markets/v2/stocks/snapshots?symbols=${encodeURIComponent(symbols.join(','))}`;
+    const res = await fetch(url, {
+      headers: {
+        'APCA-API-KEY-ID': apiKeyId,
+        'APCA-API-SECRET-KEY': apiSecret,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      console.error(`Alpaca snapshots HTTP ${res.status}: ${await res.text()}`);
+      return [];
+    }
+
+    const data = await res.json();
+    // Response is { "AAPL": { latestTrade, latestQuote, minuteBar, dailyBar, prevDailyBar }, ... }
+    for (const [sym, snap] of Object.entries(data)) {
+      const s = snap as Record<string, any>;
+      const daily = s.dailyBar;
+      const prev = s.prevDailyBar;
+      const trade = s.latestTrade;
+      if (!daily && !trade) continue;
+
+      const price = trade?.p || daily?.c || 0;
+      if (price <= 0) continue;
+
+      const prevClose = prev?.c || price;
+      const change = price - prevClose;
+      const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
+
+      results.push({
+        symbol: sym,
+        name: sym,
+        asset_type: etfSet.has(sym) ? 'etf' : 'stock',
+        price,
+        open: daily?.o || price,
+        high: daily?.h || price,
+        low: daily?.l || price,
+        volume: daily?.v || 0,
+        change,
+        change_percent: changePct,
+        previous_close: prevClose,
+        is_market_open: true,
+        source: 'alpaca',
+        timestamp: trade?.t || new Date().toISOString(),
+      });
+    }
+  } catch (e) {
+    console.error('Alpaca snapshots:', e);
+  }
+
+  return results;
+}
+
+// ─── Alpaca Crypto Snapshot Fetcher ───
+async function fetchAlpacaCryptoSnapshots(symbols: string[]): Promise<NormalizedQuote[]> {
+  if (!symbols.length) return [];
+  const apiKeyId = Deno.env.get("ALPACA_API_KEY_ID");
+  const apiSecret = Deno.env.get("ALPACA_API_SECRET_KEY");
+  if (!apiKeyId || !apiSecret) return [];
+
+  const results: NormalizedQuote[] = [];
+
+  try {
+    // Convert symbols: BTC/USD → BTC/USD (Alpaca uses this format)
+    const alpacaSymbols = symbols.map(s => s.replace('/', '%2F'));
+    const url = `https://data.alpaca.markets/v1beta3/crypto/us/snapshots?symbols=${alpacaSymbols.join(',')}`;
+    const res = await fetch(url, {
+      headers: {
+        'APCA-API-KEY-ID': apiKeyId,
+        'APCA-API-SECRET-KEY': apiSecret,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!res.ok) return [];
+    const data = await res.json();
+    const snapshots = data?.snapshots || data;
+
+    for (const [sym, snap] of Object.entries(snapshots)) {
+      const s = snap as Record<string, any>;
+      const daily = s.dailyBar;
+      const trade = s.latestTrade;
+      const price = trade?.p || daily?.c || 0;
+      if (price <= 0) continue;
+
+      const prevClose = daily?.c || price;
+      const change = price - prevClose;
+
+      results.push({
+        symbol: sym,
+        name: sym,
+        asset_type: 'crypto',
+        price,
+        open: daily?.o || price,
+        high: daily?.h || price,
+        low: daily?.l || price,
+        volume: daily?.v || 0,
+        change,
+        change_percent: prevClose > 0 ? (change / prevClose) * 100 : 0,
+        previous_close: prevClose,
+        is_market_open: true,
+        source: 'alpaca',
+        timestamp: trade?.t || new Date().toISOString(),
+      });
+    }
+  } catch (e) {
+    console.error('Alpaca crypto:', e);
+  }
+
+  return results;
+}
+
 // ─── API Usage Logger (fire-and-forget) ───
 function logApiUsage(db: ReturnType<typeof createClient>, source: string, action: string, requested: number, returned: number, timeMs: number, error?: string) {
   db.from('api_usage_log').insert({
@@ -668,7 +794,30 @@ serve(async (req) => {
         allQuotes.push(...tdQuotes);
       }
 
-      // Fallback 2: ExchangeRate-API for missing forex (FREE, no key)
+      // Fallback 2: Alpaca snapshots for missing stocks/ETFs (200 req/min, batch)
+      const missingForAlpaca = allStockLike.filter(s => !fetched.has(s));
+      if (missingForAlpaca.length > 0) {
+        const tAlp = Date.now();
+        const alpQuotes = await fetchAlpacaSnapshots(missingForAlpaca);
+        logApiUsage(db, 'alpaca', 'quote-stock', missingForAlpaca.length, alpQuotes.length, Date.now() - tAlp);
+        for (const q of alpQuotes) {
+          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
+          fetched.add(q.symbol);
+        }
+        allQuotes.push(...alpQuotes);
+      }
+
+      // Fallback 2b: Alpaca crypto for missing crypto
+      const missingCrypto = crypto.filter(s => !fetched.has(s));
+      if (missingCrypto.length > 0) {
+        const tAlpC = Date.now();
+        const alpCryptoQ = await fetchAlpacaCryptoSnapshots(missingCrypto);
+        logApiUsage(db, 'alpaca', 'quote-crypto', missingCrypto.length, alpCryptoQ.length, Date.now() - tAlpC);
+        for (const q of alpCryptoQ) fetched.add(q.symbol);
+        allQuotes.push(...alpCryptoQ);
+      }
+
+      // Fallback 3: ExchangeRate-API for missing forex (FREE, no key)
       const missingForexAfterTD = [...forex].filter(s => !fetched.has(s));
       if (missingForexAfterTD.length > 0) {
         const t25 = Date.now();
@@ -678,7 +827,7 @@ serve(async (req) => {
         allQuotes.push(...erQuotes);
       }
 
-      // Fallback 3: Alpha Vantage forex/commodity for remaining pairs
+      // Fallback 4: Alpha Vantage forex/commodity for remaining pairs
       const missingFXCommodity = [...forex, ...commodity].filter(s => !fetched.has(s));
       if (alphaVantageKey && missingFXCommodity.length > 0) {
         const t26 = Date.now();
@@ -688,7 +837,7 @@ serve(async (req) => {
         allQuotes.push(...avFxQuotes);
       }
 
-      // Fallback 4: Finnhub for missing stocks/ETFs
+      // Fallback 5: Finnhub for missing stocks/ETFs
       const missingForFinnhub = allStockLike.filter(s => !fetched.has(s));
       if (finnhubKey && missingForFinnhub.length > 0) {
         const t3 = Date.now();
