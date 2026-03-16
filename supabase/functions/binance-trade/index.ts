@@ -91,7 +91,7 @@ serve(async (req) => {
         params += `&price=${price}&timeInForce=${timeInForce || "GTC"}`;
       }
 
-      const signature = hmac("sha256", apiSecret, params, "utf8", "hex");
+      const signature = await hmacSha256(apiSecret, params);
 
       const response = await fetch(`${BINANCE_API_URL}/api/v3/order?${params}&signature=${signature}`, {
         method: "POST",
