@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.regime-trade-ideas]
 verify_jwt = false
+
+[functions.process-agent-runs]
+verify_jwt = false
