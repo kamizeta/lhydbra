@@ -794,7 +794,30 @@ serve(async (req) => {
         allQuotes.push(...tdQuotes);
       }
 
-      // Fallback 2: ExchangeRate-API for missing forex (FREE, no key)
+      // Fallback 2: Alpaca snapshots for missing stocks/ETFs (200 req/min, batch)
+      const missingForAlpaca = allStockLike.filter(s => !fetched.has(s));
+      if (missingForAlpaca.length > 0) {
+        const tAlp = Date.now();
+        const alpQuotes = await fetchAlpacaSnapshots(missingForAlpaca);
+        logApiUsage(db, 'alpaca', 'quote-stock', missingForAlpaca.length, alpQuotes.length, Date.now() - tAlp);
+        for (const q of alpQuotes) {
+          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
+          fetched.add(q.symbol);
+        }
+        allQuotes.push(...alpQuotes);
+      }
+
+      // Fallback 2b: Alpaca crypto for missing crypto
+      const missingCrypto = crypto.filter(s => !fetched.has(s));
+      if (missingCrypto.length > 0) {
+        const tAlpC = Date.now();
+        const alpCryptoQ = await fetchAlpacaCryptoSnapshots(missingCrypto);
+        logApiUsage(db, 'alpaca', 'quote-crypto', missingCrypto.length, alpCryptoQ.length, Date.now() - tAlpC);
+        for (const q of alpCryptoQ) fetched.add(q.symbol);
+        allQuotes.push(...alpCryptoQ);
+      }
+
+      // Fallback 3: ExchangeRate-API for missing forex (FREE, no key)
       const missingForexAfterTD = [...forex].filter(s => !fetched.has(s));
       if (missingForexAfterTD.length > 0) {
         const t25 = Date.now();
@@ -804,7 +827,7 @@ serve(async (req) => {
         allQuotes.push(...erQuotes);
       }
 
-      // Fallback 3: Alpha Vantage forex/commodity for remaining pairs
+      // Fallback 4: Alpha Vantage forex/commodity for remaining pairs
       const missingFXCommodity = [...forex, ...commodity].filter(s => !fetched.has(s));
       if (alphaVantageKey && missingFXCommodity.length > 0) {
         const t26 = Date.now();
@@ -814,7 +837,7 @@ serve(async (req) => {
         allQuotes.push(...avFxQuotes);
       }
 
-      // Fallback 4: Finnhub for missing stocks/ETFs
+      // Fallback 5: Finnhub for missing stocks/ETFs
       const missingForFinnhub = allStockLike.filter(s => !fetched.has(s));
       if (finnhubKey && missingForFinnhub.length > 0) {
         const t3 = Date.now();
