@@ -51,9 +51,8 @@ export default function SettingsPage() {
   const [weights, setWeights] = useState<ScoringWeights>(defaultWeights);
   const [weightsLoading, setWeightsLoading] = useState(true);
 
-  useEffect(() => {
-    setSettings(savedSettings);
-  }, [savedSettings]);
+  useEffect(() => { setSettings(savedSettings); }, [savedSettings]);
+  useEffect(() => { setLocalNotifPrefs(notifPrefs); }, [notifPrefs]);
 
   // Load profile
   useEffect(() => {
