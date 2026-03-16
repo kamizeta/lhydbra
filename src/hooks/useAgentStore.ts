@@ -189,7 +189,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       },
     })),
 
-  runAgent: async (agent, marketData, portfolioData, tradeHistory) => {
+  runAgent: async (agent, marketData, portfolioData, tradeHistory, marketFeatures, opportunityScores, strategyPerformance) => {
     const { language } = get();
     let sessionId = get().sessionId;
     if (!sessionId) {
