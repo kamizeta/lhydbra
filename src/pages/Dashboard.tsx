@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatNumber } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { useMarketData } from "@/hooks/useMarketData";
 
 interface DBPosition {
   id: string;
