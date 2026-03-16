@@ -48,7 +48,8 @@ export default function MarketExplorer() {
   };
 
   const { data: liveAssets, isLoading, isError, refetch } = useQuickQuotes();
-  const assets = liveAssets && liveAssets.length > 0 ? liveAssets : mockAssets;
+  const assets = liveAssets && liveAssets.length > 0 ? liveAssets : mockAssets.map(a => ({ ...a, isMock: true }));
+  const mockCount = assets.filter(a => a.isMock).length;
 
   const filtered = assets
     .filter(a => typeFilter === 'all' || a.type === typeFilter)
