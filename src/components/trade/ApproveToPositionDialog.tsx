@@ -457,6 +457,46 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           </div>
         )}
 
+        {/* Alpaca execution toggle */}
+        {openPosition && (signal.asset_type === 'stock' || signal.asset_type === 'etf' || signal.asset_type === 'crypto') && (
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={executeOnAlpaca}
+                onChange={(e) => setExecuteOnAlpaca(e.target.checked)}
+                className="rounded border-border"
+              />
+              <div className="flex items-center gap-1.5">
+                {executeOnAlpaca ? <Wifi className="h-3.5 w-3.5 text-lime-400" /> : <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />}
+                <span className="text-xs text-foreground">Ejecutar orden en Alpaca Markets</span>
+              </div>
+            </label>
+            {executeOnAlpaca && (
+              <div className="flex items-center gap-2 pl-8">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={alpacaPaper}
+                    onChange={() => setAlpacaPaper(true)}
+                    className="border-border"
+                  />
+                  <span className="text-[10px] text-muted-foreground font-mono">Paper Trading</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={!alpacaPaper}
+                    onChange={() => setAlpacaPaper(false)}
+                    className="border-border"
+                  />
+                  <span className="text-[10px] text-loss font-mono font-bold">⚠ Live Trading</span>
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex gap-3 pt-2">
           <button
             onClick={onClose}
