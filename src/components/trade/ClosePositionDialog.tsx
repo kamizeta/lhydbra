@@ -28,6 +28,8 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
   const [closePrice, setClosePrice] = useState(currentPrice || position.avg_entry);
   const [saving, setSaving] = useState(false);
   const [executeOnBinance, setExecuteOnBinance] = useState(false);
+  const [executeOnAlpaca, setExecuteOnAlpaca] = useState(false);
+  const [alpacaPaper, setAlpacaPaper] = useState(true);
   const [hasBinanceKeys, setHasBinanceKeys] = useState<boolean | null>(null);
 
   // Check Binance keys on mount
@@ -84,6 +86,31 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
       }
     }
 
+    // Execute on Alpaca if enabled
+    if (executeOnAlpaca) {
+      try {
+        const { data, error } = await supabase.functions.invoke('alpaca-trade', {
+          body: {
+            action: 'close_position',
+            paper: alpacaPaper,
+            symbol: position.symbol.replace('/', ''),
+            qty: position.quantity,
+          },
+        });
+
+        if (error || data?.error) {
+          toast.error(`Alpaca: ${data?.error || error?.message}`);
+          setSaving(false);
+          return;
+        }
+        toast.success(`Orden de cierre enviada a Alpaca ${alpacaPaper ? '(Paper)' : '(Live)'}`);
+      } catch (err) {
+        toast.error('Error al ejecutar en Alpaca');
+        setSaving(false);
+        return;
+      }
+    }
+
     // Update position in DB
     const { error } = await supabase.from('positions').update({
       status: 'closed',
@@ -102,6 +129,8 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
     setSaving(false);
     onConfirm();
   };
+
+  const isAlpacaEligible = position.asset_type === 'stock' || position.asset_type === 'etf' || position.asset_type === 'crypto';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -169,6 +198,36 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
               <span className="text-xs text-foreground">Ejecutar orden en Binance</span>
             </div>
           </label>
+        )}
+
+        {/* Alpaca toggle */}
+        {isAlpacaEligible && (
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={executeOnAlpaca}
+                onChange={(e) => setExecuteOnAlpaca(e.target.checked)}
+                className="rounded border-border"
+              />
+              <div className="flex items-center gap-1.5">
+                {executeOnAlpaca ? <Wifi className="h-3.5 w-3.5 text-lime-400" /> : <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />}
+                <span className="text-xs text-foreground">Ejecutar cierre en Alpaca Markets</span>
+              </div>
+            </label>
+            {executeOnAlpaca && (
+              <div className="flex items-center gap-2 pl-8">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="radio" checked={alpacaPaper} onChange={() => setAlpacaPaper(true)} className="border-border" />
+                  <span className="text-[10px] text-muted-foreground font-mono">Paper</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="radio" checked={!alpacaPaper} onChange={() => setAlpacaPaper(false)} className="border-border" />
+                  <span className="text-[10px] text-loss font-mono font-bold">⚠ Live</span>
+                </label>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="flex gap-3 pt-2">

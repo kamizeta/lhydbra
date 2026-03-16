@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, X, ArrowRight, Shield, AlertTriangle } from "lucide-react";
+import { Check, X, ArrowRight, Shield, AlertTriangle, Wifi, WifiOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserSettings } from "@/hooks/useUserSettings";
@@ -46,6 +46,8 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
   const [quantityTouched, setQuantityTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [openPosition, setOpenPosition] = useState(true);
+  const [executeOnAlpaca, setExecuteOnAlpaca] = useState(false);
+  const [alpacaPaper, setAlpacaPaper] = useState(true);
   const [violations, setViolations] = useState<RiskViolation[]>([]);
   const [openPositionsCount, setOpenPositionsCount] = useState(0);
   const [existingExposure, setExistingExposure] = useState(0);
@@ -230,6 +232,46 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
     setSaving(true);
 
     if (openPosition) {
+      // Execute on Alpaca first if enabled
+      if (executeOnAlpaca) {
+        try {
+          const alpacaSide = signal.direction === 'long' ? 'buy' : 'sell';
+          const isStock = signal.asset_type === 'stock' || signal.asset_type === 'etf';
+          
+          const orderBody: Record<string, unknown> = {
+            action: 'place_order',
+            paper: alpacaPaper,
+            symbol: signal.symbol.replace('/', ''),
+            qty: quantity,
+            side: alpacaSide,
+            type: 'market',
+            time_in_force: isStock ? 'day' : 'gtc',
+          };
+
+          // Use bracket order if SL and TP are set
+          if (signal.stop_loss > 0 && signal.take_profit > 0) {
+            orderBody.order_class = 'bracket';
+            orderBody.take_profit = signal.take_profit;
+            orderBody.stop_loss = signal.stop_loss;
+          }
+
+          const { data, error } = await supabase.functions.invoke('alpaca-trade', {
+            body: orderBody,
+          });
+
+          if (error || data?.error) {
+            toast.error(`Alpaca: ${data?.error || error?.message}`);
+            setSaving(false);
+            return;
+          }
+          toast.success(`Orden enviada a Alpaca ${alpacaPaper ? '(Paper)' : '(Live)'}: ${data?.order?.status}`);
+        } catch (err) {
+          toast.error('Error al ejecutar en Alpaca');
+          setSaving(false);
+          return;
+        }
+      }
+
       const { error } = await supabase.from('positions').insert({
         user_id: user.id,
         symbol: signal.symbol,
@@ -412,6 +454,46 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
                 <span className="text-foreground">{openPositionsCount + 1} / {settings.max_positions}</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Alpaca execution toggle */}
+        {openPosition && (signal.asset_type === 'stock' || signal.asset_type === 'etf' || signal.asset_type === 'crypto') && (
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={executeOnAlpaca}
+                onChange={(e) => setExecuteOnAlpaca(e.target.checked)}
+                className="rounded border-border"
+              />
+              <div className="flex items-center gap-1.5">
+                {executeOnAlpaca ? <Wifi className="h-3.5 w-3.5 text-lime-400" /> : <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />}
+                <span className="text-xs text-foreground">Ejecutar orden en Alpaca Markets</span>
+              </div>
+            </label>
+            {executeOnAlpaca && (
+              <div className="flex items-center gap-2 pl-8">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={alpacaPaper}
+                    onChange={() => setAlpacaPaper(true)}
+                    className="border-border"
+                  />
+                  <span className="text-[10px] text-muted-foreground font-mono">Paper Trading</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={!alpacaPaper}
+                    onChange={() => setAlpacaPaper(false)}
+                    className="border-border"
+                  />
+                  <span className="text-[10px] text-loss font-mono font-bold">⚠ Live Trading</span>
+                </label>
+              </div>
+            )}
           </div>
         )}
 
