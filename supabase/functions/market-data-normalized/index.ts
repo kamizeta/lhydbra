@@ -638,7 +638,7 @@ serve(async (req) => {
         allQuotes.push(...yBatch);
       }
 
-      // Fallback 4: Yahoo chart (parallel batches of 5)
+      // Fallback 5: Yahoo chart (parallel batches of 5)
       const stillMissing = allStockLike.filter(s => !fetched.has(s));
       if (stillMissing.length > 0) {
         const t5 = Date.now();
