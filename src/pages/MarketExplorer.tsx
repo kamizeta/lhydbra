@@ -459,8 +459,52 @@ export default function MarketExplorer() {
         })}
       </div>
 
-      {/* Table */}
-      <div className="terminal-border rounded-lg overflow-hidden">
+      {/* Mobile: Card layout */}
+      <div className="md:hidden space-y-2">
+        {filtered.map(asset => {
+          const features = featuresMap?.[asset.symbol];
+          const score = scoresMap?.[asset.symbol];
+          return (
+            <div key={asset.symbol} className="terminal-border rounded-lg p-2.5 space-y-1.5" onClick={() => {
+              let tvSymbol = asset.symbol.replace('/', '');
+              if (asset.type === 'crypto') tvSymbol = `BINANCE:${tvSymbol.replace('USD', 'USDT')}`;
+              else if (asset.type === 'forex') tvSymbol = `FX:${tvSymbol}`;
+              else tvSymbol = `NASDAQ:${asset.symbol}`;
+              (window.top || window).open(`https://www.tradingview.com/chart/?symbol=${tvSymbol}`, '_blank', 'noopener,noreferrer');
+            }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  {asset.isMock && <span className="rounded bg-purple-500/20 text-purple-400 text-[8px] font-bold px-1 py-0.5 border border-purple-500/30">MOCK</span>}
+                  <span className="font-mono font-bold text-xs text-foreground">{asset.symbol}</span>
+                  <StatusBadge variant={asset.type === 'crypto' ? 'info' : asset.type === 'stock' ? 'primary' : 'neutral'}>
+                    {asset.type === 'commodity' ? 'CMD' : asset.type === 'forex' ? 'FX' : asset.type.toUpperCase()}
+                  </StatusBadge>
+                </div>
+                <span className="font-mono font-medium text-xs text-foreground">{formatCurrency(asset.price, asset.price < 1 ? 4 : 2)}</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <div className="flex items-center gap-2">
+                  <span className={cn(asset.changePercent >= 0 ? "text-profit" : "text-loss")}>
+                    {asset.changePercent >= 0 ? '+' : ''}{formatNumber(asset.changePercent)}%
+                  </span>
+                  <span className="text-muted-foreground">RSI {features?.rsi_14 != null ? Math.round(features.rsi_14) : asset.rsi}</span>
+                  {score && (
+                    <span className={cn("font-bold px-1.5 py-0.5 rounded",
+                      score.total_score >= 70 ? "bg-profit/15 text-profit" : score.total_score >= 50 ? "bg-warning/15 text-warning" : "bg-loss/15 text-loss"
+                    )}>{score.total_score} {score.direction?.toUpperCase()}</span>
+                  )}
+                </div>
+                {features?.market_regime && (
+                  <RegimeBadge regime={features.market_regime} confidence={0} />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop: Table */}
+      <div className="hidden md:block terminal-border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
