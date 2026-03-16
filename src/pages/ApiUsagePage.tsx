@@ -54,7 +54,9 @@ const SOURCE_LABELS: Record<string, string> = {
   alphavantage: "Alpha Vantage",
   "yahoo-batch": "Yahoo Batch",
   "yahoo-chart": "Yahoo Chart",
-  "db-cache": "DB Cache",
+  "db-cache": "DB Cache (ohlcv)",
+  "db-cache-hit": "✅ Cache Hit (market_cache)",
+  "mem-cache": "⚡ Memory Cache",
 };
 
 const SOURCE_LIMITS: Record<string, string> = {
