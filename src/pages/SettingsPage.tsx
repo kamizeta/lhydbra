@@ -216,6 +216,7 @@ export default function SettingsPage() {
   const tabs: { key: Tab; label: string; icon: typeof Settings }[] = [
     { key: 'risk', label: 'Capital & Riesgo', icon: Shield },
     { key: 'scoring', label: 'Scoring Weights', icon: Target },
+    { key: 'notifications', label: 'Notificaciones', icon: Bell },
     { key: 'profile', label: 'Perfil', icon: User },
     { key: 'binance', label: 'Binance API', icon: Key },
   ];
