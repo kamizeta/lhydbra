@@ -373,43 +373,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Agent Activity Feed */}
-      <div className="terminal-border rounded-lg cursor-pointer" onClick={() => navigate('/agents')}>
-        <div className="flex items-center justify-between border-b border-border p-4">
-          <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-            <Bot className="h-4 w-4 text-primary" />
-            {t.dashboard.agentActivityFeed}
-          </h2>
-          <span className="text-xs font-mono text-muted-foreground">{agentOutputs.length} {t.dashboard.recentOutputs}</span>
-        </div>
-        <div className="divide-y divide-border/50">
-          {agentOutputs.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground text-xs font-mono">
-              Sin actividad de agentes. Ve al Panel de Agentes para ejecutar análisis.
-            </div>
-          ) : agentOutputs.slice(0, 5).map((output) => {
-            const severity = getAgentSeverity(output.agent_type, output.content);
-            return (
-              <div key={output.id} className="p-4 hover:bg-accent/30 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <StatusBadge variant={severity === 'critical' ? 'loss' : severity === 'warning' ? 'warning' : 'info'} dot>
-                      {AGENT_LABELS[output.agent_type] || output.agent_type}
-                    </StatusBadge>
-                    <span className="text-sm font-medium text-foreground">{extractTitle(output.content)}</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap ml-2">
-                    {new Date(output.created_at).toLocaleTimeString(dateLocale)}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground leading-relaxed line-clamp-2">
-                  {output.content.replace(/[#*_]/g, '').slice(0, 200)}...
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
