@@ -275,7 +275,7 @@ export default function PositionsPage() {
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-foreground">{formatCurrency(pnlData.currentPrice)}</span>
                         {pnlData.isMock && (
-                          <AlertTriangle className="h-3 w-3 text-purple-400" title="Mock data" />
+                          <AlertTriangle className="h-3 w-3 text-purple-400" />
                         )}
                       </div>
                     ) : (
