@@ -686,7 +686,7 @@ export default function SettingsPage() {
                 { key: 'signals', label: '💡 Señales de Trade', desc: 'Nuevas señales generadas por los agentes' },
                 { key: 'pnl_threshold', label: '💰 PnL Significativo', desc: 'Cuando una posición supera el umbral de ganancia/pérdida' },
                 { key: 'agents', label: '🤖 Agentes Completados', desc: 'Cuando finaliza un análisis de agentes' },
-              ] as const).map(({ key, label, desc, critical }) => {
+              ] as { key: string; label: string; desc: string; critical?: boolean }[]).map(({ key, label, desc, critical }) => {
                 const enabledKey = `${key}_enabled` as keyof NotificationPreferences;
                 const soundKey = `${key}_sound` as keyof NotificationPreferences;
                 return (
