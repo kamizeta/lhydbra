@@ -1,0 +1,1 @@
+ALTER TABLE public.positions ADD COLUMN IF NOT EXISTS signal_id uuid REFERENCES public.trade_signals(id) ON DELETE SET NULL;
