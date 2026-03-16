@@ -393,6 +393,135 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* Scoring Weights Tab */}
+      {activeTab === 'scoring' && (
+        <div className="max-w-2xl space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setWeights(defaultWeights)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground border border-border rounded-md hover:bg-accent transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" /> Reset Defaults
+              </button>
+              <span className={cn(
+                "text-xs font-mono",
+                totalWeight === 100 ? "text-profit" : "text-warning"
+              )}>
+                Total: {totalWeight}/100
+              </span>
+            </div>
+            <button
+              onClick={saveWeights}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? 'Saving...' : 'Save Weights'}
+            </button>
+          </div>
+
+          <div className="terminal-border rounded-lg p-5 space-y-5">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Target className="h-4 w-4 text-warning" />
+              Opportunity Score Weights
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Personaliza la importancia relativa de cada factor en el cálculo del Opportunity Score (0-100). Los pesos se normalizan automáticamente.
+            </p>
+
+            <div className="space-y-4">
+              {([
+                { field: 'structure_weight' as const, label: 'Structure', desc: 'Alineación de tendencia, SMAs y posición respecto a S/R', icon: '🏗️' },
+                { field: 'momentum_weight' as const, label: 'Momentum', desc: 'RSI, MACD y aceleración del precio', icon: '🚀' },
+                { field: 'volatility_weight' as const, label: 'Volatility', desc: 'Régimen de volatilidad: compresión = oportunidad', icon: '⚡' },
+                { field: 'strategy_weight' as const, label: 'Strategy', desc: 'Favorabilidad del régimen de mercado para trading', icon: '♟️' },
+                { field: 'rr_weight' as const, label: 'Risk:Reward', desc: 'Ratio riesgo/beneficio basado en S/R', icon: '🎯' },
+                { field: 'macro_weight' as const, label: 'Macro', desc: 'Contexto macro derivado de SMA50 vs SMA200', icon: '🌍' },
+                { field: 'sentiment_weight' as const, label: 'Sentiment', desc: 'Sentimiento contrarian basado en extremos RSI', icon: '💭' },
+                { field: 'historical_weight' as const, label: 'Historical', desc: 'Win rate y R-múltiplo de tu historial de trades', icon: '📊' },
+              ]).map(({ field, label, desc, icon }) => {
+                const value = weights[field] as number;
+                const pct = totalWeight > 0 ? (value / totalWeight * 100) : 0;
+                return (
+                  <div key={field} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{icon}</span>
+                        <div>
+                          <span className="text-xs font-bold text-foreground">{label}</span>
+                          <p className="text-[10px] text-muted-foreground">{desc}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-mono text-muted-foreground">{pct.toFixed(0)}%</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={value}
+                          onChange={(e) => updateWeight(field, Math.max(0, Math.min(100, Number(e.target.value))))}
+                          className="w-16 px-2 py-1 bg-background border border-border rounded-md text-xs text-foreground font-mono text-right focus:ring-1 focus:ring-primary focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all", 
+                          pct > 20 ? "bg-primary" : pct > 10 ? "bg-warning" : "bg-muted-foreground"
+                        )}
+                        style={{ width: `${Math.min(100, pct)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Visual weight distribution */}
+            <div className="rounded-md bg-accent/50 p-3 space-y-2">
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Distribución de pesos</p>
+              <div className="flex h-4 rounded-full overflow-hidden">
+                {[
+                  { field: 'structure_weight' as const, color: 'bg-primary' },
+                  { field: 'momentum_weight' as const, color: 'bg-profit' },
+                  { field: 'volatility_weight' as const, color: 'bg-warning' },
+                  { field: 'strategy_weight' as const, color: 'bg-info' },
+                  { field: 'rr_weight' as const, color: 'bg-accent-foreground' },
+                  { field: 'macro_weight' as const, color: 'bg-muted-foreground' },
+                  { field: 'sentiment_weight' as const, color: 'bg-loss' },
+                  { field: 'historical_weight' as const, color: 'bg-secondary-foreground' },
+                ].map(({ field, color }) => {
+                  const val = weights[field] as number;
+                  const pct = totalWeight > 0 ? (val / totalWeight * 100) : 0;
+                  return pct > 0 ? (
+                    <div key={field} className={cn("h-full", color)} style={{ width: `${pct}%` }} title={`${field.replace('_weight', '')}: ${val}`} />
+                  ) : null;
+                })}
+              </div>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {[
+                  { label: 'STR', color: 'bg-primary' },
+                  { label: 'MOM', color: 'bg-profit' },
+                  { label: 'VOL', color: 'bg-warning' },
+                  { label: 'STRAT', color: 'bg-info' },
+                  { label: 'R:R', color: 'bg-accent-foreground' },
+                  { label: 'MAC', color: 'bg-muted-foreground' },
+                  { label: 'SENT', color: 'bg-loss' },
+                  { label: 'HIST', color: 'bg-secondary-foreground' },
+                ].map(({ label, color }) => (
+                  <div key={label} className="flex items-center gap-1">
+                    <div className={cn("h-2 w-2 rounded-full", color)} />
+                    <span className="text-[9px] font-mono text-muted-foreground">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Profile Tab */}
       {activeTab === 'profile' && (
         <div className="max-w-lg space-y-6">
