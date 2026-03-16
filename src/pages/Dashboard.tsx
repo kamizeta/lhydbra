@@ -124,8 +124,8 @@ export default function Dashboard() {
 
   const dateLocale = language === 'es' ? 'es-ES' : language === 'pt' ? 'pt-BR' : language === 'fr' ? 'fr-FR' : 'en-US';
 
-  const portfolioValue = settings.current_capital + unrealizedPnl;
   const totalRealizedPnl = closedPositions.reduce((sum, p) => sum + (p.pnl || 0), 0);
+  const portfolioValue = settings.current_capital + totalRealizedPnl + unrealizedPnl;
   const pnlPercent = settings.initial_capital > 0 ? ((portfolioValue - settings.initial_capital) / settings.initial_capital) * 100 : 0;
 
   const totalExposure = positions.reduce((sum, p) => sum + (p.quantity * p.avg_entry), 0);
