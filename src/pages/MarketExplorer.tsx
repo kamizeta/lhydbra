@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X, AlertTriangle, Brain, Zap, Activity, BarChart3, Shield, Target } from "lucide-react";
+import { Search, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X, AlertTriangle, Brain, Zap, Activity, BarChart3, Shield, Target, Lightbulb } from "lucide-react";
 import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolume } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import { useMarketFeaturesDB, useRunDataIntelligence } from "@/hooks/useDataIntelligence";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength' | 'score';
 
@@ -77,6 +78,7 @@ export default function MarketExplorer() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showFeatures, setShowFeatures] = useState(true);
   const [regimeFilter, setRegimeFilter] = useState<string | null>(null);
+  const [generatingIdeas, setGeneratingIdeas] = useState(false);
 
   const typeFilters: { label: string; value: AssetType | 'all' }[] = [
     { label: t.common.all, value: 'all' },
@@ -261,6 +263,39 @@ export default function MarketExplorer() {
         >
           <Activity className="h-3.5 w-3.5" />
           {showFeatures ? 'Features ON' : 'Features OFF'}
+        </button>
+
+        <button
+          onClick={async () => {
+            setGeneratingIdeas(true);
+            try {
+              const { data, error } = await supabase.functions.invoke('regime-trade-ideas', {
+                body: { min_score: 45 },
+              });
+              if (error) throw error;
+              if (data?.count > 0) {
+                toast({ title: `⚡ ${data.count} ideas generadas`, description: `${data.skipped_existing} existentes omitidas, ${data.skipped_neutral} en régimen neutral omitidas. Ve a Trade Ideas.` });
+              } else {
+                toast({ title: '📊 Sin nuevas ideas', description: `No hay oportunidades con score ≥ 45 en regímenes accionables. ${data?.skipped_existing || 0} ya existentes, ${data?.skipped_neutral || 0} en régimen neutral.` });
+              }
+            } catch (e: any) {
+              toast({ title: 'Error', description: e.message || 'Error generando ideas', variant: 'destructive' });
+            } finally {
+              setGeneratingIdeas(false);
+            }
+          }}
+          disabled={generatingIdeas || !featuresMap || featuresCount === 0}
+          className={cn(
+            "rounded-md px-3 py-2 text-xs font-medium flex items-center gap-1.5 transition-colors",
+            generatingIdeas
+              ? "bg-warning/15 text-warning border border-warning/30 cursor-wait"
+              : featuresCount > 0
+                ? "bg-terminal-gold/15 text-terminal-gold border border-terminal-gold/30 hover:bg-terminal-gold/25"
+                : "bg-secondary text-muted-foreground cursor-not-allowed"
+          )}
+        >
+          {generatingIdeas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lightbulb className="h-3.5 w-3.5" />}
+          {generatingIdeas ? 'Generando...' : 'Auto-Ideas'}
         </button>
       </div>
 
