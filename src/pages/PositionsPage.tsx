@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart, Pencil, Check } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart, Pencil, Check, RefreshCw, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
