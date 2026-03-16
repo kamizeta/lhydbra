@@ -100,20 +100,42 @@ export default function RiskManagement() {
     { label: t.riskMgmt.minRRRatio, value: `${settings.min_rr_ratio}:1`, status: 'ok' as const },
   ];
 
-  // Position sizing from real data: use first open position or zeros
-  const firstPos = positions[0];
+  // Consolidated risk per position
   const accountSize = settings.current_capital;
   const riskPercent = settings.risk_per_trade;
-  const entryPrice = firstPos ? Number(firstPos.avg_entry) : 0;
-  const stopLossPrice = firstPos?.stop_loss ? Number(firstPos.stop_loss) : 0;
-  const riskPerUnit = entryPrice > 0 && stopLossPrice > 0 ? Math.abs(entryPrice - stopLossPrice) : 0;
-  const dollarRisk = accountSize * (riskPercent / 100);
-  // For crypto/forex use fractional sizing; for stocks use whole shares
-  const rawPositionSize = riskPerUnit > 0 ? dollarRisk / riskPerUnit : 0;
-  const isFractional = firstPos?.asset_type === 'crypto' || firstPos?.asset_type === 'forex';
-  const positionSize = isFractional
-    ? parseFloat(rawPositionSize.toFixed(6))
-    : Math.floor(rawPositionSize);
+  const dollarRiskPerTrade = accountSize * (riskPercent / 100);
+
+  const positionRiskDetails = positions.map(p => {
+    const entry = Number(p.avg_entry);
+    const sl = p.stop_loss ? Number(p.stop_loss) : 0;
+    const tp = p.take_profit ? Number(p.take_profit) : 0;
+    const riskPerUnit = entry > 0 && sl > 0 ? Math.abs(entry - sl) : 0;
+    const riskDollars = riskPerUnit * p.quantity;
+    const riskPct = accountSize > 0 ? (riskDollars / accountSize) * 100 : 0;
+    const exposureValue = p.quantity * entry;
+    const exposurePct = accountSize > 0 ? (exposureValue / accountSize) * 100 : 0;
+    const rewardPerUnit = tp > 0 ? Math.abs(tp - entry) : 0;
+    const rr = riskPerUnit > 0 && rewardPerUnit > 0 ? rewardPerUnit / riskPerUnit : 0;
+    const isFractional = p.asset_type === 'crypto' || p.asset_type === 'forex';
+    const idealSize = riskPerUnit > 0 ? dollarRiskPerTrade / riskPerUnit : 0;
+    const idealSizeDisplay = isFractional ? parseFloat(idealSize.toFixed(6)) : Math.floor(idealSize);
+    const isSLMissing = !p.stop_loss;
+    const isOversized = p.quantity > idealSize * 1.1; // >10% over ideal
+
+    return {
+      ...p,
+      entry, sl, tp, riskPerUnit, riskDollars, riskPct,
+      exposureValue, exposurePct, rr, isFractional,
+      idealSize: idealSizeDisplay, isSLMissing, isOversized,
+    };
+  });
+
+  const totalRiskAll = positionRiskDetails.reduce((s, p) => s + p.riskDollars, 0);
+  const totalRiskPctAll = accountSize > 0 ? (totalRiskAll / accountSize) * 100 : 0;
+  const capitalInvested = positionRiskDetails.reduce((s, p) => s + p.exposureValue, 0);
+  const capitalAvailable = accountSize;
+  const positionsWithoutSL = positionRiskDetails.filter(p => p.isSLMissing).length;
+  const oversizedPositions = positionRiskDetails.filter(p => p.isOversized).length;
 
   const typeLabels: Record<string, string> = {
     crypto: t.common.crypto,
@@ -173,97 +195,170 @@ export default function RiskManagement() {
           </div>
         </div>
 
-        {/* Position Sizing Calculator */}
+        {/* Account Risk Overview */}
         <div className="terminal-border rounded-lg p-4">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
-            <BarChart3 className="h-4 w-4 text-primary" /> {t.riskMgmt.positionSizing}
+            <BarChart3 className="h-4 w-4 text-primary" /> Resumen de Cuenta
           </h2>
           <div className="space-y-3">
+            {/* Account summary */}
             <div className="rounded-md bg-accent/50 p-3 space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">{t.riskMgmt.accountSize}</span>
-                <span className="font-mono text-foreground">{formatCurrency(accountSize)}</span>
+                <span className="font-mono text-foreground font-medium">{formatCurrency(accountSize)}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">{t.riskMgmt.riskPercent}</span>
-                <span className="font-mono text-foreground">{riskPercent}%</span>
+                <span className="text-muted-foreground">Capital Invertido</span>
+                <span className="font-mono text-foreground">{formatCurrency(capitalInvested)}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">{t.riskMgmt.dollarAtRisk}</span>
-                <span className="font-mono text-loss">{formatCurrency(dollarRisk)}</span>
-              </div>
-              {firstPos ? (
-                <>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">{t.common.entry} ({firstPos.symbol})</span>
-                    <span className="font-mono text-foreground">{formatCurrency(entryPrice)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">{t.common.stopLoss}</span>
-                    <span className="font-mono text-loss">{formatCurrency(stopLossPrice)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">{t.riskMgmt.riskPerShare}</span>
-                    <span className="font-mono text-foreground">{formatCurrency(riskPerUnit)}</span>
-                  </div>
-                </>
-              ) : (
-                <p className="text-[10px] text-muted-foreground italic text-center pt-1">
-                  Sin posiciones abiertas — datos en vivo aparecerán aquí
-                </p>
-              )}
-            </div>
-            <div className="rounded-md bg-primary/10 border border-primary/20 p-3 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-medium text-foreground">{t.riskMgmt.positionSize}</span>
-                <span className="text-xl font-bold font-mono text-primary">
-                  {positionSize > 0 ? `${positionSize} ${isFractional ? 'units' : t.riskMgmt.shares}` : '—'}
+                <span className="text-muted-foreground">Riesgo Total Abierto</span>
+                <span className={cn("font-mono font-medium", totalRiskPctAll > settings.max_daily_risk ? "text-loss" : "text-warning")}>
+                  {formatCurrency(totalRiskAll)} ({formatNumber(totalRiskPctAll)}%)
                 </span>
               </div>
-              {positionSize > 0 && (
-                <>
-                  <p className="text-[10px] text-muted-foreground">
-                    {t.riskMgmt.totalValue}: {formatCurrency(positionSize * entryPrice)}
-                  </p>
-                  <div className="border-t border-primary/20 pt-2 mt-1">
-                    <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      💡 {isFractional ? (
-                        <>Con tu cuenta de <span className="text-foreground font-medium">{formatCurrency(accountSize)}</span> arriesgando <span className="text-loss font-medium">{riskPercent}%</span> ({formatCurrency(dollarRisk)}), puedes comprar <span className="text-primary font-medium">{positionSize}</span> {firstPos?.symbol?.split('/')[0] || 'unidades'}. Si el precio toca tu Stop Loss, perderás máximo <span className="text-loss font-medium">{formatCurrency(dollarRisk)}</span>.</>
-                      ) : (
-                        <>Con tu cuenta de <span className="text-foreground font-medium">{formatCurrency(accountSize)}</span> arriesgando <span className="text-loss font-medium">{riskPercent}%</span> ({formatCurrency(dollarRisk)}), puedes comprar <span className="text-primary font-medium">{positionSize} acciones</span>. Si el precio toca tu Stop Loss, perderás máximo <span className="text-loss font-medium">{formatCurrency(dollarRisk)}</span>.</>
-                      )}
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Exposure by type */}
-          <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mt-6 mb-3">{t.riskMgmt.exposureByMarket}</h3>
-          {(['crypto', 'stock', 'etf', 'commodity'] as const).map(type => {
-            const alloc = totalCapital > 0 ? ((exposureByType[type] || 0) / totalCapital) * 100 : 0;
-            return (
-              <div key={type} className="flex items-center justify-between py-1.5">
-                <span className="text-xs text-muted-foreground">{typeLabels[type]}</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full", alloc > settings.max_single_asset ? "bg-warning" : "bg-primary")}
-                      style={{ width: `${Math.min(alloc, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-mono text-foreground w-12 text-right">{formatNumber(alloc)}%</span>
-                </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Posiciones Abiertas</span>
+                <span className="font-mono text-foreground">{openCount} / {settings.max_positions}</span>
               </div>
-            );
-          })}
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Riesgo por Trade (regla)</span>
+                <span className="font-mono text-foreground">{riskPercent}% = {formatCurrency(dollarRiskPerTrade)}</span>
+              </div>
+            </div>
 
-          {openCount === 0 && (
-            <p className="text-xs text-muted-foreground text-center mt-4 italic">No hay posiciones abiertas</p>
-          )}
+            {/* Alerts */}
+            {(positionsWithoutSL > 0 || oversizedPositions > 0) && (
+              <div className="rounded-md bg-loss/10 border border-loss/20 p-2 space-y-1">
+                {positionsWithoutSL > 0 && (
+                  <p className="text-[10px] text-loss flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> {positionsWithoutSL} posición(es) sin Stop Loss
+                  </p>
+                )}
+                {oversizedPositions > 0 && (
+                  <p className="text-[10px] text-warning flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> {oversizedPositions} posición(es) sobredimensionada(s)
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Exposure by type */}
+            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mt-3 mb-2">{t.riskMgmt.exposureByMarket}</h3>
+            {(['crypto', 'stock', 'etf', 'forex', 'commodity'] as const).map(type => {
+              const alloc = totalCapital > 0 ? ((exposureByType[type] || 0) / totalCapital) * 100 : 0;
+              if (alloc === 0) return null;
+              return (
+                <div key={type} className="flex items-center justify-between py-1">
+                  <span className="text-xs text-muted-foreground">{typeLabels[type] || type}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full", alloc > settings.max_single_asset ? "bg-warning" : "bg-primary")}
+                        style={{ width: `${Math.min(alloc, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-mono text-foreground w-14 text-right">{formatNumber(alloc)}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
+
+      {/* Per-Position Risk Breakdown */}
+      {positions.length > 0 && (
+        <div className="terminal-border rounded-lg p-4">
+          <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
+            <Activity className="h-4 w-4 text-primary" /> Riesgo por Posición
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-2 text-muted-foreground font-medium">Activo</th>
+                  <th className="text-right py-2 text-muted-foreground font-medium">Cantidad</th>
+                  <th className="text-right py-2 text-muted-foreground font-medium">Entrada</th>
+                  <th className="text-right py-2 text-muted-foreground font-medium">Stop Loss</th>
+                  <th className="text-right py-2 text-muted-foreground font-medium">Riesgo $</th>
+                  <th className="text-right py-2 text-muted-foreground font-medium">Riesgo %</th>
+                  <th className="text-right py-2 text-muted-foreground font-medium">R:R</th>
+                  <th className="text-right py-2 text-muted-foreground font-medium">Tamaño Ideal</th>
+                  <th className="text-center py-2 text-muted-foreground font-medium">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {positionRiskDetails.map((p, i) => (
+                  <tr key={i} className="border-b border-border/30 hover:bg-accent/30">
+                    <td className="py-2">
+                      <div>
+                        <span className="font-medium text-foreground">{p.symbol}</span>
+                        <span className={cn("ml-1.5 text-[10px]", p.direction === 'long' ? 'text-profit' : 'text-loss')}>
+                          {p.direction === 'long' ? '▲ LONG' : '▼ SHORT'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="text-right py-2 font-mono text-foreground">{p.isFractional ? p.quantity : Math.floor(p.quantity)}</td>
+                    <td className="text-right py-2 font-mono text-foreground">{formatCurrency(p.entry)}</td>
+                    <td className="text-right py-2 font-mono">
+                      {p.isSLMissing ? (
+                        <span className="text-loss">⚠ Sin SL</span>
+                      ) : (
+                        <span className="text-loss">{formatCurrency(p.sl)}</span>
+                      )}
+                    </td>
+                    <td className="text-right py-2 font-mono text-loss">{formatCurrency(p.riskDollars)}</td>
+                    <td className={cn("text-right py-2 font-mono", p.riskPct > riskPercent ? "text-loss font-bold" : "text-foreground")}>
+                      {formatNumber(p.riskPct)}%
+                    </td>
+                    <td className={cn("text-right py-2 font-mono", p.rr >= settings.min_rr_ratio ? "text-profit" : p.rr > 0 ? "text-warning" : "text-muted-foreground")}>
+                      {p.rr > 0 ? `${p.rr.toFixed(1)}:1` : '—'}
+                    </td>
+                    <td className="text-right py-2 font-mono text-primary">
+                      {p.isSLMissing ? '—' : p.idealSize}
+                    </td>
+                    <td className="text-center py-2">
+                      {p.isSLMissing ? (
+                        <StatusBadge variant="loss" dot>SIN SL</StatusBadge>
+                      ) : p.isOversized ? (
+                        <StatusBadge variant="warning" dot>EXCESO</StatusBadge>
+                      ) : p.riskPct > riskPercent ? (
+                        <StatusBadge variant="warning" dot>ALTO</StatusBadge>
+                      ) : (
+                        <StatusBadge variant="profit" dot>OK</StatusBadge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-border">
+                  <td className="py-2 font-medium text-foreground" colSpan={4}>TOTAL</td>
+                  <td className="text-right py-2 font-mono text-loss font-medium">{formatCurrency(totalRiskAll)}</td>
+                  <td className={cn("text-right py-2 font-mono font-medium", totalRiskPctAll > settings.max_daily_risk ? "text-loss" : "text-foreground")}>
+                    {formatNumber(totalRiskPctAll)}%
+                  </td>
+                  <td colSpan={3}></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {positions.length > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
+              💡 <strong>Tamaño Ideal</strong> = cantidad que deberías tener para arriesgar exactamente {riskPercent}% ({formatCurrency(dollarRiskPerTrade)}) por posición. 
+              Si tu cantidad actual es mayor al ideal, la posición está <span className="text-warning">sobredimensionada</span>.
+            </p>
+          )}
+        </div>
+      )}
+
+      {openCount === 0 && (
+        <div className="terminal-border rounded-lg p-8 text-center">
+          <Shield className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">No hay posiciones abiertas — abre posiciones para ver el análisis de riesgo detallado</p>
+        </div>
+      )}
     </div>
   );
 }
