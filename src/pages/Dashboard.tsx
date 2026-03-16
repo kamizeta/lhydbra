@@ -184,17 +184,17 @@ export default function Dashboard() {
   const typeLabels: Record<string, string> = { crypto: 'Crypto', stock: 'Acciones', etf: 'ETFs', forex: 'Forex', commodity: 'Commodities' };
 
   return (
-    <div className="p-6 space-y-6 animate-slide-in">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 animate-slide-in">
       <OnboardingTutorial />
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{t.dashboard.title}</h1>
-          <p className="text-sm text-muted-foreground font-mono">{t.dashboard.subtitle} • {new Date().toLocaleDateString(dateLocale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-lg md:text-2xl font-bold text-foreground">{t.dashboard.title}</h1>
+          <p className="text-[10px] md:text-sm text-muted-foreground font-mono truncate">{new Date().toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' })}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge variant="profit" dot>{t.common.marketOpen}</StatusBadge>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <StatusBadge variant="profit" dot><span className="hidden sm:inline">{t.common.marketOpen}</span><span className="sm:hidden">Live</span></StatusBadge>
           {(warnings.length > 0 || riskAlerts.length > 0) && (
-            <StatusBadge variant="warning" dot>{warnings.length + riskAlerts.length} alertas</StatusBadge>
+            <StatusBadge variant="warning" dot>{warnings.length + riskAlerts.length}</StatusBadge>
           )}
         </div>
       </div>
@@ -212,21 +212,21 @@ export default function Dashboard() {
       )}
 
       {/* Top metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
         <div className="cursor-pointer" onClick={() => navigate('/settings')}>
-          <MetricCard label={t.dashboard.portfolioValue} value={formatCurrency(portfolioValue)} change={`Capital inicial: ${formatCurrency(settings.initial_capital)} | PnL: ${totalRealizedPnl >= 0 ? '+' : ''}${formatCurrency(totalRealizedPnl)} | PnL Abierto: ${unrealizedPnl >= 0 ? '+' : ''}${formatCurrency(unrealizedPnl)}`} changeType={totalRealizedPnl + unrealizedPnl >= 0 ? "positive" : "negative"} icon={DollarSign} />
+          <MetricCard label="Portfolio" value={formatCurrency(portfolioValue)} change={`PnL ${totalRealizedPnl >= 0 ? '+' : ''}${formatCurrency(totalRealizedPnl)}`} changeType={totalRealizedPnl + unrealizedPnl >= 0 ? "positive" : "negative"} icon={DollarSign} />
         </div>
         <div className="cursor-pointer" onClick={() => navigate('/portfolio')}>
-          <MetricCard label={t.dashboard.dailyPnl} value={totalRealizedPnl >= 0 ? `+${formatCurrency(totalRealizedPnl)}` : formatCurrency(totalRealizedPnl)} change={`${pnlPercent >= 0 ? '+' : ''}${formatNumber(pnlPercent)}% total`} changeType={totalRealizedPnl >= 0 ? "positive" : "negative"} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} />
+          <MetricCard label="PnL" value={totalRealizedPnl >= 0 ? `+${formatCurrency(totalRealizedPnl)}` : formatCurrency(totalRealizedPnl)} change={`${pnlPercent >= 0 ? '+' : ''}${formatNumber(pnlPercent)}%`} changeType={totalRealizedPnl >= 0 ? "positive" : "negative"} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} />
         </div>
         <div className="cursor-pointer relative" onClick={() => setShowRiskDetail(!showRiskDetail)}>
-          <MetricCard label={t.dashboard.riskUsed} value={`${formatNumber(dailyRiskUsed)}%`} change={`${settings.max_daily_risk}% ${t.dashboard.ofDailyLimit}`} changeType="neutral" icon={Shield} subtitle={`Exposición: ${formatCurrency(totalExposure)}`} />
+          <MetricCard label="Riesgo" value={`${formatNumber(dailyRiskUsed)}%`} change={`${exposurePercent.toFixed(0)}% exp`} changeType="neutral" icon={Shield} />
           <div className="absolute top-2 right-2 text-muted-foreground">
-            {showRiskDetail ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {showRiskDetail ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </div>
         </div>
         <div className="cursor-pointer" onClick={() => navigate('/portfolio')}>
-          <MetricCard label={t.dashboard.activePositions} value={`${positions.length}`} change={`${pendingSignals.length} ${t.dashboard.pendingIdeas}`} changeType="neutral" icon={Activity} subtitle={`${t.dashboard.max}: ${settings.max_positions}`} />
+          <MetricCard label="Posiciones" value={`${positions.length}/${settings.max_positions}`} change={`${pendingSignals.length} ideas`} changeType="neutral" icon={Activity} />
         </div>
       </div>
 
@@ -301,17 +301,34 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Portfolio Positions */}
         <div className="lg:col-span-2 terminal-border rounded-lg cursor-pointer" onClick={() => navigate('/portfolio')}>
-          <div className="flex items-center justify-between border-b border-border p-4">
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <PieChart className="h-4 w-4 text-primary" />
-              {t.dashboard.openPositions}
+          <div className="flex items-center justify-between border-b border-border p-3">
+            <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
+              <PieChart className="h-3.5 w-3.5 text-primary" />
+              Posiciones
             </h2>
-            <span className="text-xs font-mono text-muted-foreground">{positions.length} {t.common.active}</span>
+            <span className="text-[10px] font-mono text-muted-foreground">{positions.length} abiertas</span>
           </div>
-          <div className="overflow-x-auto">
+          {/* Mobile: card layout */}
+          <div className="md:hidden p-2 space-y-2">
+            {positions.length === 0 ? (
+              <p className="text-center text-muted-foreground text-[10px] font-mono py-4">Sin posiciones</p>
+            ) : positions.map((pos) => (
+              <div key={pos.id} className="flex items-center justify-between py-1.5 px-2 border-b border-border/50 last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-medium text-xs text-foreground">{pos.symbol}</span>
+                  <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
+                    {pos.direction === 'long' ? '▲' : '▼'}
+                  </StatusBadge>
+                </div>
+                <span className="text-[10px] font-mono text-muted-foreground">${Number(pos.avg_entry).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+          {/* Desktop: table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
@@ -333,8 +350,7 @@ export default function Dashboard() {
                     </td>
                     <td className="text-center p-3">
                       <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
-                        {pos.direction === 'long' ? <TrendingUp className="h-3 w-3 inline" /> : <TrendingDown className="h-3 w-3 inline" />}
-                        {' '}{pos.direction.toUpperCase()}
+                        {pos.direction.toUpperCase()}
                       </StatusBadge>
                     </td>
                     <td className="text-right p-3 font-mono text-foreground">{pos.quantity}</td>
@@ -350,12 +366,12 @@ export default function Dashboard() {
         </div>
 
         {/* Right column */}
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Pending Ideas */}
-          <div className="terminal-border rounded-lg p-4 space-y-3 cursor-pointer" onClick={() => navigate('/trade-ideas')}>
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              {t.dashboard.pendingTradeIdeas}
+          <div className="terminal-border rounded-lg p-3 space-y-2 cursor-pointer" onClick={() => navigate('/trade-ideas')}>
+            <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
+              <Zap className="h-3.5 w-3.5 text-primary" />
+              Ideas
             </h2>
             {pendingSignals.length === 0 ? (
               <p className="text-xs text-muted-foreground font-mono">Sin ideas pendientes. Ejecuta los agentes para generar nuevas.</p>
@@ -374,10 +390,10 @@ export default function Dashboard() {
           </div>
 
           {/* Capital & Risk Summary */}
-          <div className="terminal-border rounded-lg p-4 space-y-3 cursor-pointer" onClick={() => navigate('/settings')}>
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-primary" />
-              Capital & Riesgo
+          <div className="terminal-border rounded-lg p-3 space-y-2 cursor-pointer" onClick={() => navigate('/settings')}>
+            <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
+              <DollarSign className="h-3.5 w-3.5 text-primary" />
+              Capital
             </h2>
             <div className="space-y-2 text-xs font-mono">
               <div className="flex justify-between"><span className="text-muted-foreground">Capital Inicial</span><span className="text-foreground">{formatCurrency(settings.initial_capital)}</span></div>
@@ -388,10 +404,10 @@ export default function Dashboard() {
           </div>
 
           {/* Alerts */}
-          <div className="terminal-border rounded-lg p-4 space-y-3 cursor-pointer" onClick={() => navigate('/agents')}>
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-warning" />
-              {t.dashboard.activeAlerts}
+          <div className="terminal-border rounded-lg p-3 space-y-2 cursor-pointer" onClick={() => navigate('/agents')}>
+            <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+              Alertas
             </h2>
             {warnings.length === 0 ? (
               <p className="text-xs text-muted-foreground font-mono">Sin alertas activas</p>

@@ -185,55 +185,56 @@ export default function MarketExplorer() {
   );
 
   return (
-    <div className="p-6 space-y-6 animate-slide-in">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-6 animate-slide-in">
       {mockCount > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-purple-500/30 bg-purple-500/10 px-4 py-3">
-          <AlertTriangle className="h-4 w-4 text-purple-400 shrink-0" />
-          <p className="text-sm text-purple-300">
-            <span className="font-bold">{mockCount} activos</span> muestran datos <span className="font-bold uppercase">no reales</span> (mock/demo).
+        <div className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2">
+          <AlertTriangle className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+          <p className="text-[10px] md:text-sm text-purple-300">
+            <span className="font-bold">{mockCount}</span> mock
           </p>
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{t.market.title}</h1>
-          <p className="text-sm text-muted-foreground font-mono">{t.market.subtitle}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-lg md:text-2xl font-bold text-foreground">{t.market.title}</h1>
+          <p className="text-[10px] md:text-sm text-muted-foreground font-mono truncate">{t.market.subtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
           {isLoading && (
             <StatusBadge variant="info" dot>
-              <Loader2 className="h-3 w-3 animate-spin mr-1" />{t.common.loadingLiveData}
+              <Loader2 className="h-3 w-3 animate-spin" />
             </StatusBadge>
           )}
           {!isLoading && liveAssets && liveAssets.length > 0 && (
-            <StatusBadge variant="profit" dot>{t.common.live}</StatusBadge>
+            <StatusBadge variant="profit" dot><span className="hidden sm:inline">{t.common.live}</span><span className="sm:hidden">•</span></StatusBadge>
           )}
-          {featuresCount > 0 && (
-            <StatusBadge variant="info" dot>
-              <Brain className="h-3 w-3 mr-1" />{featuresCount} features
-            </StatusBadge>
-          )}
-          {scoresCount > 0 && (
-            <StatusBadge variant="warning" dot>
-              <Target className="h-3 w-3 mr-1" />{scoresCount} scores
-            </StatusBadge>
-          )}
+          <span className="hidden md:flex items-center gap-1.5">
+            {featuresCount > 0 && (
+              <StatusBadge variant="info" dot>
+                <Brain className="h-3 w-3 mr-1" />{featuresCount}
+              </StatusBadge>
+            )}
+            {scoresCount > 0 && (
+              <StatusBadge variant="warning" dot>
+                <Target className="h-3 w-3 mr-1" />{scoresCount}
+              </StatusBadge>
+            )}
+          </span>
           <button
             onClick={() => autoRefresh.toggle()}
             className={cn(
-              "rounded-md px-3 py-2 text-xs font-medium flex items-center gap-1.5 transition-colors",
+              "rounded-md px-2 py-1.5 text-[10px] md:text-xs font-medium flex items-center gap-1 transition-colors",
               autoRefresh.enabled
-                ? "bg-profit/15 text-profit border border-profit/30 hover:bg-profit/25"
-                : "bg-secondary text-muted-foreground hover:text-foreground"
+                ? "bg-profit/15 text-profit border border-profit/30"
+                : "bg-secondary text-muted-foreground"
             )}
-            title={autoRefresh.enabled ? `Auto-refresh: ${countdown}s` : 'Auto-refresh off'}
           >
-            {autoRefresh.enabled ? <Timer className="h-3.5 w-3.5" /> : <TimerOff className="h-3.5 w-3.5" />}
+            {autoRefresh.enabled ? <Timer className="h-3 w-3" /> : <TimerOff className="h-3 w-3" />}
             {autoRefresh.enabled ? `${countdown}s` : 'Off'}
           </button>
-          <button onClick={() => { refetch(); setCountdown(60); }} className="rounded-md bg-secondary p-2 text-muted-foreground hover:text-foreground transition-colors">
-            <RefreshCw className="h-4 w-4" />
+          <button onClick={() => { refetch(); setCountdown(60); }} className="rounded-md bg-secondary p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+            <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -300,29 +301,29 @@ export default function MarketExplorer() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[240px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-4">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input
             type="text"
             placeholder={t.common.searchAssets}
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-8 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className="w-full rounded-md border border-input bg-background py-1.5 pl-8 pr-7 text-xs md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
           {search && (
-            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-              <X className="h-4 w-4" />
+            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto pb-1 -mb-1 scrollbar-none">
           {typeFilters.map(f => (
             <button
               key={f.value}
               onClick={() => setTypeFilter(f.value)}
               className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                "rounded-md px-2.5 py-1.5 text-[10px] md:text-xs font-medium transition-colors whitespace-nowrap shrink-0",
                 typeFilter === f.value
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-secondary-foreground hover:bg-accent"
@@ -441,25 +442,69 @@ export default function MarketExplorer() {
         </div>
       )}
 
-      {/* Market stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {/* Market stats - horizontal scroll on mobile */}
+      <div className="flex md:grid md:grid-cols-5 gap-2 md:gap-4 overflow-x-auto pb-1 -mb-1 scrollbar-none">
         {(['crypto', 'stock', 'etf', 'forex', 'commodity'] as AssetType[]).map(type => {
           const typeAssets = assets.filter(a => a.type === type);
           const avgChange = typeAssets.length > 0 ? typeAssets.reduce((s, a) => s + a.changePercent, 0) / typeAssets.length : 0;
           return (
-            <div key={type} className="terminal-border rounded-lg p-3">
-              <p className="text-xs uppercase text-muted-foreground tracking-wider">{typeLabels[type]}</p>
-              <p className={cn("text-lg font-bold font-mono mt-1", avgChange >= 0 ? "text-profit" : "text-loss")}>
+            <div key={type} className="terminal-border rounded-lg p-2 md:p-3 min-w-[100px] shrink-0 md:shrink md:min-w-0">
+              <p className="text-[10px] md:text-xs uppercase text-muted-foreground tracking-wider">{typeLabels[type]}</p>
+              <p className={cn("text-sm md:text-lg font-bold font-mono mt-0.5", avgChange >= 0 ? "text-profit" : "text-loss")}>
                 {avgChange >= 0 ? '+' : ''}{formatNumber(avgChange)}%
               </p>
-              <p className="text-xs text-muted-foreground">{typeAssets.length} {t.common.assets}</p>
+              <p className="text-[10px] text-muted-foreground">{typeAssets.length}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Table */}
-      <div className="terminal-border rounded-lg overflow-hidden">
+      {/* Mobile: Card layout */}
+      <div className="md:hidden space-y-2">
+        {filtered.map(asset => {
+          const features = featuresMap?.[asset.symbol];
+          const score = scoresMap?.[asset.symbol];
+          return (
+            <div key={asset.symbol} className="terminal-border rounded-lg p-2.5 space-y-1.5" onClick={() => {
+              let tvSymbol = asset.symbol.replace('/', '');
+              if (asset.type === 'crypto') tvSymbol = `BINANCE:${tvSymbol.replace('USD', 'USDT')}`;
+              else if (asset.type === 'forex') tvSymbol = `FX:${tvSymbol}`;
+              else tvSymbol = `NASDAQ:${asset.symbol}`;
+              (window.top || window).open(`https://www.tradingview.com/chart/?symbol=${tvSymbol}`, '_blank', 'noopener,noreferrer');
+            }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  {asset.isMock && <span className="rounded bg-purple-500/20 text-purple-400 text-[8px] font-bold px-1 py-0.5 border border-purple-500/30">MOCK</span>}
+                  <span className="font-mono font-bold text-xs text-foreground">{asset.symbol}</span>
+                  <StatusBadge variant={asset.type === 'crypto' ? 'info' : asset.type === 'stock' ? 'primary' : 'neutral'}>
+                    {asset.type === 'commodity' ? 'CMD' : asset.type === 'forex' ? 'FX' : asset.type.toUpperCase()}
+                  </StatusBadge>
+                </div>
+                <span className="font-mono font-medium text-xs text-foreground">{formatCurrency(asset.price, asset.price < 1 ? 4 : 2)}</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-mono">
+                <div className="flex items-center gap-2">
+                  <span className={cn(asset.changePercent >= 0 ? "text-profit" : "text-loss")}>
+                    {asset.changePercent >= 0 ? '+' : ''}{formatNumber(asset.changePercent)}%
+                  </span>
+                  <span className="text-muted-foreground">RSI {features?.rsi_14 != null ? Math.round(features.rsi_14) : asset.rsi}</span>
+                  {score && (
+                    <span className={cn("font-bold px-1.5 py-0.5 rounded",
+                      score.total_score >= 70 ? "bg-profit/15 text-profit" : score.total_score >= 50 ? "bg-warning/15 text-warning" : "bg-loss/15 text-loss"
+                    )}>{score.total_score} {score.direction?.toUpperCase()}</span>
+                  )}
+                </div>
+                {features?.market_regime && (
+                  <RegimeBadge regime={features.market_regime} confidence={0} />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop: Table */}
+      <div className="hidden md:block terminal-border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

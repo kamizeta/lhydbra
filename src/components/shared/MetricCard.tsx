@@ -13,14 +13,14 @@ interface MetricCardProps {
 
 export default function MetricCard({ label, value, change, changeType = 'neutral', icon: Icon, subtitle, className }: MetricCardProps) {
   return (
-    <div className={cn("terminal-border rounded-lg p-4", className)}>
+    <div className={cn("terminal-border rounded-lg p-2.5 md:p-4", className)}>
       <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-          <p className="mt-1 text-2xl font-bold font-mono text-foreground">{value}</p>
+        <div className="min-w-0">
+          <p className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wider truncate">{label}</p>
+          <p className="mt-0.5 md:mt-1 text-lg md:text-2xl font-bold font-mono text-foreground truncate">{value}</p>
           {change && (
             <p className={cn(
-              "mt-1 text-xs font-mono",
+              "mt-0.5 text-[10px] md:text-xs font-mono truncate",
               changeType === 'positive' && "text-profit",
               changeType === 'negative' && "text-loss",
               changeType === 'neutral' && "text-muted-foreground"
