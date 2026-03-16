@@ -301,17 +301,34 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Portfolio Positions */}
         <div className="lg:col-span-2 terminal-border rounded-lg cursor-pointer" onClick={() => navigate('/portfolio')}>
-          <div className="flex items-center justify-between border-b border-border p-4">
-            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <PieChart className="h-4 w-4 text-primary" />
-              {t.dashboard.openPositions}
+          <div className="flex items-center justify-between border-b border-border p-3">
+            <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
+              <PieChart className="h-3.5 w-3.5 text-primary" />
+              Posiciones
             </h2>
-            <span className="text-xs font-mono text-muted-foreground">{positions.length} {t.common.active}</span>
+            <span className="text-[10px] font-mono text-muted-foreground">{positions.length} abiertas</span>
           </div>
-          <div className="overflow-x-auto">
+          {/* Mobile: card layout */}
+          <div className="md:hidden p-2 space-y-2">
+            {positions.length === 0 ? (
+              <p className="text-center text-muted-foreground text-[10px] font-mono py-4">Sin posiciones</p>
+            ) : positions.map((pos) => (
+              <div key={pos.id} className="flex items-center justify-between py-1.5 px-2 border-b border-border/50 last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-medium text-xs text-foreground">{pos.symbol}</span>
+                  <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
+                    {pos.direction === 'long' ? '▲' : '▼'}
+                  </StatusBadge>
+                </div>
+                <span className="text-[10px] font-mono text-muted-foreground">${Number(pos.avg_entry).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+          {/* Desktop: table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
@@ -333,8 +350,7 @@ export default function Dashboard() {
                     </td>
                     <td className="text-center p-3">
                       <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
-                        {pos.direction === 'long' ? <TrendingUp className="h-3 w-3 inline" /> : <TrendingDown className="h-3 w-3 inline" />}
-                        {' '}{pos.direction.toUpperCase()}
+                        {pos.direction.toUpperCase()}
                       </StatusBadge>
                     </td>
                     <td className="text-right p-3 font-mono text-foreground">{pos.quantity}</td>
