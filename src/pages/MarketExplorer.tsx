@@ -124,26 +124,39 @@ export default function MarketExplorer() {
     else { setSortKey(key); setSortDir('desc'); }
   };
 
-  const handleRunIntelligence = () => {
-    // Get symbols for the current filter
-    const symbolsToAnalyze = typeFilter === 'all'
-      ? ALL_SYMBOLS.slice(0, 8).map(s => s.tdSymbol) // Limit to 8 due to rate limits
-      : ALL_SYMBOLS.filter(s => s.type === typeFilter).slice(0, 8).map(s => s.tdSymbol);
+  // Auto-run Data Intelligence + Opportunity Scoring on mount
+  const autoRunRef = useRef(false);
+  useEffect(() => {
+    if (autoRunRef.current) return;
+    autoRunRef.current = true;
 
-    toast({ title: "🧠 Data Intelligence", description: `Analizando ${symbolsToAnalyze.length} activos... Esto puede tomar ~${Math.ceil(symbolsToAnalyze.length / 4) * 15}s` });
+    const allSymbols = ALL_SYMBOLS.map(s => s.tdSymbol);
+    // Run in batches of 8 to respect rate limits
+    const runBatches = async () => {
+      for (let i = 0; i < allSymbols.length; i += 8) {
+        const batch = allSymbols.slice(i, i + 8);
+        try {
+          await runIntelligence.mutateAsync(batch);
+        } catch {
+          // Continue with next batch even if one fails
+        }
+        if (i + 8 < allSymbols.length) {
+          await new Promise(r => setTimeout(r, 15000)); // Wait 15s between batches
+        }
+      }
+      // After all intelligence runs, compute opportunity scores
+      try {
+        await runScoring.mutateAsync(undefined);
+      } catch {
+        // Silent fail
+      }
+    };
 
-    runIntelligence.mutate(symbolsToAnalyze, {
-      onSuccess: (data) => {
-        toast({
-          title: "✅ Análisis completado",
-          description: `${data.processed}/${data.total} activos procesados${data.errors ? ` (${data.errors.length} errores)` : ''}`,
-        });
-      },
-      onError: (err) => {
-        toast({ title: "❌ Error", description: err.message, variant: "destructive" });
-      },
-    });
-  };
+    // Only auto-run if features are stale (none computed or older than 2 hours)
+    if (!featuresMap || Object.keys(featuresMap).length === 0) {
+      runBatches();
+    }
+  }, []);
 
   const TrendIcon = ({ trend }: { trend: string }) => {
     if (trend === 'uptrend') return <TrendingUp className="h-3.5 w-3.5 text-profit" />;

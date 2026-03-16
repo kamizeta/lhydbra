@@ -1,20 +1,14 @@
 import { useState } from "react";
-import { Briefcase, BookOpen, FlaskConical, Activity, Brain } from "lucide-react";
+import { Briefcase, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PositionsPage from "@/pages/PositionsPage";
 import Journal from "@/pages/Journal";
-import StrategyLab from "@/pages/StrategyLab";
-import AlgoEffectiveness from "@/pages/AlgoEffectiveness";
-import Strategies from "@/pages/Strategies";
 
-type TabId = 'positions' | 'journal' | 'strategies' | 'lab' | 'algo';
+type TabId = 'positions' | 'journal';
 
 const TABS: { id: TabId; label: string; icon: typeof Briefcase }[] = [
   { id: 'positions', label: 'Posiciones', icon: Briefcase },
   { id: 'journal', label: 'Diario', icon: BookOpen },
-  { id: 'strategies', label: 'Estrategias', icon: Brain },
-  { id: 'lab', label: 'Performance', icon: FlaskConical },
-  { id: 'algo', label: 'Calibración', icon: Activity },
 ];
 
 export default function PortfolioPage() {
@@ -22,7 +16,6 @@ export default function PortfolioPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tab Bar */}
       <div className="border-b border-border bg-card px-6 pt-4">
         <div className="flex gap-1 overflow-x-auto">
           {TABS.map(tab => (
@@ -42,14 +35,9 @@ export default function PortfolioPage() {
           ))}
         </div>
       </div>
-
-      {/* Tab Content */}
       <div className="flex-1 overflow-auto">
         {activeTab === 'positions' && <PositionsPage />}
         {activeTab === 'journal' && <Journal />}
-        {activeTab === 'strategies' && <Strategies />}
-        {activeTab === 'lab' && <StrategyLab />}
-        {activeTab === 'algo' && <AlgoEffectiveness />}
       </div>
     </div>
   );

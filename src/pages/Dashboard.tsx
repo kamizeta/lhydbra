@@ -177,8 +177,11 @@ export default function Dashboard() {
         <div className="cursor-pointer" onClick={() => navigate('/portfolio')}>
           <MetricCard label={t.dashboard.dailyPnl} value={totalRealizedPnl >= 0 ? `+${formatCurrency(totalRealizedPnl)}` : formatCurrency(totalRealizedPnl)} change={`${pnlPercent >= 0 ? '+' : ''}${formatNumber(pnlPercent)}% total`} changeType={totalRealizedPnl >= 0 ? "positive" : "negative"} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} />
         </div>
-        <div className="cursor-pointer" onClick={() => setShowRiskDetail(!showRiskDetail)}>
+        <div className="cursor-pointer relative" onClick={() => setShowRiskDetail(!showRiskDetail)}>
           <MetricCard label={t.dashboard.riskUsed} value={`${formatNumber(dailyRiskUsed)}%`} change={`${settings.max_daily_risk}% ${t.dashboard.ofDailyLimit}`} changeType="neutral" icon={Shield} subtitle={`Exposición: ${formatCurrency(totalExposure)}`} />
+          <div className="absolute top-2 right-2 text-muted-foreground">
+            {showRiskDetail ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
         </div>
         <div className="cursor-pointer" onClick={() => navigate('/portfolio')}>
           <MetricCard label={t.dashboard.activePositions} value={`${positions.length}`} change={`${pendingSignals.length} ${t.dashboard.pendingIdeas}`} changeType="neutral" icon={Activity} subtitle={`${t.dashboard.max}: ${settings.max_positions}`} />
