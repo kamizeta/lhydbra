@@ -143,15 +143,12 @@ export async function fetchQuotes(symbols: string[]): Promise<Record<string, Twe
     const info = ALL_SYMBOLS.find(s => s.tdSymbol === symbol || s.symbol === symbol);
     if (!info) continue;
     
-    if (info.type === 'commodity' && forexPairs.has(info.symbol)) {
-      forexSymbols.push(info.tdSymbol);
-    } else {
-      switch (info.type) {
-        case 'crypto': cryptoSymbols.push(info.tdSymbol); break;
-        case 'stock': stockSymbols.push(info.tdSymbol); break;
-        case 'etf': etfSymbols.push(info.tdSymbol); break;
-        case 'commodity': commoditySymbols.push(info.tdSymbol); break;
-      }
+    switch (info.type) {
+      case 'crypto': cryptoSymbols.push(info.tdSymbol); break;
+      case 'stock': stockSymbols.push(info.tdSymbol); break;
+      case 'etf': etfSymbols.push(info.tdSymbol); break;
+      case 'commodity': commoditySymbols.push(info.tdSymbol); break;
+      case 'forex': forexSymbols.push(info.tdSymbol); break;
     }
   }
 
