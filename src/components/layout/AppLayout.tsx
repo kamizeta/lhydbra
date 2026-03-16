@@ -81,6 +81,7 @@ export default function AppLayout() {
             <span className="text-xs font-mono text-muted-foreground">{user?.email}</span>
           </div>
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <LanguageSelector collapsed={false} variant="header" />
             <button onClick={signOut} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-loss border border-border rounded-md hover:bg-accent transition-colors">
               <LogOut className="h-3.5 w-3.5" />

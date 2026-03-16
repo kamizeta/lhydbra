@@ -40,6 +40,7 @@ function ProtectedRoutes() {
         <Route path="/trade-ideas" element={<TradeIdeas />} />
         <Route path="/portfolio" element={<PortfolioPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
