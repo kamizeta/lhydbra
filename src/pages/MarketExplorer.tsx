@@ -76,6 +76,7 @@ export default function MarketExplorer() {
   const [sortKey, setSortKey] = useState<SortKey>('relativeStrength');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showFeatures, setShowFeatures] = useState(true);
+  const [regimeFilter, setRegimeFilter] = useState<string | null>(null);
 
   const typeFilters: { label: string; value: AssetType | 'all' }[] = [
     { label: t.common.all, value: 'all' },
