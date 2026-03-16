@@ -163,7 +163,7 @@ export default function ApiUsagePage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card className="bg-card border-border">
           <CardContent className="pt-4 pb-3 px-4">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Calls</p>
@@ -174,6 +174,18 @@ export default function ApiUsagePage() {
           <CardContent className="pt-4 pb-3 px-4">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Symbols Returned</p>
             <p className="text-2xl font-bold text-foreground">{totalReturned.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border border-green-500/30">
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-[10px] uppercase tracking-wider text-green-400">Cache Hit %</p>
+            <p className="text-2xl font-bold text-green-400">{cacheHitPercent}%</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border border-green-500/30">
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-[10px] uppercase tracking-wider text-green-400">Requests Saved</p>
+            <p className="text-2xl font-bold text-green-400">{requestsSaved.toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
