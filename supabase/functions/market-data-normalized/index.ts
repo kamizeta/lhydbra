@@ -612,7 +612,20 @@ serve(async (req) => {
         allQuotes.push(...fhQuotes);
       }
 
-      // Fallback 3: Yahoo batch (single request)
+      // Fallback 3: Alpha Vantage (max 5 symbols, 25/day limit)
+      const missingForAV = allStockLike.filter(s => !fetched.has(s));
+      if (alphaVantageKey && missingForAV.length > 0) {
+        const t35 = Date.now();
+        const avQuotes = await fetchAlphaVantageQuotes(missingForAV.slice(0, 5), alphaVantageKey);
+        logApiUsage(db, 'alphavantage', 'quote', Math.min(missingForAV.length, 5), avQuotes.length, Date.now() - t35);
+        for (const q of avQuotes) {
+          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
+          fetched.add(q.symbol);
+        }
+        allQuotes.push(...avQuotes);
+      }
+
+      // Fallback 4: Yahoo batch (single request)
       const stillMissingStocks = allStockLike.filter(s => !fetched.has(s));
       if (stillMissingStocks.length > 0) {
         const t4 = Date.now();
