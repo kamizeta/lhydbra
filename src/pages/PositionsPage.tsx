@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart } from 'lucide-react';
+import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart, Pencil, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
@@ -36,6 +36,7 @@ export default function PositionsPage() {
   const [showForm, setShowForm] = useState(false);
   const [closingPosition, setClosingPosition] = useState<Position | null>(null);
   const [viewSignalId, setViewSignalId] = useState<string | null>(null);
+  const [editingSlTp, setEditingSlTp] = useState<{ id: string; sl: string; tp: string } | null>(null);
   const [form, setForm] = useState({
     symbol: '', name: '', asset_type: 'stock', direction: 'long',
     quantity: 0, avg_entry: 0, stop_loss: 0, take_profit: 0, strategy: '',
@@ -108,6 +109,27 @@ export default function PositionsPage() {
   const handlePositionClosed = () => {
     setClosingPosition(null);
     loadPositions();
+  };
+
+  const checkSlTpHit = (pos: Position, currentPrice: number | undefined) => {
+    if (!currentPrice) return { hitSl: false, hitTp: false };
+    const hitSl = pos.stop_loss != null && (
+      pos.direction === 'long' ? currentPrice <= Number(pos.stop_loss) : currentPrice >= Number(pos.stop_loss)
+    );
+    const hitTp = pos.take_profit != null && (
+      pos.direction === 'long' ? currentPrice >= Number(pos.take_profit) : currentPrice <= Number(pos.take_profit)
+    );
+    return { hitSl, hitTp };
+  };
+
+  const saveSlTp = async () => {
+    if (!editingSlTp) return;
+    const { error } = await supabase.from('positions').update({
+      stop_loss: editingSlTp.sl ? Number(editingSlTp.sl) : null,
+      take_profit: editingSlTp.tp ? Number(editingSlTp.tp) : null,
+    }).eq('id', editingSlTp.id);
+    if (error) toast.error('Error updating SL/TP');
+    else { toast.success('SL/TP updated'); setEditingSlTp(null); loadPositions(); }
   };
 
   return (
@@ -191,6 +213,7 @@ export default function PositionsPage() {
               <th className="text-center p-3">Dir</th>
               <th className="text-right p-3">Qty</th>
               <th className="text-right p-3">{t.common.entry}</th>
+              <th className="text-right p-3">Capital</th>
               <th className="text-right p-3">Actual</th>
               <th className="text-right p-3">PnL</th>
               <th className="text-right p-3">SL</th>
@@ -201,11 +224,18 @@ export default function PositionsPage() {
           </thead>
           <tbody>
             {positions.length === 0 ? (
-              <tr><td colSpan={10} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
+              <tr><td colSpan={11} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
             ) : positions.map((pos) => {
               const pnlData = getPnL(pos);
+              const capitalUsed = pos.quantity * pos.avg_entry;
+              const { hitSl, hitTp } = checkSlTpHit(pos, pnlData?.currentPrice);
+              const isEditing = editingSlTp?.id === pos.id;
+
               return (
-                <tr key={pos.id} className="border-b border-border/50 hover:bg-accent/30 transition-colors cursor-pointer"
+                <tr key={pos.id} className={cn(
+                  "border-b border-border/50 transition-colors cursor-pointer",
+                  (hitSl || hitTp) ? "bg-warning/15 border-warning/40" : "hover:bg-accent/30"
+                )}
                   onClick={() => pos.signal_id && setViewSignalId(pos.signal_id)}>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
@@ -213,8 +243,12 @@ export default function PositionsPage() {
                         <div className="font-mono font-medium text-foreground">{pos.symbol}</div>
                         <div className="text-xs text-muted-foreground">{pos.name}</div>
                       </div>
-                      {pos.signal_id && (
-                        <Lightbulb className="h-3 w-3 text-primary/60" />
+                      {pos.signal_id && <Lightbulb className="h-3 w-3 text-primary/60" />}
+                      {(hitSl || hitTp) && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-warning bg-warning/20 text-warning text-[10px] font-bold whitespace-nowrap">
+                          <AlertTriangle className="h-3 w-3" />
+                          {hitSl ? 'SL alcanzado' : 'TP alcanzado'}
+                        </span>
                       )}
                     </div>
                   </td>
@@ -226,6 +260,7 @@ export default function PositionsPage() {
                   </td>
                   <td className="text-right p-3 font-mono text-foreground">{pos.quantity}</td>
                   <td className="text-right p-3 font-mono text-foreground">{formatCurrency(pos.avg_entry)}</td>
+                  <td className="text-right p-3 font-mono text-muted-foreground">{formatCurrency(capitalUsed)}</td>
                   <td className="text-right p-3 font-mono">
                     {pnlData ? (
                       <div className="flex items-center justify-end gap-1">
@@ -246,17 +281,48 @@ export default function PositionsPage() {
                       </div>
                     ) : <span className="text-muted-foreground text-[10px]">Sin precio</span>}
                   </td>
-                  <td className="text-right p-3 font-mono text-loss">{pos.stop_loss ? formatCurrency(Number(pos.stop_loss)) : '—'}</td>
-                  <td className="text-right p-3 font-mono text-profit">{pos.take_profit ? formatCurrency(Number(pos.take_profit)) : '—'}</td>
+                  <td className="text-right p-3 font-mono" onClick={e => e.stopPropagation()}>
+                    {isEditing ? (
+                      <input type="number" step="any" value={editingSlTp.sl}
+                        onChange={e => setEditingSlTp(prev => prev ? { ...prev, sl: e.target.value } : null)}
+                        className="w-20 px-1 py-0.5 bg-background border border-border rounded text-xs text-loss font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
+                    ) : (
+                      <span className={cn(hitSl ? "text-warning font-bold" : "text-loss")}>
+                        {pos.stop_loss ? formatCurrency(Number(pos.stop_loss)) : '—'}
+                      </span>
+                    )}
+                  </td>
+                  <td className="text-right p-3 font-mono" onClick={e => e.stopPropagation()}>
+                    {isEditing ? (
+                      <input type="number" step="any" value={editingSlTp.tp}
+                        onChange={e => setEditingSlTp(prev => prev ? { ...prev, tp: e.target.value } : null)}
+                        className="w-20 px-1 py-0.5 bg-background border border-border rounded text-xs text-profit font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
+                    ) : (
+                      <span className={cn(hitTp ? "text-warning font-bold" : "text-profit")}>
+                        {pos.take_profit ? formatCurrency(Number(pos.take_profit)) : '—'}
+                      </span>
+                    )}
+                  </td>
                   <td className="text-right p-3"><StatusBadge variant="info">{pos.strategy || '—'}</StatusBadge></td>
-                  <td className="text-center p-3">
+                  <td className="text-center p-3" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-1">
-                      <button onClick={(e) => { e.stopPropagation(); setClosingPosition(pos); }}
+                      {isEditing ? (
+                        <button onClick={saveSlTp}
+                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-profit/10 text-profit hover:bg-profit/20 transition-colors text-[10px] font-bold">
+                          <Check className="h-3 w-3" /> Guardar
+                        </button>
+                      ) : (
+                        <button onClick={() => setEditingSlTp({ id: pos.id, sl: pos.stop_loss?.toString() || '', tp: pos.take_profit?.toString() || '' })}
+                          className="p-1 text-muted-foreground hover:text-primary transition-colors" title="Editar SL/TP">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <button onClick={() => setClosingPosition(pos)}
                         className="flex items-center gap-1 px-2 py-1 rounded-md bg-loss/10 text-loss hover:bg-loss/20 transition-colors text-[10px] font-bold"
                         title="Cerrar posición">
                         <DollarSign className="h-3 w-3" /> Cerrar
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); deletePosition(pos.id); }}
+                      <button onClick={() => deletePosition(pos.id)}
                         className="p-1 text-muted-foreground hover:text-loss transition-colors" title="Delete">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
