@@ -321,6 +321,75 @@ async function fetchFromDBCache(symbols: string[], db: ReturnType<typeof createC
   return results;
 }
 
+// ─── Twelve Data Quote Fetcher (batch up to 8 symbols per request) ───
+async function fetchTwelveDataQuotes(symbols: string[], apiKey: string): Promise<NormalizedQuote[]> {
+  if (!symbols.length || !apiKey) return [];
+  const results: NormalizedQuote[] = [];
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
+  const forexSet = new Set(['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','NZD/USD','EUR/GBP','EUR/JPY','GBP/JPY','USD/MXN','EUR/CHF','AUD/JPY']);
+  const commoditySet = new Set(['XAU/USD','XAG/USD','CL','NG','HG']);
+
+  // Twelve Data free plan: 8 credits/min, 1 credit per symbol in batch quote
+  const BATCH = 8;
+  for (let i = 0; i < symbols.length; i += BATCH) {
+    const batch = symbols.slice(i, i + BATCH);
+    try {
+      const symbolStr = batch.join(',');
+      const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbolStr)}&apikey=${apiKey}`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+
+      // Single symbol returns object directly, multiple returns keyed object
+      const entries = batch.length === 1 ? [[batch[0], data]] : Object.entries(data);
+
+      for (const [sym, quote] of entries) {
+        const q = quote as Record<string, unknown>;
+        if (!q || q.status === 'error' || !q.close) continue;
+
+        const price = parseFloat(String(q.close));
+        if (price <= 0) continue;
+
+        const prevClose = parseFloat(String(q.previous_close || q.open || price));
+        const change = price - prevClose;
+        const changePct = prevClose > 0 ? (change / prevClose) * 100 : 0;
+
+        let assetType = 'stock';
+        const s = String(sym);
+        if (etfSet.has(s)) assetType = 'etf';
+        else if (forexSet.has(s)) assetType = 'forex';
+        else if (commoditySet.has(s)) assetType = 'commodity';
+
+        results.push({
+          symbol: s,
+          name: String(q.name || s),
+          asset_type: assetType,
+          price,
+          open: parseFloat(String(q.open || price)),
+          high: parseFloat(String(q.high || price)),
+          low: parseFloat(String(q.low || price)),
+          volume: parseFloat(String(q.volume || 0)),
+          change,
+          change_percent: changePct,
+          previous_close: prevClose,
+          is_market_open: q.is_market_open === true,
+          source: 'twelvedata',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (e) {
+      console.error(`TwelveData batch ${i}:`, e);
+    }
+
+    // Delay between batches to respect rate limit
+    if (i + BATCH < symbols.length) {
+      await new Promise(resolve => setTimeout(resolve, 8000));
+    }
+  }
+
+  return results;
+}
+
 // ─── OHLCV Historical Fetcher (Twelve Data) ───
 async function fetchOHLCVHistory(symbol: string, timeframe: string, outputsize: number, apiKey: string): Promise<OHLCVBar[]> {
   const interval = timeframe === '1d' ? '1day' : timeframe === '1h' ? '1h' : timeframe === '4h' ? '4h' : '1day';
@@ -393,10 +462,24 @@ serve(async (req) => {
       const allQuotes = [...cryptoQ, ...forexQ, ...stockQ];
       const fetched = new Set(allQuotes.map(q => q.symbol));
 
-      // Fallback 1: Yahoo batch for ALL missing stocks/ETFs (single request)
+      // Fallback 1: Twelve Data for missing stocks/ETFs AND missing forex/commodities (batch of 8)
       const missingStockLike = allStockLike.filter(s => !fetched.has(s));
-      if (missingStockLike.length > 0) {
-        const yBatch = await fetchYahooBatch(missingStockLike);
+      const missingForex = [...forex, ...commodity].filter(s => !fetched.has(s));
+      const missingForTwelve = [...missingStockLike, ...missingForex];
+      if (twelveKey && missingForTwelve.length > 0) {
+        // Only fetch first batch (8 symbols) to stay within rate limits
+        const twelveSymbols = missingForTwelve.slice(0, 8);
+        const tdQuotes = await fetchTwelveDataQuotes(twelveSymbols, twelveKey);
+        for (const q of tdQuotes) {
+          fetched.add(q.symbol);
+        }
+        allQuotes.push(...tdQuotes);
+      }
+
+      // Fallback 2: Yahoo batch for remaining missing stocks/ETFs (single request)
+      const stillMissingStocks = allStockLike.filter(s => !fetched.has(s));
+      if (stillMissingStocks.length > 0) {
+        const yBatch = await fetchYahooBatch(stillMissingStocks);
         for (const q of yBatch) {
           if (etfSet.has(q.symbol)) q.asset_type = 'etf';
           fetched.add(q.symbol);
@@ -404,7 +487,7 @@ serve(async (req) => {
         allQuotes.push(...yBatch);
       }
 
-      // Fallback 2: Yahoo chart for still-missing symbols (parallel batches of 5)
+      // Fallback 3: Yahoo chart for still-missing symbols (parallel batches of 5)
       const stillMissing = allStockLike.filter(s => !fetched.has(s));
       if (stillMissing.length > 0) {
         const yChart = await fetchYahooChartParallel(stillMissing);
@@ -415,7 +498,7 @@ serve(async (req) => {
         allQuotes.push(...yChart);
       }
 
-      // Fallback 3: DB cache for anything still missing
+      // Fallback 4: DB cache for anything still missing
       const finalMissing = allStockLike.filter(s => !fetched.has(s));
       if (finalMissing.length > 0) {
         const dbQuotes = await fetchFromDBCache(finalMissing, db);
