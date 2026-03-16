@@ -106,9 +106,14 @@ export default function RiskManagement() {
   const riskPercent = settings.risk_per_trade;
   const entryPrice = firstPos ? Number(firstPos.avg_entry) : 0;
   const stopLossPrice = firstPos?.stop_loss ? Number(firstPos.stop_loss) : 0;
-  const riskPerShare = entryPrice > 0 && stopLossPrice > 0 ? Math.abs(entryPrice - stopLossPrice) : 0;
+  const riskPerUnit = entryPrice > 0 && stopLossPrice > 0 ? Math.abs(entryPrice - stopLossPrice) : 0;
   const dollarRisk = accountSize * (riskPercent / 100);
-  const positionSize = riskPerShare > 0 ? Math.floor(dollarRisk / riskPerShare) : 0;
+  // For crypto/forex use fractional sizing; for stocks use whole shares
+  const rawPositionSize = riskPerUnit > 0 ? dollarRisk / riskPerUnit : 0;
+  const isFractional = firstPos?.asset_type === 'crypto' || firstPos?.asset_type === 'forex';
+  const positionSize = isFractional
+    ? parseFloat(rawPositionSize.toFixed(6))
+    : Math.floor(rawPositionSize);
 
   const typeLabels: Record<string, string> = {
     crypto: t.common.crypto,
@@ -190,7 +195,7 @@ export default function RiskManagement() {
               {firstPos ? (
                 <>
                   <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">{t.common.entry}</span>
+                    <span className="text-muted-foreground">{t.common.entry} ({firstPos.symbol})</span>
                     <span className="font-mono text-foreground">{formatCurrency(entryPrice)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
@@ -199,7 +204,7 @@ export default function RiskManagement() {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">{t.riskMgmt.riskPerShare}</span>
-                    <span className="font-mono text-foreground">{formatCurrency(riskPerShare)}</span>
+                    <span className="font-mono text-foreground">{formatCurrency(riskPerUnit)}</span>
                   </div>
                 </>
               ) : (
@@ -212,7 +217,7 @@ export default function RiskManagement() {
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium text-foreground">{t.riskMgmt.positionSize}</span>
                 <span className="text-xl font-bold font-mono text-primary">
-                  {positionSize > 0 ? `${positionSize} ${t.riskMgmt.shares}` : '—'}
+                  {positionSize > 0 ? `${positionSize} ${isFractional ? 'units' : t.riskMgmt.shares}` : '—'}
                 </span>
               </div>
               {positionSize > 0 && (
