@@ -7,7 +7,25 @@ import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-type Tab = 'risk' | 'profile' | 'binance';
+type Tab = 'risk' | 'scoring' | 'profile' | 'binance';
+
+interface ScoringWeights {
+  structure_weight: number;
+  momentum_weight: number;
+  volatility_weight: number;
+  strategy_weight: number;
+  rr_weight: number;
+  macro_weight: number;
+  sentiment_weight: number;
+  historical_weight: number;
+  name: string;
+}
+
+const defaultWeights: ScoringWeights = {
+  structure_weight: 15, momentum_weight: 15, volatility_weight: 10,
+  strategy_weight: 15, rr_weight: 15, macro_weight: 10,
+  sentiment_weight: 10, historical_weight: 10, name: 'default',
+};
 
 export default function SettingsPage() {
   const { user } = useAuth();
