@@ -44,6 +44,10 @@ export default function SettingsPage() {
   const [binanceKey, setBinanceKey] = useState('');
   const [binanceSecret, setBinanceSecret] = useState('');
 
+  // Scoring weights state
+  const [weights, setWeights] = useState<ScoringWeights>(defaultWeights);
+  const [weightsLoading, setWeightsLoading] = useState(true);
+
   useEffect(() => {
     setSettings(savedSettings);
   }, [savedSettings]);
