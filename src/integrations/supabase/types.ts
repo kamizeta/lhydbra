@@ -41,8 +41,198 @@ export type Database = {
         }
         Relationships: []
       }
+      market_features: {
+        Row: {
+          asset_type: string
+          atr_14: number | null
+          bollinger_lower: number | null
+          bollinger_upper: number | null
+          computed_at: string
+          ema_12: number | null
+          ema_26: number | null
+          id: string
+          macd: number | null
+          macd_histogram: number | null
+          macd_signal: number | null
+          market_regime: string | null
+          momentum_score: number | null
+          regime_confidence: number | null
+          resistance_level: number | null
+          rsi_14: number | null
+          sma_20: number | null
+          sma_200: number | null
+          sma_50: number | null
+          support_level: number | null
+          symbol: string
+          timeframe: string
+          trend_direction: string | null
+          trend_strength: number | null
+          volatility_regime: string | null
+        }
+        Insert: {
+          asset_type?: string
+          atr_14?: number | null
+          bollinger_lower?: number | null
+          bollinger_upper?: number | null
+          computed_at?: string
+          ema_12?: number | null
+          ema_26?: number | null
+          id?: string
+          macd?: number | null
+          macd_histogram?: number | null
+          macd_signal?: number | null
+          market_regime?: string | null
+          momentum_score?: number | null
+          regime_confidence?: number | null
+          resistance_level?: number | null
+          rsi_14?: number | null
+          sma_20?: number | null
+          sma_200?: number | null
+          sma_50?: number | null
+          support_level?: number | null
+          symbol: string
+          timeframe?: string
+          trend_direction?: string | null
+          trend_strength?: number | null
+          volatility_regime?: string | null
+        }
+        Update: {
+          asset_type?: string
+          atr_14?: number | null
+          bollinger_lower?: number | null
+          bollinger_upper?: number | null
+          computed_at?: string
+          ema_12?: number | null
+          ema_26?: number | null
+          id?: string
+          macd?: number | null
+          macd_histogram?: number | null
+          macd_signal?: number | null
+          market_regime?: string | null
+          momentum_score?: number | null
+          regime_confidence?: number | null
+          resistance_level?: number | null
+          rsi_14?: number | null
+          sma_20?: number | null
+          sma_200?: number | null
+          sma_50?: number | null
+          support_level?: number | null
+          symbol?: string
+          timeframe?: string
+          trend_direction?: string | null
+          trend_strength?: number | null
+          volatility_regime?: string | null
+        }
+        Relationships: []
+      }
+      ohlcv_cache: {
+        Row: {
+          asset_type: string
+          close: number
+          fetched_at: string
+          high: number
+          id: string
+          low: number
+          open: number
+          source: string
+          symbol: string
+          timeframe: string
+          timestamp: string
+          volume: number
+        }
+        Insert: {
+          asset_type?: string
+          close: number
+          fetched_at?: string
+          high: number
+          id?: string
+          low: number
+          open: number
+          source?: string
+          symbol: string
+          timeframe?: string
+          timestamp: string
+          volume?: number
+        }
+        Update: {
+          asset_type?: string
+          close?: number
+          fetched_at?: string
+          high?: number
+          id?: string
+          low?: number
+          open?: number
+          source?: string
+          symbol?: string
+          timeframe?: string
+          timestamp?: string
+          volume?: number
+        }
+        Relationships: []
+      }
+      opportunity_scores: {
+        Row: {
+          asset_type: string
+          computed_at: string
+          direction: string | null
+          expires_at: string | null
+          historical_score: number | null
+          id: string
+          macro_score: number | null
+          momentum_score: number | null
+          rr_score: number | null
+          sentiment_score: number | null
+          strategy_family: string | null
+          strategy_score: number | null
+          structure_score: number | null
+          symbol: string
+          timeframe: string
+          total_score: number
+          volatility_score: number | null
+        }
+        Insert: {
+          asset_type?: string
+          computed_at?: string
+          direction?: string | null
+          expires_at?: string | null
+          historical_score?: number | null
+          id?: string
+          macro_score?: number | null
+          momentum_score?: number | null
+          rr_score?: number | null
+          sentiment_score?: number | null
+          strategy_family?: string | null
+          strategy_score?: number | null
+          structure_score?: number | null
+          symbol: string
+          timeframe?: string
+          total_score?: number
+          volatility_score?: number | null
+        }
+        Update: {
+          asset_type?: string
+          computed_at?: string
+          direction?: string | null
+          expires_at?: string | null
+          historical_score?: number | null
+          id?: string
+          macro_score?: number | null
+          momentum_score?: number | null
+          rr_score?: number | null
+          sentiment_score?: number | null
+          strategy_family?: string | null
+          strategy_score?: number | null
+          structure_score?: number | null
+          symbol?: string
+          timeframe?: string
+          total_score?: number
+          volatility_score?: number | null
+        }
+        Relationships: []
+      }
       positions: {
         Row: {
+          actual_r_multiple: number | null
           asset_type: string
           avg_entry: number
           close_price: number | null
@@ -55,15 +245,18 @@ export type Database = {
           opened_at: string
           pnl: number | null
           quantity: number
+          regime_at_entry: string | null
           status: string
           stop_loss: number | null
           strategy: string | null
+          strategy_family: string | null
           symbol: string
           take_profit: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          actual_r_multiple?: number | null
           asset_type?: string
           avg_entry: number
           close_price?: number | null
@@ -76,15 +269,18 @@ export type Database = {
           opened_at?: string
           pnl?: number | null
           quantity: number
+          regime_at_entry?: string | null
           status?: string
           stop_loss?: number | null
           strategy?: string | null
+          strategy_family?: string | null
           symbol: string
           take_profit?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          actual_r_multiple?: number | null
           asset_type?: string
           avg_entry?: number
           close_price?: number | null
@@ -97,9 +293,11 @@ export type Database = {
           opened_at?: string
           pnl?: number | null
           quantity?: number
+          regime_at_entry?: string | null
           status?: string
           stop_loss?: number | null
           strategy?: string | null
+          strategy_family?: string | null
           symbol?: string
           take_profit?: number | null
           updated_at?: string
@@ -134,6 +332,195 @@ export type Database = {
         }
         Relationships: []
       }
+      scoring_weights: {
+        Row: {
+          created_at: string
+          historical_weight: number
+          id: string
+          is_active: boolean
+          macro_weight: number
+          momentum_weight: number
+          name: string
+          rr_weight: number
+          sentiment_weight: number
+          strategy_weight: number
+          structure_weight: number
+          updated_at: string
+          user_id: string
+          volatility_weight: number
+        }
+        Insert: {
+          created_at?: string
+          historical_weight?: number
+          id?: string
+          is_active?: boolean
+          macro_weight?: number
+          momentum_weight?: number
+          name?: string
+          rr_weight?: number
+          sentiment_weight?: number
+          strategy_weight?: number
+          structure_weight?: number
+          updated_at?: string
+          user_id: string
+          volatility_weight?: number
+        }
+        Update: {
+          created_at?: string
+          historical_weight?: number
+          id?: string
+          is_active?: boolean
+          macro_weight?: number
+          momentum_weight?: number
+          name?: string
+          rr_weight?: number
+          sentiment_weight?: number
+          strategy_weight?: number
+          structure_weight?: number
+          updated_at?: string
+          user_id?: string
+          volatility_weight?: number
+        }
+        Relationships: []
+      }
+      strategy_performance: {
+        Row: {
+          avg_r_multiple: number | null
+          id: string
+          losing_trades: number
+          market_regime: string
+          max_drawdown: number | null
+          sharpe_ratio: number | null
+          strategy_family: string
+          total_pnl: number | null
+          total_trades: number
+          updated_at: string
+          user_id: string
+          win_rate: number | null
+          winning_trades: number
+        }
+        Insert: {
+          avg_r_multiple?: number | null
+          id?: string
+          losing_trades?: number
+          market_regime?: string
+          max_drawdown?: number | null
+          sharpe_ratio?: number | null
+          strategy_family: string
+          total_pnl?: number | null
+          total_trades?: number
+          updated_at?: string
+          user_id: string
+          win_rate?: number | null
+          winning_trades?: number
+        }
+        Update: {
+          avg_r_multiple?: number | null
+          id?: string
+          losing_trades?: number
+          market_regime?: string
+          max_drawdown?: number | null
+          sharpe_ratio?: number | null
+          strategy_family?: string
+          total_pnl?: number | null
+          total_trades?: number
+          updated_at?: string
+          user_id?: string
+          win_rate?: number | null
+          winning_trades?: number
+        }
+        Relationships: []
+      }
+      trade_journal: {
+        Row: {
+          asset_type: string
+          created_at: string
+          direction: string
+          entered_at: string
+          entry_price: number
+          entry_reasoning: string | null
+          exit_price: number | null
+          exit_reasoning: string | null
+          exited_at: string | null
+          id: string
+          lessons_learned: string | null
+          market_regime: string | null
+          mistake_tags: string[] | null
+          opportunity_score: number | null
+          pnl: number | null
+          position_id: string | null
+          quantity: number
+          r_multiple: number | null
+          signal_id: string | null
+          strategy_family: string | null
+          symbol: string
+          user_id: string
+        }
+        Insert: {
+          asset_type?: string
+          created_at?: string
+          direction?: string
+          entered_at?: string
+          entry_price: number
+          entry_reasoning?: string | null
+          exit_price?: number | null
+          exit_reasoning?: string | null
+          exited_at?: string | null
+          id?: string
+          lessons_learned?: string | null
+          market_regime?: string | null
+          mistake_tags?: string[] | null
+          opportunity_score?: number | null
+          pnl?: number | null
+          position_id?: string | null
+          quantity: number
+          r_multiple?: number | null
+          signal_id?: string | null
+          strategy_family?: string | null
+          symbol: string
+          user_id: string
+        }
+        Update: {
+          asset_type?: string
+          created_at?: string
+          direction?: string
+          entered_at?: string
+          entry_price?: number
+          entry_reasoning?: string | null
+          exit_price?: number | null
+          exit_reasoning?: string | null
+          exited_at?: string | null
+          id?: string
+          lessons_learned?: string | null
+          market_regime?: string | null
+          mistake_tags?: string[] | null
+          opportunity_score?: number | null
+          pnl?: number | null
+          position_id?: string | null
+          quantity?: number
+          r_multiple?: number | null
+          signal_id?: string | null
+          strategy_family?: string | null
+          symbol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_journal_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_journal_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "trade_signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trade_signals: {
         Row: {
           agent_analysis: string | null
@@ -143,14 +530,18 @@ export type Database = {
           direction: string
           entry_price: number
           id: string
+          market_regime: string | null
           name: string
+          opportunity_score: number | null
           position_size: number | null
           reasoning: string | null
           risk_percent: number | null
           risk_reward: number
+          score_breakdown: Json | null
           status: string
           stop_loss: number
           strategy: string
+          strategy_family: string | null
           symbol: string
           take_profit: number
           updated_at: string
@@ -164,14 +555,18 @@ export type Database = {
           direction?: string
           entry_price: number
           id?: string
+          market_regime?: string | null
           name: string
+          opportunity_score?: number | null
           position_size?: number | null
           reasoning?: string | null
           risk_percent?: number | null
           risk_reward: number
+          score_breakdown?: Json | null
           status?: string
           stop_loss: number
           strategy: string
+          strategy_family?: string | null
           symbol: string
           take_profit: number
           updated_at?: string
@@ -185,14 +580,18 @@ export type Database = {
           direction?: string
           entry_price?: number
           id?: string
+          market_regime?: string | null
           name?: string
+          opportunity_score?: number | null
           position_size?: number | null
           reasoning?: string | null
           risk_percent?: number | null
           risk_reward?: number
+          score_breakdown?: Json | null
           status?: string
           stop_loss?: number
           strategy?: string
+          strategy_family?: string | null
           symbol?: string
           take_profit?: number
           updated_at?: string
