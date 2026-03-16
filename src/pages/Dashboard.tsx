@@ -86,20 +86,39 @@ export default function Dashboard() {
   const [closedPositions, setClosedPositions] = useState<{ pnl: number | null }[]>([]);
   const [showRiskDetail, setShowRiskDetail] = useState(false);
 
+  const fetchDashboardData = useMemo(() => {
+    if (!user) return () => {};
+    return () => {
+      Promise.all([
+        supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false }),
+        supabase.from('trade_signals').select('id, symbol, name, direction, strategy, risk_reward, confidence, status').eq('user_id', user.id).eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
+        supabase.from('agent_analyses').select('id, agent_type, content, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('positions').select('pnl').eq('user_id', user.id).eq('status', 'closed'),
+      ]).then(([posRes, sigRes, agentRes, closedRes]) => {
+        setPositions((posRes.data as DBPosition[]) || []);
+        setPendingSignals((sigRes.data as DBTradeSignal[]) || []);
+        setAgentOutputs((agentRes.data as DBAgentAnalysis[]) || []);
+        setClosedPositions((closedRes.data as { pnl: number | null }[]) || []);
+      });
+    };
+  }, [user]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Realtime: positions, signals, agent analyses
   useEffect(() => {
     if (!user) return;
-    Promise.all([
-      supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false }),
-      supabase.from('trade_signals').select('id, symbol, name, direction, strategy, risk_reward, confidence, status').eq('user_id', user.id).eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
-      supabase.from('agent_analyses').select('id, agent_type, content, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
-      supabase.from('positions').select('pnl').eq('user_id', user.id).eq('status', 'closed'),
-    ]).then(([posRes, sigRes, agentRes, closedRes]) => {
-      setPositions((posRes.data as DBPosition[]) || []);
-      setPendingSignals((sigRes.data as DBTradeSignal[]) || []);
-      setAgentOutputs((agentRes.data as DBAgentAnalysis[]) || []);
-      setClosedPositions((closedRes.data as { pnl: number | null }[]) || []);
-    });
-  }, [user]);
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'positions', filter: `user_id=eq.${user.id}` }, () => fetchDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trade_signals', filter: `user_id=eq.${user.id}` }, () => fetchDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_analyses', filter: `user_id=eq.${user.id}` }, () => fetchDashboardData())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user, fetchDashboardData]);
 
   const priceMap = useMemo(() => {
     const map = new Map<string, number>();
