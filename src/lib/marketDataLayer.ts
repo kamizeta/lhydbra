@@ -1,0 +1,94 @@
+import { supabase } from '@/integrations/supabase/client';
+
+// ─── Types ───
+
+export interface NormalizedQuote {
+  symbol: string;
+  name: string;
+  asset_type: string;
+  price: number;
+  open: number;
+  high: number;
+  low: number;
+  volume: number;
+  change: number;
+  change_percent: number;
+  previous_close: number;
+  is_market_open: boolean;
+  source: string;
+  timestamp: string;
+}
+
+export interface OHLCVBar {
+  symbol: string;
+  timeframe: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  timestamp: string;
+  source: string;
+  asset_type: string;
+}
+
+export interface MarketFeatures {
+  symbol: string;
+  timeframe: string;
+  asset_type: string;
+  sma_20: number | null;
+  sma_50: number | null;
+  sma_200: number | null;
+  ema_12: number | null;
+  ema_26: number | null;
+  rsi_14: number | null;
+  macd: number | null;
+  macd_signal: number | null;
+  macd_histogram: number | null;
+  momentum_score: number;
+  atr_14: number | null;
+  bollinger_upper: number | null;
+  bollinger_lower: number | null;
+  volatility_regime: string;
+  trend_direction: string;
+  trend_strength: number;
+  support_level: number | null;
+  resistance_level: number | null;
+  market_regime: string;
+  regime_confidence: number;
+  computed_at: string;
+}
+
+// ─── API Layer ───
+
+export async function fetchNormalizedQuotes(symbols: string[]): Promise<Record<string, NormalizedQuote>> {
+  const { data, error } = await supabase.functions.invoke('market-data-normalized', {
+    body: { action: 'quotes', symbols },
+  });
+  if (error) throw new Error(`Normalized quotes error: ${error.message}`);
+  return (data || {}) as Record<string, NormalizedQuote>;
+}
+
+export async function fetchOHLCV(symbol: string, timeframe = '1d', outputsize = 50): Promise<OHLCVBar[]> {
+  const { data, error } = await supabase.functions.invoke('market-data-normalized', {
+    body: { action: 'ohlcv', symbols: [symbol], timeframe, outputsize },
+  });
+  if (error) throw new Error(`OHLCV error: ${error.message}`);
+  return data?.bars || [];
+}
+
+export async function fetchMarketFeatures(symbols: string[], timeframe = '1d'): Promise<Record<string, MarketFeatures>> {
+  const { data, error } = await supabase.functions.invoke('market-data-normalized', {
+    body: { action: 'features', symbols, timeframe },
+  });
+  if (error) throw new Error(`Features error: ${error.message}`);
+  return data?.features || {};
+}
+
+export async function computeIndicators(symbols: string[], timeframe = '1d'): Promise<Record<string, MarketFeatures>> {
+  const { data, error } = await supabase.functions.invoke('compute-indicators', {
+    body: { symbols, timeframe },
+  });
+  if (error) throw new Error(`Compute indicators error: ${error.message}`);
+  return data?.features || {};
+}
