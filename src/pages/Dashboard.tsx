@@ -184,17 +184,17 @@ export default function Dashboard() {
   const typeLabels: Record<string, string> = { crypto: 'Crypto', stock: 'Acciones', etf: 'ETFs', forex: 'Forex', commodity: 'Commodities' };
 
   return (
-    <div className="p-6 space-y-6 animate-slide-in">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6 animate-slide-in">
       <OnboardingTutorial />
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{t.dashboard.title}</h1>
-          <p className="text-sm text-muted-foreground font-mono">{t.dashboard.subtitle} • {new Date().toLocaleDateString(dateLocale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-lg md:text-2xl font-bold text-foreground">{t.dashboard.title}</h1>
+          <p className="text-[10px] md:text-sm text-muted-foreground font-mono truncate">{new Date().toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' })}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge variant="profit" dot>{t.common.marketOpen}</StatusBadge>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <StatusBadge variant="profit" dot><span className="hidden sm:inline">{t.common.marketOpen}</span><span className="sm:hidden">Live</span></StatusBadge>
           {(warnings.length > 0 || riskAlerts.length > 0) && (
-            <StatusBadge variant="warning" dot>{warnings.length + riskAlerts.length} alertas</StatusBadge>
+            <StatusBadge variant="warning" dot>{warnings.length + riskAlerts.length}</StatusBadge>
           )}
         </div>
       </div>
