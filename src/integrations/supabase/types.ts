@@ -768,6 +768,60 @@ export type Database = {
         }
         Relationships: []
       }
+      symbol_mapping: {
+        Row: {
+          alpaca_symbol: string | null
+          asset_class: string
+          base_asset: string | null
+          created_at: string
+          display_name: string
+          exchangerate_pair: string | null
+          fcs_symbol: string | null
+          finnhub_symbol: string | null
+          freecrypto_symbol: string | null
+          id: string
+          internal_symbol: string
+          is_active: boolean
+          quote_asset: string | null
+          twelvedata_symbol: string | null
+          yahoo_symbol: string | null
+        }
+        Insert: {
+          alpaca_symbol?: string | null
+          asset_class?: string
+          base_asset?: string | null
+          created_at?: string
+          display_name?: string
+          exchangerate_pair?: string | null
+          fcs_symbol?: string | null
+          finnhub_symbol?: string | null
+          freecrypto_symbol?: string | null
+          id?: string
+          internal_symbol: string
+          is_active?: boolean
+          quote_asset?: string | null
+          twelvedata_symbol?: string | null
+          yahoo_symbol?: string | null
+        }
+        Update: {
+          alpaca_symbol?: string | null
+          asset_class?: string
+          base_asset?: string | null
+          created_at?: string
+          display_name?: string
+          exchangerate_pair?: string | null
+          fcs_symbol?: string | null
+          finnhub_symbol?: string | null
+          freecrypto_symbol?: string | null
+          id?: string
+          internal_symbol?: string
+          is_active?: boolean
+          quote_asset?: string | null
+          twelvedata_symbol?: string | null
+          yahoo_symbol?: string | null
+        }
+        Relationships: []
+      }
       trade_journal: {
         Row: {
           asset_type: string
