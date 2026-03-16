@@ -20,6 +20,7 @@ import PositionsPage from "@/pages/PositionsPage";
 import OpportunityRadar from "@/pages/OpportunityRadar";
 import StrategyLab from "@/pages/StrategyLab";
 import ControlCenter from "@/pages/ControlCenter";
+import AlgoEffectiveness from "@/pages/AlgoEffectiveness";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -53,6 +54,7 @@ function ProtectedRoutes() {
         <Route path="/radar" element={<OpportunityRadar />} />
         <Route path="/lab" element={<StrategyLab />} />
         <Route path="/center" element={<ControlCenter />} />
+        <Route path="/algo" element={<AlgoEffectiveness />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
