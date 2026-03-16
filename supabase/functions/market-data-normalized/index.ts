@@ -714,7 +714,7 @@ serve(async (req) => {
         allQuotes.push(...avQuotes);
       }
 
-      // Fallback 4: Yahoo batch (single request)
+      // Fallback 6: Yahoo batch (single request)
       const stillMissingStocks = allStockLike.filter(s => !fetched.has(s));
       if (stillMissingStocks.length > 0) {
         const t4 = Date.now();
@@ -727,7 +727,7 @@ serve(async (req) => {
         allQuotes.push(...yBatch);
       }
 
-      // Fallback 5: Yahoo chart (parallel batches of 5)
+      // Fallback 7: Yahoo chart (parallel batches of 5)
       const stillMissing = allStockLike.filter(s => !fetched.has(s));
       if (stillMissing.length > 0) {
         const t5 = Date.now();
