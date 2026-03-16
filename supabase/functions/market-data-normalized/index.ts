@@ -96,6 +96,7 @@ async function fetchCryptoQuotes(symbols: string[], apiKey: string): Promise<Nor
 async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'forex' | 'stock'): Promise<NormalizedQuote[]> {
   if (!symbols.length) return [];
   const results: NormalizedQuote[] = [];
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB']);
   const baseUrl = endpoint === 'stock'
     ? `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&exchange=NASDAQ,NYSE,AMEX&access_key=${apiKey}`
     : `https://fcsapi.com/api-v3/forex/latest?symbol=${encodeURIComponent(symbols.join(','))}&access_key=${apiKey}`;
@@ -113,10 +114,18 @@ async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'fore
       if (close <= 0) continue;
       const matched = symbols.find(sym => s === sym || s.includes(sym)) || s;
       const change = parseFloat(String(item.ch || 0));
+      
+      let assetType: string;
+      if (endpoint === 'stock') {
+        assetType = etfSet.has(matched) ? 'etf' : 'stock';
+      } else {
+        assetType = matched.includes('XAU') || matched.includes('XAG') || ['CL', 'NG', 'HG'].includes(matched) ? 'commodity' : 'forex';
+      }
+      
       results.push({
         symbol: matched,
         name: item.name || matched,
-        asset_type: endpoint === 'stock' ? 'stock' : (matched.includes('XAU') || matched.includes('XAG') || ['CL', 'NG', 'HG'].includes(matched) ? 'commodity' : 'forex'),
+        asset_type: assetType,
         price: close,
         open: parseFloat(String(item.o || close)),
         high: parseFloat(String(item.h || close)),
@@ -226,21 +235,25 @@ serve(async (req) => {
         else stocks.push(s);
       }
 
-      // Fetch in parallel
-      const [cryptoQ, forexQ, stockQ, yahooQ] = await Promise.all([
+      // Fetch in parallel: ETFs go through FCS stock endpoint first (same as stocks)
+      const allStockLike = [...stocks, ...etfs];
+      const [cryptoQ, forexQ, stockQ] = await Promise.all([
         freeCryptoKey ? fetchCryptoQuotes(crypto, freeCryptoKey) : [],
         fcsKey ? fetchFCSQuotes([...forex, ...commodity], fcsKey, 'forex') : [],
-        fcsKey ? fetchFCSQuotes(stocks, fcsKey, 'stock') : [],
-        fetchYahooQuotes([...etfs]),
+        fcsKey ? fetchFCSQuotes(allStockLike, fcsKey, 'stock') : [],
       ]);
 
-      const allQuotes = [...cryptoQ, ...forexQ, ...stockQ, ...yahooQ];
+      const allQuotes = [...cryptoQ, ...forexQ, ...stockQ];
       const fetched = new Set(allQuotes.map(q => q.symbol));
 
-      // Fallback: Yahoo for missing stocks
-      const missingStocks = stocks.filter(s => !fetched.has(s));
-      if (missingStocks.length > 0) {
-        const yFallback = await fetchYahooQuotes(missingStocks);
+      // Fallback: Yahoo for missing stocks AND ETFs
+      const missingStockLike = allStockLike.filter(s => !fetched.has(s));
+      if (missingStockLike.length > 0) {
+        const yFallback = await fetchYahooQuotes(missingStockLike);
+        // Fix asset_type for ETFs from Yahoo
+        for (const q of yFallback) {
+          if (etfSet.has(q.symbol)) q.asset_type = 'etf';
+        }
         allQuotes.push(...yFallback);
       }
 
