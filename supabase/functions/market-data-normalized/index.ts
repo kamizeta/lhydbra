@@ -442,6 +442,55 @@ async function fetchFinnhubQuotes(symbols: string[], apiKey: string): Promise<No
   return results;
 }
 
+// ─── Alpha Vantage Quote Fetcher ───
+// Free: 25 requests/day. Premium: varies. 1 symbol per call (GLOBAL_QUOTE).
+async function fetchAlphaVantageQuotes(symbols: string[], apiKey: string): Promise<NormalizedQuote[]> {
+  if (!symbols.length || !apiKey) return [];
+  const results: NormalizedQuote[] = [];
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
+
+  // Alpha Vantage free: 25 req/day, so limit to first 5 symbols max per call
+  const batch = symbols.slice(0, 5);
+  for (const symbol of batch) {
+    try {
+      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${apiKey}`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const gq = data?.['Global Quote'];
+      if (!gq || !gq['05. price']) continue;
+
+      const price = parseFloat(gq['05. price']);
+      if (price <= 0) continue;
+      const prevClose = parseFloat(gq['08. previous close'] || price);
+      const change = parseFloat(gq['09. change'] || '0');
+      const changePct = parseFloat((gq['10. change percent'] || '0').replace('%', ''));
+
+      results.push({
+        symbol,
+        name: symbol,
+        asset_type: etfSet.has(symbol) ? 'etf' : 'stock',
+        price,
+        open: parseFloat(gq['02. open'] || String(price)),
+        high: parseFloat(gq['03. high'] || String(price)),
+        low: parseFloat(gq['04. low'] || String(price)),
+        volume: parseFloat(gq['06. volume'] || '0'),
+        change,
+        change_percent: changePct,
+        previous_close: prevClose,
+        is_market_open: true,
+        source: 'alphavantage',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error(`AlphaVantage ${symbol}:`, e);
+    }
+    // Small delay between calls
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+  return results;
+}
+
 // ─── API Usage Logger (fire-and-forget) ───
 function logApiUsage(db: ReturnType<typeof createClient>, source: string, action: string, requested: number, returned: number, timeMs: number, error?: string) {
   db.from('api_usage_log').insert({
