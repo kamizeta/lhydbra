@@ -54,6 +54,7 @@ serve(async (req) => {
 
     if (action === "test_connection") {
       const timestamp = Date.now();
+      const queryString = `timestamp=${timestamp}`;
       const signature = await hmacSha256(apiSecret, queryString);
 
       const response = await fetch(`${BINANCE_API_URL}/api/v3/account?${queryString}&signature=${signature}`, {

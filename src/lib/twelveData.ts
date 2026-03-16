@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from '@/integrations/supabase/client';
 import type { Asset, AssetType } from './mockData';
 
 // Symbol definitions for each market

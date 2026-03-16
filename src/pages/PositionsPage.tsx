@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
-import { Trash2, Plus, X, TrendingUp, TrendingDown } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
+import { useMarketData } from '@/hooks/useMarketData';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import StatusBadge from '@/components/shared/StatusBadge';
+import { formatCurrency } from '@/lib/mockData';
 
 interface Position {
   id: string;
@@ -32,6 +34,45 @@ export default function PositionsPage() {
     symbol: '', name: '', asset_type: 'stock', direction: 'long',
     quantity: 0, avg_entry: 0, stop_loss: 0, take_profit: 0, strategy: '',
   });
+
+  const { data: marketAssets, isLoading: marketLoading } = useMarketData();
+
+  // Build a price lookup map from live market data
+  const priceMap = useMemo(() => {
+    const map = new Map<string, { price: number; isMock: boolean }>();
+    if (!marketAssets) return map;
+    for (const asset of marketAssets) {
+      map.set(asset.symbol, { price: asset.price, isMock: !!asset.isMock });
+      // Also map without slash for crypto (e.g. BTCUSDT -> BTC/USD)
+      const clean = asset.symbol.replace('/', '');
+      map.set(clean, { price: asset.price, isMock: !!asset.isMock });
+    }
+    return map;
+  }, [marketAssets]);
+
+  const getPnL = (pos: Position) => {
+    const lookup = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
+    if (!lookup) return null;
+    const currentPrice = lookup.price;
+    const diff = pos.direction === 'long'
+      ? currentPrice - pos.avg_entry
+      : pos.avg_entry - currentPrice;
+    return {
+      pnl: diff * pos.quantity,
+      pnlPercent: (diff / pos.avg_entry) * 100,
+      currentPrice,
+      isMock: lookup.isMock,
+    };
+  };
+
+  const totalPnL = useMemo(() => {
+    let total = 0;
+    for (const pos of positions) {
+      const result = getPnL(pos);
+      if (result) total += result.pnl;
+    }
+    return total;
+  }, [positions, priceMap]);
 
   useEffect(() => {
     if (user) loadPositions();
@@ -83,14 +124,19 @@ export default function PositionsPage() {
   };
 
   const closePosition = async (id: string) => {
+    const pos = positions.find(p => p.id === id);
+    const pnlResult = pos ? getPnL(pos) : null;
+
     const { error } = await supabase.from('positions').update({
       status: 'closed',
       closed_at: new Date().toISOString(),
+      close_price: pnlResult?.currentPrice || null,
+      pnl: pnlResult?.pnl || null,
     }).eq('id', id);
     if (error) {
       toast.error('Error closing position');
     } else {
-      toast.success('Position closed');
+      toast.success(`Position closed${pnlResult ? ` — PnL: ${formatCurrency(pnlResult.pnl)}` : ''}`);
       setPositions(prev => prev.filter(p => p.id !== id));
     }
   };
@@ -100,7 +146,17 @@ export default function PositionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t.dashboard.openPositions}</h1>
-          <p className="text-sm text-muted-foreground font-mono">{positions.length} {t.common.active}</p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-muted-foreground font-mono">{positions.length} {t.common.active}</p>
+            {positions.length > 0 && (
+              <span className={cn(
+                "text-sm font-mono font-bold",
+                totalPnL >= 0 ? "text-profit" : "text-loss"
+              )}>
+                PnL Total: {totalPnL >= 0 ? '+' : ''}{formatCurrency(totalPnL)}
+              </span>
+            )}
+          </div>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -187,6 +243,8 @@ export default function PositionsPage() {
               <th className="text-center p-3">Dir</th>
               <th className="text-right p-3">Qty</th>
               <th className="text-right p-3">{t.common.entry}</th>
+              <th className="text-right p-3">Actual</th>
+              <th className="text-right p-3">PnL</th>
               <th className="text-right p-3">SL</th>
               <th className="text-right p-3">TP</th>
               <th className="text-right p-3">{t.common.strategy}</th>
@@ -195,36 +253,65 @@ export default function PositionsPage() {
           </thead>
           <tbody>
             {positions.length === 0 ? (
-              <tr><td colSpan={8} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
-            ) : positions.map((pos) => (
-              <tr key={pos.id} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
-                <td className="p-3">
-                  <div className="font-mono font-medium text-foreground">{pos.symbol}</div>
-                  <div className="text-xs text-muted-foreground">{pos.name}</div>
-                </td>
-                <td className="text-center p-3">
-                  <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
-                    {pos.direction === 'long' ? <TrendingUp className="h-3 w-3 inline" /> : <TrendingDown className="h-3 w-3 inline" />}
-                    {' '}{pos.direction.toUpperCase()}
-                  </StatusBadge>
-                </td>
-                <td className="text-right p-3 font-mono text-foreground">{pos.quantity}</td>
-                <td className="text-right p-3 font-mono text-foreground">${Number(pos.avg_entry).toFixed(2)}</td>
-                <td className="text-right p-3 font-mono text-loss">{pos.stop_loss ? `$${Number(pos.stop_loss).toFixed(2)}` : '—'}</td>
-                <td className="text-right p-3 font-mono text-profit">{pos.take_profit ? `$${Number(pos.take_profit).toFixed(2)}` : '—'}</td>
-                <td className="text-right p-3"><StatusBadge variant="info">{pos.strategy || '—'}</StatusBadge></td>
-                <td className="text-center p-3">
-                  <div className="flex items-center justify-center gap-1">
-                    <button onClick={() => closePosition(pos.id)} className="p-1 text-muted-foreground hover:text-warning transition-colors" title="Close">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                    <button onClick={() => deletePosition(pos.id)} className="p-1 text-muted-foreground hover:text-loss transition-colors" title="Delete">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+              <tr><td colSpan={10} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
+            ) : positions.map((pos) => {
+              const pnlData = getPnL(pos);
+              return (
+                <tr key={pos.id} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
+                  <td className="p-3">
+                    <div className="font-mono font-medium text-foreground">{pos.symbol}</div>
+                    <div className="text-xs text-muted-foreground">{pos.name}</div>
+                  </td>
+                  <td className="text-center p-3">
+                    <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
+                      {pos.direction === 'long' ? <TrendingUp className="h-3 w-3 inline" /> : <TrendingDown className="h-3 w-3 inline" />}
+                      {' '}{pos.direction.toUpperCase()}
+                    </StatusBadge>
+                  </td>
+                  <td className="text-right p-3 font-mono text-foreground">{pos.quantity}</td>
+                  <td className="text-right p-3 font-mono text-foreground">{formatCurrency(pos.avg_entry)}</td>
+                  <td className="text-right p-3 font-mono">
+                    {pnlData ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-foreground">{formatCurrency(pnlData.currentPrice)}</span>
+                        {pnlData.isMock && (
+                          <AlertTriangle className="h-3 w-3 text-purple-400" />
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="text-right p-3 font-mono">
+                    {pnlData ? (
+                      <div>
+                        <span className={cn("font-bold", pnlData.pnl >= 0 ? "text-profit" : "text-loss")}>
+                          {pnlData.pnl >= 0 ? '+' : ''}{formatCurrency(pnlData.pnl)}
+                        </span>
+                        <div className={cn("text-[10px]", pnlData.pnlPercent >= 0 ? "text-profit" : "text-loss")}>
+                          {pnlData.pnlPercent >= 0 ? '+' : ''}{pnlData.pnlPercent.toFixed(2)}%
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-[10px]">Sin precio</span>
+                    )}
+                  </td>
+                  <td className="text-right p-3 font-mono text-loss">{pos.stop_loss ? formatCurrency(Number(pos.stop_loss)) : '—'}</td>
+                  <td className="text-right p-3 font-mono text-profit">{pos.take_profit ? formatCurrency(Number(pos.take_profit)) : '—'}</td>
+                  <td className="text-right p-3"><StatusBadge variant="info">{pos.strategy || '—'}</StatusBadge></td>
+                  <td className="text-center p-3">
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => closePosition(pos.id)} className="p-1 text-muted-foreground hover:text-warning transition-colors" title="Close">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => deletePosition(pos.id)} className="p-1 text-muted-foreground hover:text-loss transition-colors" title="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
