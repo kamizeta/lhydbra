@@ -232,6 +232,46 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
     setSaving(true);
 
     if (openPosition) {
+      // Execute on Alpaca first if enabled
+      if (executeOnAlpaca) {
+        try {
+          const alpacaSide = signal.direction === 'long' ? 'buy' : 'sell';
+          const isStock = signal.asset_type === 'stock' || signal.asset_type === 'etf';
+          
+          const orderBody: Record<string, unknown> = {
+            action: 'place_order',
+            paper: alpacaPaper,
+            symbol: signal.symbol.replace('/', ''),
+            qty: quantity,
+            side: alpacaSide,
+            type: 'market',
+            time_in_force: isStock ? 'day' : 'gtc',
+          };
+
+          // Use bracket order if SL and TP are set
+          if (signal.stop_loss > 0 && signal.take_profit > 0) {
+            orderBody.order_class = 'bracket';
+            orderBody.take_profit = signal.take_profit;
+            orderBody.stop_loss = signal.stop_loss;
+          }
+
+          const { data, error } = await supabase.functions.invoke('alpaca-trade', {
+            body: orderBody,
+          });
+
+          if (error || data?.error) {
+            toast.error(`Alpaca: ${data?.error || error?.message}`);
+            setSaving(false);
+            return;
+          }
+          toast.success(`Orden enviada a Alpaca ${alpacaPaper ? '(Paper)' : '(Live)'}: ${data?.order?.status}`);
+        } catch (err) {
+          toast.error('Error al ejecutar en Alpaca');
+          setSaving(false);
+          return;
+        }
+      }
+
       const { error } = await supabase.from('positions').insert({
         user_id: user.id,
         symbol: signal.symbol,
