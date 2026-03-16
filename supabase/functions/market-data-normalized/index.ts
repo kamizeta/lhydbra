@@ -95,82 +95,178 @@ async function fetchCryptoQuotes(symbols: string[], apiKey: string): Promise<Nor
 
 async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'forex' | 'stock'): Promise<NormalizedQuote[]> {
   if (!symbols.length) return [];
+
   const results: NormalizedQuote[] = [];
+  const seen = new Set<string>();
   const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB']);
-  const baseUrl = endpoint === 'stock'
-    ? `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&exchange=NASDAQ,NYSE,AMEX&access_key=${apiKey}`
-    : `https://fcsapi.com/api-v3/forex/latest?symbol=${encodeURIComponent(symbols.join(','))}&access_key=${apiKey}`;
+  const requestUrls = endpoint === 'stock'
+    ? [
+        // First try without exchange filter because many ETFs trade on ARCA/BATS and were being excluded.
+        `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&access_key=${apiKey}`,
+        // Fallback to explicit US exchanges in case the provider needs narrowing.
+        `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&exchange=NASDAQ,NYSE,AMEX,ARCA,BATS&access_key=${apiKey}`,
+      ]
+    : [
+        `https://fcsapi.com/api-v3/forex/latest?symbol=${encodeURIComponent(symbols.join(','))}&access_key=${apiKey}`,
+      ];
 
   try {
-    const res = await fetch(baseUrl);
-    if (!res.ok) return results;
-    const data = await res.json();
-    if (!data.status || !data.response) return results;
+    for (const url of requestUrls) {
+      const res = await fetch(url);
+      if (!res.ok) continue;
 
-    for (const item of data.response) {
-      const s = item.s || item.symbol;
-      if (!s) continue;
-      const close = parseFloat(String(item.c || 0));
-      if (close <= 0) continue;
-      const matched = symbols.find(sym => s === sym || s.includes(sym)) || s;
-      const change = parseFloat(String(item.ch || 0));
-      
-      let assetType: string;
-      if (endpoint === 'stock') {
-        assetType = etfSet.has(matched) ? 'etf' : 'stock';
-      } else {
-        assetType = matched.includes('XAU') || matched.includes('XAG') || ['CL', 'NG', 'HG'].includes(matched) ? 'commodity' : 'forex';
+      const data = await res.json();
+      if (!data.status || !Array.isArray(data.response) || data.response.length === 0) continue;
+
+      for (const item of data.response) {
+        const s = item.s || item.symbol;
+        if (!s) continue;
+
+        const matched = symbols.find(sym => s === sym || s.includes(sym) || sym.includes(s)) || s;
+        if (seen.has(matched)) continue;
+
+        const close = parseFloat(String(item.c || 0));
+        if (close <= 0) continue;
+
+        const isETF = endpoint === 'stock' && etfSet.has(matched);
+        // FCS sometimes returns obviously bad placeholder-like ETF prices (0.1, 0.31, 2, etc).
+        if (isETF && close < 5) continue;
+
+        const change = parseFloat(String(item.ch || 0));
+
+        let assetType: string;
+        if (endpoint === 'stock') {
+          assetType = isETF ? 'etf' : 'stock';
+        } else {
+          assetType = matched.includes('XAU') || matched.includes('XAG') || ['CL', 'NG', 'HG'].includes(matched) ? 'commodity' : 'forex';
+        }
+
+        results.push({
+          symbol: matched,
+          name: item.name || matched,
+          asset_type: assetType,
+          price: close,
+          open: parseFloat(String(item.o || close)),
+          high: parseFloat(String(item.h || close)),
+          low: parseFloat(String(item.l || close)),
+          volume: parseFloat(String(item.v || 0)),
+          change,
+          change_percent: parseFloat(String(item.cp || 0)),
+          previous_close: close - change,
+          is_market_open: true,
+          source: 'fcsapi',
+          timestamp: new Date().toISOString(),
+        });
+        seen.add(matched);
       }
-      
+
+      if (results.length > 0) break;
+    }
+  } catch (e) {
+    console.error(`FCS ${endpoint}:`, e);
+  }
+
+  return results;
+}
+
+async function fetchYahooChartQuotes(symbols: string[]): Promise<NormalizedQuote[]> {
+  const results: NormalizedQuote[] = [];
+
+  for (const symbol of symbols) {
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          'Accept': 'application/json,text/plain,*/*',
+        },
+      });
+      if (!res.ok) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        continue;
+      }
+
+      const data = await res.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (!meta?.regularMarketPrice) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        continue;
+      }
+
+      const price = Number(meta.regularMarketPrice);
+      const previousClose = Number(meta.previousClose || meta.chartPreviousClose || price);
+      const change = price - previousClose;
+      const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0;
+
       results.push({
-        symbol: matched,
-        name: item.name || matched,
-        asset_type: assetType,
-        price: close,
-        open: parseFloat(String(item.o || close)),
-        high: parseFloat(String(item.h || close)),
-        low: parseFloat(String(item.l || close)),
-        volume: parseFloat(String(item.v || 0)),
+        symbol,
+        name: meta.shortName || meta.longName || symbol,
+        asset_type: 'stock',
+        price,
+        open: Number(meta.regularMarketOpen || price),
+        high: Number(meta.regularMarketDayHigh || price),
+        low: Number(meta.regularMarketDayLow || price),
+        volume: Number(meta.regularMarketVolume || 0),
         change,
-        change_percent: parseFloat(String(item.cp || 0)),
-        previous_close: close - change,
-        is_market_open: true,
-        source: 'fcsapi',
+        change_percent: changePercent,
+        previous_close: previousClose,
+        is_market_open: meta.marketState === 'REGULAR',
+        source: 'yahoo-chart',
         timestamp: new Date().toISOString(),
       });
+    } catch (e) {
+      console.error(`Yahoo chart ${symbol}:`, e);
     }
-  } catch (e) { console.error(`FCS ${endpoint}:`, e); }
+
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
+
   return results;
 }
 
 async function fetchYahooQuotes(symbols: string[]): Promise<NormalizedQuote[]> {
   if (!symbols.length) return [];
+
   const results: NormalizedQuote[] = [];
+  const fetched = new Set<string>();
+
   try {
     const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols.join(','))}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume,regularMarketPreviousClose,shortName,longName,exchange`;
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (!res.ok) return results;
-    const data = await res.json();
-    for (const q of (data?.quoteResponse?.result || [])) {
-      if (!q.symbol || !q.regularMarketPrice) continue;
-      results.push({
-        symbol: q.symbol,
-        name: q.longName || q.shortName || q.symbol,
-        asset_type: 'stock',
-        price: q.regularMarketPrice,
-        open: q.regularMarketOpen || q.regularMarketPrice,
-        high: q.regularMarketDayHigh || q.regularMarketPrice,
-        low: q.regularMarketDayLow || q.regularMarketPrice,
-        volume: q.regularMarketVolume || 0,
-        change: q.regularMarketChange || 0,
-        change_percent: q.regularMarketChangePercent || 0,
-        previous_close: q.regularMarketPreviousClose || q.regularMarketPrice,
-        is_market_open: q.marketState === 'REGULAR',
-        source: 'yahoo',
-        timestamp: new Date().toISOString(),
-      });
+
+    if (res.ok) {
+      const data = await res.json();
+      for (const q of (data?.quoteResponse?.result || [])) {
+        if (!q.symbol || !q.regularMarketPrice) continue;
+        results.push({
+          symbol: q.symbol,
+          name: q.longName || q.shortName || q.symbol,
+          asset_type: 'stock',
+          price: q.regularMarketPrice,
+          open: q.regularMarketOpen || q.regularMarketPrice,
+          high: q.regularMarketDayHigh || q.regularMarketPrice,
+          low: q.regularMarketDayLow || q.regularMarketPrice,
+          volume: q.regularMarketVolume || 0,
+          change: q.regularMarketChange || 0,
+          change_percent: q.regularMarketChangePercent || 0,
+          previous_close: q.regularMarketPreviousClose || q.regularMarketPrice,
+          is_market_open: q.marketState === 'REGULAR',
+          source: 'yahoo',
+          timestamp: new Date().toISOString(),
+        });
+        fetched.add(q.symbol);
+      }
     }
-  } catch (e) { console.error('Yahoo:', e); }
+  } catch (e) {
+    console.error('Yahoo quote:', e);
+  }
+
+  const missingSymbols = symbols.filter(symbol => !fetched.has(symbol));
+  if (missingSymbols.length > 0) {
+    const chartFallback = await fetchYahooChartQuotes(missingSymbols);
+    results.push(...chartFallback);
+  }
+
   return results;
 }
 
