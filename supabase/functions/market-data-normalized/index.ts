@@ -498,7 +498,7 @@ serve(async (req) => {
         allQuotes.push(...yChart);
       }
 
-      // Fallback 3: DB cache for anything still missing
+      // Fallback 4: DB cache for anything still missing
       const finalMissing = allStockLike.filter(s => !fetched.has(s));
       if (finalMissing.length > 0) {
         const dbQuotes = await fetchFromDBCache(finalMissing, db);
