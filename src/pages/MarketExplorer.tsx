@@ -264,6 +264,39 @@ export default function MarketExplorer() {
           <Activity className="h-3.5 w-3.5" />
           {showFeatures ? 'Features ON' : 'Features OFF'}
         </button>
+
+        <button
+          onClick={async () => {
+            setGeneratingIdeas(true);
+            try {
+              const { data, error } = await supabase.functions.invoke('regime-trade-ideas', {
+                body: { min_score: 45 },
+              });
+              if (error) throw error;
+              if (data?.count > 0) {
+                toast({ title: `⚡ ${data.count} ideas generadas`, description: `${data.skipped_existing} existentes omitidas, ${data.skipped_neutral} en régimen neutral omitidas. Ve a Trade Ideas.` });
+              } else {
+                toast({ title: '📊 Sin nuevas ideas', description: `No hay oportunidades con score ≥ 45 en regímenes accionables. ${data?.skipped_existing || 0} ya existentes, ${data?.skipped_neutral || 0} en régimen neutral.` });
+              }
+            } catch (e: any) {
+              toast({ title: 'Error', description: e.message || 'Error generando ideas', variant: 'destructive' });
+            } finally {
+              setGeneratingIdeas(false);
+            }
+          }}
+          disabled={generatingIdeas || !featuresMap || featuresCount === 0}
+          className={cn(
+            "rounded-md px-3 py-2 text-xs font-medium flex items-center gap-1.5 transition-colors",
+            generatingIdeas
+              ? "bg-warning/15 text-warning border border-warning/30 cursor-wait"
+              : featuresCount > 0
+                ? "bg-terminal-gold/15 text-terminal-gold border border-terminal-gold/30 hover:bg-terminal-gold/25"
+                : "bg-secondary text-muted-foreground cursor-not-allowed"
+          )}
+        >
+          {generatingIdeas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lightbulb className="h-3.5 w-3.5" />}
+          {generatingIdeas ? 'Generando...' : 'Auto-Ideas'}
+        </button>
       </div>
 
       {/* Filters */}
