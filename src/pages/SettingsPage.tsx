@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2, User, Key, Target, RotateCcw } from 'lucide-react';
+import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2, User, Key, Target, RotateCcw, Bell, Volume2, VolumeX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSettings, type UserSettings } from '@/hooks/useUserSettings';
+import { useNotifications, type NotificationPreferences } from '@/hooks/useNotifications';
 import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-type Tab = 'risk' | 'scoring' | 'profile' | 'binance';
+type Tab = 'risk' | 'scoring' | 'profile' | 'binance' | 'notifications';
 
 interface ScoringWeights {
   structure_weight: number;
@@ -31,9 +32,11 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const { t } = useI18n();
   const { settings: savedSettings, loading } = useUserSettings();
+  const { preferences: notifPrefs, savePreferences: saveNotifPrefs } = useNotifications();
   const [settings, setSettings] = useState<UserSettings>(savedSettings);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('risk');
+  const [localNotifPrefs, setLocalNotifPrefs] = useState<NotificationPreferences>(notifPrefs);
 
   // Profile state
   const [fullName, setFullName] = useState('');
@@ -48,9 +51,8 @@ export default function SettingsPage() {
   const [weights, setWeights] = useState<ScoringWeights>(defaultWeights);
   const [weightsLoading, setWeightsLoading] = useState(true);
 
-  useEffect(() => {
-    setSettings(savedSettings);
-  }, [savedSettings]);
+  useEffect(() => { setSettings(savedSettings); }, [savedSettings]);
+  useEffect(() => { setLocalNotifPrefs(notifPrefs); }, [notifPrefs]);
 
   // Load profile
   useEffect(() => {
@@ -214,6 +216,7 @@ export default function SettingsPage() {
   const tabs: { key: Tab; label: string; icon: typeof Settings }[] = [
     { key: 'risk', label: 'Capital & Riesgo', icon: Shield },
     { key: 'scoring', label: 'Scoring Weights', icon: Target },
+    { key: 'notifications', label: 'Notificaciones', icon: Bell },
     { key: 'profile', label: 'Perfil', icon: User },
     { key: 'binance', label: 'Binance API', icon: Key },
   ];
@@ -642,6 +645,101 @@ export default function SettingsPage() {
               <p className="text-[10px] text-muted-foreground font-mono">
                 Estado: {binanceKey ? '🟢 API Key configurada' : '🔴 No configurada'}
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications Tab */}
+      {activeTab === 'notifications' && (
+        <div className="max-w-2xl space-y-6">
+          <div className="flex justify-end">
+            <button
+              onClick={async () => {
+                setSaving(true);
+                await saveNotifPrefs(localNotifPrefs);
+                toast.success('Preferencias de notificación guardadas ✓');
+                setSaving(false);
+              }}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? 'Saving...' : 'Guardar'}
+            </button>
+          </div>
+
+          <div className="terminal-border rounded-lg p-5 space-y-4">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Bell className="h-4 w-4 text-primary" />
+              Preferencias de Notificación
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Configura qué notificaciones recibir y cuáles deben tener sonido de alerta.
+            </p>
+
+            <div className="space-y-3">
+              {([
+                { key: 'sl_tp', label: '🎯 Stop Loss / Take Profit', desc: 'Alerta cuando el precio alcanza tu SL o TP', critical: true },
+                { key: 'risk_alerts', label: '🛡️ Alertas de Riesgo', desc: 'Drawdown máximo, posiciones excedidas, límites de riesgo', critical: true },
+                { key: 'regime_change', label: '📊 Cambio de Régimen', desc: 'Cuando un activo cambia de régimen de mercado' },
+                { key: 'signals', label: '💡 Señales de Trade', desc: 'Nuevas señales generadas por los agentes' },
+                { key: 'pnl_threshold', label: '💰 PnL Significativo', desc: 'Cuando una posición supera el umbral de ganancia/pérdida' },
+                { key: 'agents', label: '🤖 Agentes Completados', desc: 'Cuando finaliza un análisis de agentes' },
+              ] as { key: string; label: string; desc: string; critical?: boolean }[]).map(({ key, label, desc, critical }) => {
+                const enabledKey = `${key}_enabled` as keyof NotificationPreferences;
+                const soundKey = `${key}_sound` as keyof NotificationPreferences;
+                return (
+                  <div key={key} className={cn(
+                    "flex items-center justify-between p-3 rounded-md border transition-colors",
+                    localNotifPrefs[enabledKey] ? "border-border bg-background" : "border-border/50 bg-muted/30 opacity-60"
+                  )}>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground">{label}</span>
+                        {critical && <span className="text-[9px] px-1.5 py-0.5 rounded bg-loss/10 text-loss font-bold">CRÍTICO</span>}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
+                      {key === 'pnl_threshold' && localNotifPrefs.pnl_threshold_enabled && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <label className="text-[10px] text-muted-foreground font-mono">Umbral:</label>
+                          <input
+                            type="number"
+                            step="1"
+                            value={localNotifPrefs.pnl_threshold_percent}
+                            onChange={(e) => setLocalNotifPrefs(p => ({ ...p, pnl_threshold_percent: Number(e.target.value) }))}
+                            className="w-16 px-2 py-1 bg-background border border-border rounded text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+                          />
+                          <span className="text-[10px] text-muted-foreground">%</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={localNotifPrefs[enabledKey] as boolean}
+                          onChange={(e) => setLocalNotifPrefs(p => ({ ...p, [enabledKey]: e.target.checked }))}
+                          className="rounded border-border"
+                        />
+                        <span className="text-[10px] text-muted-foreground font-mono">ON</span>
+                      </label>
+                      <button
+                        onClick={() => setLocalNotifPrefs(p => ({ ...p, [soundKey]: !(p[soundKey] as boolean) }))}
+                        disabled={!localNotifPrefs[enabledKey]}
+                        className={cn(
+                          "p-1.5 rounded transition-colors",
+                          localNotifPrefs[soundKey] ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground",
+                          !localNotifPrefs[enabledKey] && "opacity-30 cursor-not-allowed"
+                        )}
+                        title={localNotifPrefs[soundKey] ? 'Sonido activado' : 'Sonido desactivado'}
+                      >
+                        {localNotifPrefs[soundKey] ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

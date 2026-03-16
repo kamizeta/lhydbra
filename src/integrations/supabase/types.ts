@@ -220,6 +220,105 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          agents_enabled: boolean
+          agents_sound: boolean
+          created_at: string
+          id: string
+          pnl_threshold_enabled: boolean
+          pnl_threshold_percent: number
+          pnl_threshold_sound: boolean
+          regime_change_enabled: boolean
+          regime_change_sound: boolean
+          risk_alerts_enabled: boolean
+          risk_alerts_sound: boolean
+          signals_enabled: boolean
+          signals_sound: boolean
+          sl_tp_enabled: boolean
+          sl_tp_sound: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agents_enabled?: boolean
+          agents_sound?: boolean
+          created_at?: string
+          id?: string
+          pnl_threshold_enabled?: boolean
+          pnl_threshold_percent?: number
+          pnl_threshold_sound?: boolean
+          regime_change_enabled?: boolean
+          regime_change_sound?: boolean
+          risk_alerts_enabled?: boolean
+          risk_alerts_sound?: boolean
+          signals_enabled?: boolean
+          signals_sound?: boolean
+          sl_tp_enabled?: boolean
+          sl_tp_sound?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agents_enabled?: boolean
+          agents_sound?: boolean
+          created_at?: string
+          id?: string
+          pnl_threshold_enabled?: boolean
+          pnl_threshold_percent?: number
+          pnl_threshold_sound?: boolean
+          regime_change_enabled?: boolean
+          regime_change_sound?: boolean
+          risk_alerts_enabled?: boolean
+          risk_alerts_sound?: boolean
+          signals_enabled?: boolean
+          signals_sound?: boolean
+          sl_tp_enabled?: boolean
+          sl_tp_sound?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          metadata: Json | null
+          severity: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          metadata?: Json | null
+          severity?: string
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          metadata?: Json | null
+          severity?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ohlcv_cache: {
         Row: {
           asset_type: string

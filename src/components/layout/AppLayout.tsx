@@ -8,14 +8,17 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import LanguageSelector from "@/components/LanguageSelector";
+import NotificationBell from "@/components/NotificationBell";
 import lhydbraLogo from "@/assets/lhydbra-logo.png";
 import { useRegimeAlerts } from "@/hooks/useRegimeAlerts";
+import { usePositionAlerts } from "@/hooks/usePositionAlerts";
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const { t } = useI18n();
   const { user, signOut } = useAuth();
   useRegimeAlerts();
+  usePositionAlerts();
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
@@ -78,6 +81,7 @@ export default function AppLayout() {
             <span className="text-xs font-mono text-muted-foreground">{user?.email}</span>
           </div>
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <LanguageSelector collapsed={false} variant="header" />
             <button onClick={signOut} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-loss border border-border rounded-md hover:bg-accent transition-colors">
               <LogOut className="h-3.5 w-3.5" />
