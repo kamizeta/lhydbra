@@ -740,8 +740,8 @@ serve(async (req) => {
         allQuotes.push(...yChart);
       }
 
-      // Fallback 6: DB cache for anything still missing
-      const finalMissing = allStockLike.filter(s => !fetched.has(s));
+      // Fallback 8: DB cache for anything still missing
+      const finalMissing = [...allStockLike, ...forex, ...commodity].filter(s => !fetched.has(s));
       if (finalMissing.length > 0) {
         const dbQuotes = await fetchFromDBCache(finalMissing, db);
         logApiUsage(db, 'db-cache', 'quote', finalMissing.length, dbQuotes.length, 0);
