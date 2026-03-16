@@ -76,6 +76,7 @@ export default function MarketExplorer() {
   const [sortKey, setSortKey] = useState<SortKey>('relativeStrength');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [showFeatures, setShowFeatures] = useState(true);
+  const [regimeFilter, setRegimeFilter] = useState<string | null>(null);
 
   const typeFilters: { label: string; value: AssetType | 'all' }[] = [
     { label: t.common.all, value: 'all' },
@@ -108,6 +109,11 @@ export default function MarketExplorer() {
   const filtered = assets
     .filter(a => typeFilter === 'all' || a.type === typeFilter)
     .filter(a => a.symbol.toLowerCase().includes(search.toLowerCase()) || a.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(a => {
+      if (!regimeFilter) return true;
+      const f = featuresMap?.[a.symbol];
+      return f?.market_regime === regimeFilter;
+    })
     .sort((a, b) => {
       const mul = sortDir === 'asc' ? 1 : -1;
       if (sortKey === 'symbol') return mul * a.symbol.localeCompare(b.symbol);
@@ -293,6 +299,19 @@ export default function MarketExplorer() {
         </div>
       </div>
 
+      {/* Market Regime Summary — clickable filters */}
+      {regimeFilter && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-mono">Filtrado por régimen:</span>
+          <button
+            onClick={() => setRegimeFilter(null)}
+            className="flex items-center gap-1 rounded-md bg-primary/15 text-primary border border-primary/30 px-2.5 py-1 text-xs font-medium hover:bg-primary/25 transition-colors"
+          >
+            <RegimeBadge regime={regimeFilter} confidence={0} />
+            <X className="h-3 w-3 ml-1" />
+          </button>
+        </div>
+      )}
       {/* Market Regime Summary */}
       {featuresMap && featuresCount > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -305,10 +324,19 @@ export default function MarketExplorer() {
             return Object.entries(regimes)
               .sort((a, b) => b[1] - a[1])
               .map(([regime, count]) => (
-                <div key={regime} className="terminal-border rounded-lg p-3 flex items-center justify-between">
+                <button
+                  key={regime}
+                  onClick={() => setRegimeFilter(prev => prev === regime ? null : regime)}
+                  className={cn(
+                    "terminal-border rounded-lg p-3 flex items-center justify-between transition-all cursor-pointer",
+                    regimeFilter === regime
+                      ? "ring-2 ring-primary bg-primary/10 border-primary/40 shadow-[0_0_12px_-3px_hsl(var(--primary)/0.4)]"
+                      : "hover:bg-accent/30"
+                  )}
+                >
                   <RegimeBadge regime={regime} confidence={0} />
                   <span className="text-sm font-mono font-bold text-foreground">{count}</span>
-                </div>
+                </button>
               ));
           })()}
         </div>
