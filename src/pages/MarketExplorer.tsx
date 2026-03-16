@@ -299,6 +299,19 @@ export default function MarketExplorer() {
         </div>
       </div>
 
+      {/* Market Regime Summary — clickable filters */}
+      {regimeFilter && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-mono">Filtrado por régimen:</span>
+          <button
+            onClick={() => setRegimeFilter(null)}
+            className="flex items-center gap-1 rounded-md bg-primary/15 text-primary border border-primary/30 px-2.5 py-1 text-xs font-medium hover:bg-primary/25 transition-colors"
+          >
+            <RegimeBadge regime={regimeFilter} confidence={0} />
+            <X className="h-3 w-3 ml-1" />
+          </button>
+        </div>
+      )}
       {/* Market Regime Summary */}
       {featuresMap && featuresCount > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
