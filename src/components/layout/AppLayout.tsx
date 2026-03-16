@@ -8,8 +8,10 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import LanguageSelector from "@/components/LanguageSelector";
+import NotificationBell from "@/components/NotificationBell";
 import lhydbraLogo from "@/assets/lhydbra-logo.png";
 import { useRegimeAlerts } from "@/hooks/useRegimeAlerts";
+import { usePositionAlerts } from "@/hooks/usePositionAlerts";
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
