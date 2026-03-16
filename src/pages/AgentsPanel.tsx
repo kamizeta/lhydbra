@@ -68,7 +68,7 @@ export default function AgentsPanel() {
     : mockAssets.map(a => ({ symbol: a.symbol, name: a.name, type: a.type, price: a.price, change: a.changePercent, rsi: a.rsi, trend: a.trend, momentum: a.momentum, rs: a.relativeStrength, volatility: a.volatility }));
 
   const portfolioData = positions.map(p => ({ symbol: p.symbol, type: p.asset_type, qty: p.quantity, entry: p.avg_entry, direction: p.direction, strategy: p.strategy, sl: p.stop_loss, tp: p.take_profit }));
-  const tradeHistory = closedTrades.map(t => ({ symbol: t.symbol, direction: t.direction, entry: t.avg_entry, exit: t.close_price, pnl: t.pnl, strategy: t.strategy, opened: t.opened_at, closed: t.closed_at }));
+  const tradeHistory = closedTrades.map((t: any) => ({ symbol: t.symbol, direction: t.direction, entry: t.entry_price, exit: t.exit_price, pnl: t.pnl, r_multiple: t.r_multiple, strategy_family: t.strategy_family, market_regime: t.market_regime, opportunity_score: t.opportunity_score, entered: t.entered_at, exited: t.exited_at, entry_reasoning: t.entry_reasoning, lessons_learned: t.lessons_learned, mistake_tags: t.mistake_tags }));
 
   const userConfig = {
     initial_capital: settings.initial_capital,
