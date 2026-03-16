@@ -154,28 +154,54 @@ serve(async (req) => {
       });
     }
 
+    // Enrich signals with opportunity_scores from DB when AI doesn't provide them
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const db = createClient(supabaseUrl, serviceKey);
+    const signalSymbols = [...new Set(signals.map((s: any) => s.symbol).filter(Boolean))];
+    let scoreMap: Record<string, any> = {};
+    if (signalSymbols.length > 0) {
+      const { data: scores } = await db.from("opportunity_scores")
+        .select("symbol, total_score, structure_score, momentum_score, volatility_score, strategy_score, rr_score, macro_score, sentiment_score, historical_score")
+        .in("symbol", signalSymbols);
+      if (scores) {
+        for (const s of scores) scoreMap[s.symbol] = s;
+      }
+    }
+
     // Insert signals into trade_signals table
-    const rows = signals.map((s: any) => ({
-      user_id: user.id,
-      symbol: s.symbol || "UNKNOWN",
-      name: s.name || s.symbol || "Unknown",
-      asset_type: s.asset_type || "stock",
-      direction: s.direction || "long",
-      strategy: s.strategy || "AI Generated",
-      strategy_family: s.strategy_family || null,
-      entry_price: Number(s.entry_price) || 0,
-      stop_loss: Number(s.stop_loss) || 0,
-      take_profit: Number(s.take_profit) || 0,
-      risk_reward: Number(s.risk_reward) || 1.5,
-      position_size: s.position_size ? Number(s.position_size) : null,
-      risk_percent: s.risk_percent ? Number(s.risk_percent) : null,
-      confidence: Math.min(100, Math.max(0, Number(s.confidence) || 50)),
-      reasoning: s.reasoning || null,
-      agent_analysis: s.agent_analysis || null,
-      opportunity_score: s.opportunity_score ? Number(s.opportunity_score) : null,
-      market_regime: s.market_regime || null,
-      status: "pending",
-    }));
+    const rows = signals.map((s: any) => {
+      const dbScore = scoreMap[s.symbol];
+      const oppScore = s.opportunity_score ? Number(s.opportunity_score) : (dbScore?.total_score ?? null);
+      const breakdown = dbScore ? {
+        structure: dbScore.structure_score, momentum: dbScore.momentum_score,
+        volatility: dbScore.volatility_score, strategy: dbScore.strategy_score,
+        rr: dbScore.rr_score, macro: dbScore.macro_score,
+        sentiment: dbScore.sentiment_score, historical: dbScore.historical_score,
+      } : null;
+
+      return {
+        user_id: user.id,
+        symbol: s.symbol || "UNKNOWN",
+        name: s.name || s.symbol || "Unknown",
+        asset_type: s.asset_type || "stock",
+        direction: s.direction || "long",
+        strategy: s.strategy || "AI Generated",
+        strategy_family: s.strategy_family || null,
+        entry_price: Number(s.entry_price) || 0,
+        stop_loss: Number(s.stop_loss) || 0,
+        take_profit: Number(s.take_profit) || 0,
+        risk_reward: Number(s.risk_reward) || 1.5,
+        position_size: s.position_size ? Number(s.position_size) : null,
+        risk_percent: s.risk_percent ? Number(s.risk_percent) : null,
+        confidence: Math.min(100, Math.max(0, Number(s.confidence) || 50)),
+        reasoning: s.reasoning || null,
+        agent_analysis: s.agent_analysis || null,
+        opportunity_score: oppScore,
+        score_breakdown: breakdown,
+        market_regime: s.market_regime || null,
+        status: "pending",
+      };
+    });
 
     const { data: inserted, error: insertError } = await supabase
       .from("trade_signals")
