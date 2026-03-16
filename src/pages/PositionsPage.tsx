@@ -62,13 +62,15 @@ export default function PositionsPage() {
     return { pnl: diff * pos.quantity, pnlPercent: (diff / pos.avg_entry) * 100, currentPrice, isMock: lookup.isMock };
   };
 
-  const totalPnL = useMemo(() => {
+  const { totalPnL, totalPnLPercent } = useMemo(() => {
     let total = 0;
+    let totalCapital = 0;
     for (const pos of positions) {
       const result = getPnL(pos);
+      totalCapital += pos.quantity * pos.avg_entry;
       if (result) total += result.pnl;
     }
-    return total;
+    return { totalPnL: total, totalPnLPercent: totalCapital > 0 ? (total / totalCapital) * 100 : 0 };
   }, [positions, priceMap]);
 
   useEffect(() => { if (user) loadPositions(); }, [user]);
