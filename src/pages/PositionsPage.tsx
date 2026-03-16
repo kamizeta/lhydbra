@@ -62,13 +62,15 @@ export default function PositionsPage() {
     return { pnl: diff * pos.quantity, pnlPercent: (diff / pos.avg_entry) * 100, currentPrice, isMock: lookup.isMock };
   };
 
-  const totalPnL = useMemo(() => {
+  const { totalPnL, totalPnLPercent } = useMemo(() => {
     let total = 0;
+    let totalCapital = 0;
     for (const pos of positions) {
       const result = getPnL(pos);
+      totalCapital += pos.quantity * pos.avg_entry;
       if (result) total += result.pnl;
     }
-    return total;
+    return { totalPnL: total, totalPnLPercent: totalCapital > 0 ? (total / totalCapital) * 100 : 0 };
   }, [positions, priceMap]);
 
   useEffect(() => { if (user) loadPositions(); }, [user]);
@@ -141,7 +143,7 @@ export default function PositionsPage() {
             <p className="text-sm text-muted-foreground font-mono">{positions.length} {t.common.active}</p>
             {positions.length > 0 && (
               <span className={cn("text-sm font-mono font-bold", totalPnL >= 0 ? "text-profit" : "text-loss")}>
-                PnL Total: {totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)}
+                PnL Total: {totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)} ({totalPnLPercent >= 0 ? '+' : ''}{totalPnLPercent.toFixed(2)}%)
               </span>
             )}
           </div>
