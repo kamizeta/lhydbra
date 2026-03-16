@@ -70,7 +70,9 @@ const SOURCE_LIMITS: Record<string, string> = {
   alphavantage: "25 req/día · reset 24h · 1 sym = 1 req",
   "yahoo-batch": "Sin límite oficial · rate-limited por IP · N sym/req",
   "yahoo-chart": "Sin límite oficial · rate-limited por IP · 1 sym/req",
-  "db-cache": "Sin límite · caché local DB",
+  "db-cache": "Sin límite · caché ohlcv 48h",
+  "db-cache-hit": "Sin límite · market_cache TTL 2min · 0 API calls",
+  "mem-cache": "Sin límite · in-memory 55s · 0 API calls",
 };
 
 export default function ApiUsagePage() {
