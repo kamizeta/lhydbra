@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign } from 'lucide-react';
+import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
@@ -10,6 +10,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import { formatCurrency } from '@/lib/mockData';
 import ClosePositionDialog from '@/components/trade/ClosePositionDialog';
 import PositionSignalDetail from '@/components/trade/PositionSignalDetail';
+import PortfolioEngine from '@/components/trade/PortfolioEngine';
 
 interface Position {
   id: string;
