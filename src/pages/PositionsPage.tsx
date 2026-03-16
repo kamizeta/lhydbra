@@ -144,6 +144,7 @@ export default function PositionsPage() {
     }
   }, [user, loading]);
 
+  const handlePositionClosed = () => {
     setClosingPosition(null);
     loadPositions();
   };
