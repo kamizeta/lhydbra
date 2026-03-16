@@ -24,10 +24,10 @@ export function useMarketData() {
         }
       }
 
-      // Fill remaining with mock data
+      // Fill remaining with mock data (flagged)
       for (const mock of mockAssets) {
         if (!liveSymbols.has(mock.symbol)) {
-          assets.push(mock);
+          assets.push({ ...mock, isMock: true });
         }
       }
 
