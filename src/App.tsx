@@ -13,6 +13,7 @@ import AgentsPanel from "@/pages/AgentsPanel";
 import TradeIdeas from "@/pages/TradeIdeas";
 import PortfolioPage from "@/pages/PortfolioPage";
 import SettingsPage from "@/pages/SettingsPage";
+import NotificationsPage from "@/pages/NotificationsPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
