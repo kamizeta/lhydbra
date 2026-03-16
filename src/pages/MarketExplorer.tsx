@@ -509,7 +509,7 @@ export default function MarketExplorer() {
                     if (asset.type === 'crypto') tvSymbol = `BINANCE:${tvSymbol.replace('USD', 'USDT')}`;
                     else if (asset.type === 'forex') tvSymbol = `FX:${tvSymbol}`;
                     else tvSymbol = `NASDAQ:${asset.symbol}`;
-                    window.open(`https://www.tradingview.com/chart/?symbol=${tvSymbol}`, '_blank');
+                    (window.top || window).open(`https://www.tradingview.com/chart/?symbol=${tvSymbol}`, '_blank', 'noopener,noreferrer');
                   }}>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
