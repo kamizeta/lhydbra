@@ -96,6 +96,9 @@ async function streamAgent(
   portfolioData: unknown,
   tradeHistory: unknown,
   onChunk: (fullContent: string) => void,
+  marketFeatures?: unknown,
+  opportunityScores?: unknown,
+  strategyPerformance?: unknown,
 ): Promise<string> {
   const resp = await fetch(AGENT_URL, {
     method: 'POST',
@@ -103,7 +106,7 @@ async function streamAgent(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ agent, marketData, portfolioData, tradeHistory, language }),
+    body: JSON.stringify({ agent, marketData, portfolioData, tradeHistory, language, marketFeatures, opportunityScores, strategyPerformance }),
   });
 
   if (!resp.ok) {
