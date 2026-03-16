@@ -185,55 +185,56 @@ export default function MarketExplorer() {
   );
 
   return (
-    <div className="p-6 space-y-6 animate-slide-in">
+    <div className="p-3 md:p-6 space-y-3 md:space-y-6 animate-slide-in">
       {mockCount > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-purple-500/30 bg-purple-500/10 px-4 py-3">
-          <AlertTriangle className="h-4 w-4 text-purple-400 shrink-0" />
-          <p className="text-sm text-purple-300">
-            <span className="font-bold">{mockCount} activos</span> muestran datos <span className="font-bold uppercase">no reales</span> (mock/demo).
+        <div className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2">
+          <AlertTriangle className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+          <p className="text-[10px] md:text-sm text-purple-300">
+            <span className="font-bold">{mockCount}</span> mock
           </p>
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{t.market.title}</h1>
-          <p className="text-sm text-muted-foreground font-mono">{t.market.subtitle}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-lg md:text-2xl font-bold text-foreground">{t.market.title}</h1>
+          <p className="text-[10px] md:text-sm text-muted-foreground font-mono truncate">{t.market.subtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
           {isLoading && (
             <StatusBadge variant="info" dot>
-              <Loader2 className="h-3 w-3 animate-spin mr-1" />{t.common.loadingLiveData}
+              <Loader2 className="h-3 w-3 animate-spin" />
             </StatusBadge>
           )}
           {!isLoading && liveAssets && liveAssets.length > 0 && (
-            <StatusBadge variant="profit" dot>{t.common.live}</StatusBadge>
+            <StatusBadge variant="profit" dot><span className="hidden sm:inline">{t.common.live}</span><span className="sm:hidden">•</span></StatusBadge>
           )}
-          {featuresCount > 0 && (
-            <StatusBadge variant="info" dot>
-              <Brain className="h-3 w-3 mr-1" />{featuresCount} features
-            </StatusBadge>
-          )}
-          {scoresCount > 0 && (
-            <StatusBadge variant="warning" dot>
-              <Target className="h-3 w-3 mr-1" />{scoresCount} scores
-            </StatusBadge>
-          )}
+          <span className="hidden md:flex items-center gap-1.5">
+            {featuresCount > 0 && (
+              <StatusBadge variant="info" dot>
+                <Brain className="h-3 w-3 mr-1" />{featuresCount}
+              </StatusBadge>
+            )}
+            {scoresCount > 0 && (
+              <StatusBadge variant="warning" dot>
+                <Target className="h-3 w-3 mr-1" />{scoresCount}
+              </StatusBadge>
+            )}
+          </span>
           <button
             onClick={() => autoRefresh.toggle()}
             className={cn(
-              "rounded-md px-3 py-2 text-xs font-medium flex items-center gap-1.5 transition-colors",
+              "rounded-md px-2 py-1.5 text-[10px] md:text-xs font-medium flex items-center gap-1 transition-colors",
               autoRefresh.enabled
-                ? "bg-profit/15 text-profit border border-profit/30 hover:bg-profit/25"
-                : "bg-secondary text-muted-foreground hover:text-foreground"
+                ? "bg-profit/15 text-profit border border-profit/30"
+                : "bg-secondary text-muted-foreground"
             )}
-            title={autoRefresh.enabled ? `Auto-refresh: ${countdown}s` : 'Auto-refresh off'}
           >
-            {autoRefresh.enabled ? <Timer className="h-3.5 w-3.5" /> : <TimerOff className="h-3.5 w-3.5" />}
+            {autoRefresh.enabled ? <Timer className="h-3 w-3" /> : <TimerOff className="h-3 w-3" />}
             {autoRefresh.enabled ? `${countdown}s` : 'Off'}
           </button>
-          <button onClick={() => { refetch(); setCountdown(60); }} className="rounded-md bg-secondary p-2 text-muted-foreground hover:text-foreground transition-colors">
-            <RefreshCw className="h-4 w-4" />
+          <button onClick={() => { refetch(); setCountdown(60); }} className="rounded-md bg-secondary p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+            <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
