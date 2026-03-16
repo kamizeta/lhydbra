@@ -20,7 +20,7 @@ export default function MetricCard({ label, value, change, changeType = 'neutral
           <p className="mt-0.5 md:mt-1 text-lg md:text-2xl font-bold font-mono text-foreground truncate">{value}</p>
           {change && (
             <p className={cn(
-              "mt-1 text-xs font-mono",
+              "mt-0.5 text-[10px] md:text-xs font-mono truncate",
               changeType === 'positive' && "text-profit",
               changeType === 'negative' && "text-loss",
               changeType === 'neutral' && "text-muted-foreground"
