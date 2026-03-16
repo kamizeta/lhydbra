@@ -104,16 +104,22 @@ export default function AgentsPanel() {
     }
   }, [runningAgent]);
 
+  // Convert market features array to keyed object for easier agent consumption
+  const marketFeaturesMap = marketFeatures.reduce((acc: any, f: any) => {
+    acc[f.symbol] = f;
+    return acc;
+  }, {});
+
   const handleRun = (agentId: AgentType) => {
     setSelectedAgent(agentId);
     enableAutoRefreshForAgents();
-    runAgent(agentId, { marketData, userConfig }, portfolioData, tradeHistory);
+    runAgent(agentId, { marketData, userConfig }, portfolioData, tradeHistory, marketFeaturesMap, opportunityScores, strategyPerformance);
   };
 
   const handleRunAll = () => {
     setSelectedAgent('market-analyst');
     enableAutoRefreshForAgents();
-    runAllAgents({ marketData, userConfig }, portfolioData, tradeHistory);
+    runAllAgents({ marketData, userConfig }, portfolioData, tradeHistory, marketFeaturesMap, opportunityScores, strategyPerformance);
   };
 
   return (
