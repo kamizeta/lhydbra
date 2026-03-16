@@ -213,7 +213,7 @@ export default function RiskManagement() {
                 </p>
               )}
             </div>
-            <div className="rounded-md bg-primary/10 border border-primary/20 p-3">
+            <div className="rounded-md bg-primary/10 border border-primary/20 p-3 space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-medium text-foreground">{t.riskMgmt.positionSize}</span>
                 <span className="text-xl font-bold font-mono text-primary">
@@ -221,9 +221,20 @@ export default function RiskManagement() {
                 </span>
               </div>
               {positionSize > 0 && (
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  {t.riskMgmt.totalValue}: {formatCurrency(positionSize * entryPrice)}
-                </p>
+                <>
+                  <p className="text-[10px] text-muted-foreground">
+                    {t.riskMgmt.totalValue}: {formatCurrency(positionSize * entryPrice)}
+                  </p>
+                  <div className="border-t border-primary/20 pt-2 mt-1">
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      💡 {isFractional ? (
+                        <>Con tu cuenta de <span className="text-foreground font-medium">{formatCurrency(accountSize)}</span> arriesgando <span className="text-loss font-medium">{riskPercent}%</span> ({formatCurrency(dollarRisk)}), puedes comprar <span className="text-primary font-medium">{positionSize}</span> {firstPos?.symbol?.split('/')[0] || 'unidades'}. Si el precio toca tu Stop Loss, perderás máximo <span className="text-loss font-medium">{formatCurrency(dollarRisk)}</span>.</>
+                      ) : (
+                        <>Con tu cuenta de <span className="text-foreground font-medium">{formatCurrency(accountSize)}</span> arriesgando <span className="text-loss font-medium">{riskPercent}%</span> ({formatCurrency(dollarRisk)}), puedes comprar <span className="text-primary font-medium">{positionSize} acciones</span>. Si el precio toca tu Stop Loss, perderás máximo <span className="text-loss font-medium">{formatCurrency(dollarRisk)}</span>.</>
+                      )}
+                    </p>
+                  </div>
+                </>
               )}
             </div>
           </div>
