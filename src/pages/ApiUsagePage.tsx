@@ -33,6 +33,7 @@ const SOURCE_COLORS: Record<string, string> = {
   "fcsapi-stock": "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
   twelvedata: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
   finnhub: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  alphavantage: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   "yahoo-batch": "bg-red-500/20 text-red-400 border-red-500/30",
   "yahoo-chart": "bg-pink-500/20 text-pink-400 border-pink-500/30",
   "db-cache": "bg-muted text-muted-foreground border-border",
