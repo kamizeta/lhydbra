@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DollarSign, TrendingUp, TrendingDown, Shield, Activity, PieChart,
@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatNumber } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
+import { useMarketData } from "@/hooks/useMarketData";
 
 interface DBPosition {
   id: string;
@@ -78,6 +79,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { settings } = useUserSettings();
   const navigate = useNavigate();
+  const { data: marketAssets } = useMarketData();
   const [positions, setPositions] = useState<DBPosition[]>([]);
   const [pendingSignals, setPendingSignals] = useState<DBTradeSignal[]>([]);
   const [agentOutputs, setAgentOutputs] = useState<DBAgentAnalysis[]>([]);
@@ -99,9 +101,30 @@ export default function Dashboard() {
     });
   }, [user]);
 
+  const priceMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!marketAssets) return map;
+    for (const asset of marketAssets) {
+      map.set(asset.symbol, asset.price);
+      map.set(asset.symbol.replace('/', ''), asset.price);
+    }
+    return map;
+  }, [marketAssets]);
+
+  const unrealizedPnl = useMemo(() => {
+    let total = 0;
+    for (const pos of positions) {
+      const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
+      if (!currentPrice) continue;
+      const diff = pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice;
+      total += diff * pos.quantity;
+    }
+    return total;
+  }, [positions, priceMap]);
+
   const dateLocale = language === 'es' ? 'es-ES' : language === 'pt' ? 'pt-BR' : language === 'fr' ? 'fr-FR' : 'en-US';
 
-  const portfolioValue = settings.current_capital;
+  const portfolioValue = settings.current_capital + unrealizedPnl;
   const totalRealizedPnl = closedPositions.reduce((sum, p) => sum + (p.pnl || 0), 0);
   const pnlPercent = settings.initial_capital > 0 ? ((portfolioValue - settings.initial_capital) / settings.initial_capital) * 100 : 0;
 
@@ -172,7 +195,7 @@ export default function Dashboard() {
       {/* Top metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="cursor-pointer" onClick={() => navigate('/settings')}>
-          <MetricCard label={t.dashboard.portfolioValue} value={formatCurrency(portfolioValue)} change={`Capital inicial: ${formatCurrency(settings.initial_capital)}`} changeType="neutral" icon={DollarSign} />
+          <MetricCard label={t.dashboard.portfolioValue} value={formatCurrency(portfolioValue)} change={`Capital inicial: ${formatCurrency(settings.initial_capital)} | PnL: ${unrealizedPnl >= 0 ? '+' : ''}${formatCurrency(unrealizedPnl)}`} changeType={unrealizedPnl >= 0 ? "positive" : unrealizedPnl < 0 ? "negative" : "neutral"} icon={DollarSign} />
         </div>
         <div className="cursor-pointer" onClick={() => navigate('/portfolio')}>
           <MetricCard label={t.dashboard.dailyPnl} value={totalRealizedPnl >= 0 ? `+${formatCurrency(totalRealizedPnl)}` : formatCurrency(totalRealizedPnl)} change={`${pnlPercent >= 0 ? '+' : ''}${formatNumber(pnlPercent)}% total`} changeType={totalRealizedPnl >= 0 ? "positive" : "negative"} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} />
