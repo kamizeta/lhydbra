@@ -311,10 +311,19 @@ export default function MarketExplorer() {
             return Object.entries(regimes)
               .sort((a, b) => b[1] - a[1])
               .map(([regime, count]) => (
-                <div key={regime} className="terminal-border rounded-lg p-3 flex items-center justify-between">
+                <button
+                  key={regime}
+                  onClick={() => setRegimeFilter(prev => prev === regime ? null : regime)}
+                  className={cn(
+                    "terminal-border rounded-lg p-3 flex items-center justify-between transition-all cursor-pointer",
+                    regimeFilter === regime
+                      ? "ring-2 ring-primary bg-primary/10 border-primary/40 shadow-[0_0_12px_-3px_hsl(var(--primary)/0.4)]"
+                      : "hover:bg-accent/30"
+                  )}
+                >
                   <RegimeBadge regime={regime} confidence={0} />
                   <span className="text-sm font-mono font-bold text-foreground">{count}</span>
-                </div>
+                </button>
               ));
           })()}
         </div>
