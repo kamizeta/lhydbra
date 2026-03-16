@@ -126,7 +126,6 @@ export default function Dashboard() {
 
   const totalRealizedPnl = closedPositions.reduce((sum, p) => sum + (p.pnl || 0), 0);
   const portfolioValue = settings.current_capital + totalRealizedPnl + unrealizedPnl;
-  const totalRealizedPnl = closedPositions.reduce((sum, p) => sum + (p.pnl || 0), 0);
   const pnlPercent = settings.initial_capital > 0 ? ((portfolioValue - settings.initial_capital) / settings.initial_capital) * 100 : 0;
 
   const totalExposure = positions.reduce((sum, p) => sum + (p.quantity * p.avg_entry), 0);
