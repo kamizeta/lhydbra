@@ -110,7 +110,40 @@ export default function PositionsPage() {
     if (!error) { toast.success('Position deleted'); setPositions(prev => prev.filter(p => p.id !== id)); }
   };
 
-  const handlePositionClosed = () => {
+  const syncAlpaca = useCallback(async (paper = true) => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('alpaca-sync', {
+        body: { paper },
+      });
+      if (error || data?.error) {
+        toast.error(`Sync error: ${data?.error || error?.message}`);
+      } else {
+        const changes = data?.changes || [];
+        setSyncResult({ changes, synced_at: data?.synced_at });
+        if (changes.length > 0) {
+          toast.success(`Alpaca sync: ${changes.length} cambio(s) aplicados`);
+          loadPositions();
+        } else {
+          toast.info('Alpaca sync: todo sincronizado, sin cambios');
+        }
+      }
+    } catch (err) {
+      toast.error('Error al sincronizar con Alpaca');
+    }
+    setSyncing(false);
+  }, [user]);
+
+  // Auto-sync on mount
+  useEffect(() => {
+    if (user && positions.length >= 0 && !loading) {
+      // Delay auto-sync slightly to let positions load first
+      const timer = setTimeout(() => syncAlpaca(true), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, loading]);
+
     setClosingPosition(null);
     loadPositions();
   };
