@@ -111,6 +111,27 @@ export default function PositionsPage() {
     loadPositions();
   };
 
+  const checkSlTpHit = (pos: Position, currentPrice: number | undefined) => {
+    if (!currentPrice) return { hitSl: false, hitTp: false };
+    const hitSl = pos.stop_loss != null && (
+      pos.direction === 'long' ? currentPrice <= Number(pos.stop_loss) : currentPrice >= Number(pos.stop_loss)
+    );
+    const hitTp = pos.take_profit != null && (
+      pos.direction === 'long' ? currentPrice >= Number(pos.take_profit) : currentPrice <= Number(pos.take_profit)
+    );
+    return { hitSl, hitTp };
+  };
+
+  const saveSlTp = async () => {
+    if (!editingSlTp) return;
+    const { error } = await supabase.from('positions').update({
+      stop_loss: editingSlTp.sl ? Number(editingSlTp.sl) : null,
+      take_profit: editingSlTp.tp ? Number(editingSlTp.tp) : null,
+    }).eq('id', editingSlTp.id);
+    if (error) toast.error('Error updating SL/TP');
+    else { toast.success('SL/TP updated'); setEditingSlTp(null); loadPositions(); }
+  };
+
   return (
     <div className="p-6 space-y-6 animate-slide-in">
       <div className="flex items-center justify-between">
