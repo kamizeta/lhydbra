@@ -193,6 +193,11 @@ export default function MarketExplorer() {
               <Brain className="h-3 w-3 mr-1" />{featuresCount} features
             </StatusBadge>
           )}
+          {scoresCount > 0 && (
+            <StatusBadge variant="warning" dot>
+              <Target className="h-3 w-3 mr-1" />{scoresCount} scores
+            </StatusBadge>
+          )}
           <button
             onClick={() => autoRefresh.toggle()}
             className={cn(
