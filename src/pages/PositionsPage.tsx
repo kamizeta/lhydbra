@@ -37,6 +37,8 @@ export default function PositionsPage() {
   const [closingPosition, setClosingPosition] = useState<Position | null>(null);
   const [viewSignalId, setViewSignalId] = useState<string | null>(null);
   const [editingSlTp, setEditingSlTp] = useState<{ id: string; sl: string; tp: string } | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ changes: { action: string; symbol: string; detail: string }[]; synced_at: string } | null>(null);
   const [form, setForm] = useState({
     symbol: '', name: '', asset_type: 'stock', direction: 'long',
     quantity: 0, avg_entry: 0, stop_loss: 0, take_profit: 0, strategy: '',
