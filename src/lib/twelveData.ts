@@ -75,6 +75,8 @@ export const MARKET_SYMBOLS: Record<AssetType, { symbol: string; name: string; t
     { symbol: 'CL', name: 'Crude Oil', tdSymbol: 'CL' },
     { symbol: 'NG', name: 'Natural Gas', tdSymbol: 'NG' },
     { symbol: 'HG', name: 'Copper', tdSymbol: 'HG' },
+  ],
+  forex: [
     { symbol: 'EUR/USD', name: 'Euro/Dollar', tdSymbol: 'EUR/USD' },
     { symbol: 'GBP/USD', name: 'Pound/Dollar', tdSymbol: 'GBP/USD' },
     { symbol: 'USD/JPY', name: 'Dollar/Yen', tdSymbol: 'USD/JPY' },

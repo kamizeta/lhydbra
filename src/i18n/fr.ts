@@ -11,6 +11,7 @@ export const fr: Translations = {
     crypto: 'Crypto',
     stocks: 'Actions',
     etfs: 'ETFs',
+    forex: 'Forex',
     commodities: 'Matières Premières',
     assets: 'actifs',
     trades: 'opérations',
