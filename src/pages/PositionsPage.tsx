@@ -184,12 +184,51 @@ export default function PositionsPage() {
             )}
           </div>
         </div>
-        <button onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors">
-          {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showForm ? 'Cancel' : 'New Position'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => syncAlpaca(true)}
+            disabled={syncing}
+            className="flex items-center gap-2 px-3 py-2 border border-border rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+            title="Sincronizar con Alpaca (Paper)"
+          >
+            {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {syncing ? 'Syncing...' : 'Sync Alpaca'}
+          </button>
+          <button onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors">
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {showForm ? 'Cancel' : 'New Position'}
+          </button>
+        </div>
       </div>
+
+      {/* Sync results banner */}
+      {syncResult && syncResult.changes.length > 0 && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+              <RefreshCw className="h-3.5 w-3.5" /> Alpaca Sync — {syncResult.changes.length} cambio(s)
+            </span>
+            <button onClick={() => setSyncResult(null)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          {syncResult.changes.map((c, i) => (
+            <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
+              <span className={cn(
+                "px-1.5 py-0.5 rounded font-bold uppercase",
+                c.action === 'opened' ? "bg-profit/10 text-profit" :
+                c.action === 'closed' ? "bg-loss/10 text-loss" :
+                "bg-warning/10 text-warning"
+              )}>
+                {c.action}
+              </span>
+              <span className="text-foreground font-medium">{c.symbol}</span>
+              <span className="text-muted-foreground">{c.detail}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={addPosition} className="terminal-border rounded-lg p-4 space-y-3">
