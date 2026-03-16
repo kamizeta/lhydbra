@@ -34,6 +34,9 @@ export default function AgentsPanel() {
   // Fetch real positions from DB
   const [positions, setPositions] = useState<any[]>([]);
   const [closedTrades, setClosedTrades] = useState<any[]>([]);
+  const [marketFeatures, setMarketFeatures] = useState<any[]>([]);
+  const [opportunityScores, setOpportunityScores] = useState<any[]>([]);
+  const [strategyPerformance, setStrategyPerformance] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -41,6 +44,15 @@ export default function AgentsPanel() {
       .then(({ data }) => { if (data) setPositions(data); });
     supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'closed').order('closed_at', { ascending: false }).limit(50)
       .then(({ data }) => { if (data) setClosedTrades(data); });
+    // Fetch computed market features
+    supabase.from('market_features').select('*').eq('timeframe', '1d')
+      .then(({ data }) => { if (data) setMarketFeatures(data); });
+    // Fetch opportunity scores
+    supabase.from('opportunity_scores').select('*').eq('timeframe', '1d').order('total_score', { ascending: false })
+      .then(({ data }) => { if (data) setOpportunityScores(data); });
+    // Fetch strategy performance
+    supabase.from('strategy_performance').select('*').eq('user_id', user.id)
+      .then(({ data }) => { if (data) setStrategyPerformance(data); });
   }, [user]);
 
   const agents: { id: AgentType; name: string; icon: typeof Activity; description: string }[] = [
