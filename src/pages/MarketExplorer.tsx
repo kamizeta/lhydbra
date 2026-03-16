@@ -447,7 +447,7 @@ export default function MarketExplorer() {
                           {asset.type === 'commodity' ? 'CMD' : asset.type === 'forex' ? 'FX' : asset.type.toUpperCase()}
                         </StatusBadge>
                         <div>
-                          <div className={cn("font-mono font-medium", asset.isMock ? "text-purple-400" : "text-foreground")}>{asset.symbol}</div>
+                          <div className={cn("font-mono font-medium", asset.isMock ? "text-purple-400" : asset.source?.includes('yahoo') ? "text-blue-400" : "text-foreground")}>{asset.symbol}</div>
                           <div className="text-xs text-muted-foreground">{asset.name}</div>
                         </div>
                       </div>
