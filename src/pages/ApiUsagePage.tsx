@@ -45,6 +45,7 @@ const SOURCE_LABELS: Record<string, string> = {
   "fcsapi-forex": "FCS API (Forex)",
   "fcsapi-stock": "FCS API (Stocks)",
   twelvedata: "Twelve Data",
+  "exchangerate-api": "ExchangeRate API",
   finnhub: "Finnhub",
   alphavantage: "Alpha Vantage",
   "yahoo-batch": "Yahoo Batch",
