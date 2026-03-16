@@ -87,6 +87,34 @@ export default function SettingsPage() {
     loadBinance();
   }, [user]);
 
+  // Load scoring weights
+  useEffect(() => {
+    if (!user) return;
+    const loadWeights = async () => {
+      const { data } = await supabase
+        .from('scoring_weights')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (data) {
+        setWeights({
+          structure_weight: Number(data.structure_weight),
+          momentum_weight: Number(data.momentum_weight),
+          volatility_weight: Number(data.volatility_weight),
+          strategy_weight: Number(data.strategy_weight),
+          rr_weight: Number(data.rr_weight),
+          macro_weight: Number(data.macro_weight),
+          sentiment_weight: Number(data.sentiment_weight),
+          historical_weight: Number(data.historical_weight),
+          name: data.name,
+        });
+      }
+      setWeightsLoading(false);
+    };
+    loadWeights();
+  }, [user]);
+
   const saveSettings = async () => {
     if (!user) return;
     setSaving(true);
