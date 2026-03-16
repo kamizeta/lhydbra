@@ -397,9 +397,13 @@ export default function MarketExplorer() {
               {filtered.map(asset => {
                 const features = featuresMap?.[asset.symbol];
                 const score = scoresMap?.[asset.symbol];
+                return (
                   <tr key={asset.symbol} className={cn(
-                    "border-b border-border/50 transition-colors",
+                    "border-b border-border/50 transition-colors group",
                     asset.isMock
+                      ? "hover:bg-accent/20"
+                      : features ? "hover:bg-accent/30" : "hover:bg-accent/20"
+                  )}>
                       ? "bg-purple-500/5 hover:bg-purple-500/10 border-l-2 border-l-purple-500/50"
                       : features ? "hover:bg-accent/30" : "hover:bg-accent/20"
                   )}>
