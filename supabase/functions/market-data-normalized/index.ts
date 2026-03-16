@@ -802,7 +802,151 @@ async function fetchOHLCVHistory(symbol: string, timeframe: string, outputsize: 
   }
 }
 
-// ─── Main Handler ───
+// ─── Fetch ONLY missing symbols from APIs (called after DB cache check) ───
+interface FetchKeys {
+  freeCryptoKey: string | undefined;
+  fcsKey: string | undefined;
+  twelveKey: string | undefined;
+  finnhubKey: string | undefined;
+  alphaVantageKey: string | undefined;
+  db: ReturnType<typeof createClient>;
+}
+
+async function fetchMissingQuotes(symbols: string[], keys: FetchKeys): Promise<NormalizedQuote[]> {
+  const { freeCryptoKey, fcsKey, twelveKey, finnhubKey, alphaVantageKey, db } = keys;
+
+  // Classify
+  const crypto: string[] = [], forex: string[] = [], commodity: string[] = [], stocks: string[] = [], etfs: string[] = [];
+  const forexSet = new Set(['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','NZD/USD','EUR/GBP','EUR/JPY','GBP/JPY','USD/MXN','EUR/CHF','AUD/JPY']);
+  const commoditySet = new Set(['XAU/USD','XAG/USD','CL','NG','HG']);
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
+
+  for (const s of symbols) {
+    if (s.includes('/USD') && !forexSet.has(s) && !commoditySet.has(s)) crypto.push(s);
+    else if (forexSet.has(s)) forex.push(s);
+    else if (commoditySet.has(s)) commodity.push(s);
+    else if (etfSet.has(s)) etfs.push(s);
+    else stocks.push(s);
+  }
+
+  const allStockLike = [...stocks, ...etfs];
+  const t0 = Date.now();
+
+  // Primary: parallel fetch
+  const [cryptoQ, forexQ, stockQ] = await Promise.all([
+    freeCryptoKey ? fetchCryptoQuotes(crypto, freeCryptoKey) : [],
+    fcsKey ? fetchFCSQuotes([...forex, ...commodity], fcsKey, 'forex') : [],
+    fcsKey ? fetchFCSQuotes(allStockLike, fcsKey, 'stock') : [],
+  ]);
+  const t1 = Date.now();
+
+  logApiUsage(db, 'freecryptoapi', 'quote', crypto.length, cryptoQ.length, t1 - t0);
+  logApiUsage(db, 'fcsapi-forex', 'quote', forex.length + commodity.length, forexQ.length, t1 - t0);
+  logApiUsage(db, 'fcsapi-stock', 'quote', allStockLike.length, stockQ.length, t1 - t0);
+
+  const allQuotes = [...cryptoQ, ...forexQ, ...stockQ];
+  const fetched = new Set(allQuotes.map(q => q.symbol));
+
+  // Fallback 1: Twelve Data (batch 8)
+  const missingForTwelve = [...allStockLike, ...forex, ...commodity].filter(s => !fetched.has(s));
+  if (twelveKey && missingForTwelve.length > 0) {
+    const batch = missingForTwelve.slice(0, 8);
+    const t2 = Date.now();
+    const tdQ = await fetchTwelveDataQuotes(batch, twelveKey);
+    logApiUsage(db, 'twelvedata', 'quote', batch.length, tdQ.length, Date.now() - t2);
+    for (const q of tdQ) fetched.add(q.symbol);
+    allQuotes.push(...tdQ);
+  }
+
+  // Fallback 2: Alpaca (stocks batch + crypto)
+  const missingStocks = allStockLike.filter(s => !fetched.has(s));
+  if (missingStocks.length > 0) {
+    const tA = Date.now();
+    const aq = await fetchAlpacaSnapshots(missingStocks);
+    logApiUsage(db, 'alpaca', 'quote-stock', missingStocks.length, aq.length, Date.now() - tA);
+    for (const q of aq) { if (etfSet.has(q.symbol)) q.asset_type = 'etf'; fetched.add(q.symbol); }
+    allQuotes.push(...aq);
+  }
+  const missingCrypto = crypto.filter(s => !fetched.has(s));
+  if (missingCrypto.length > 0) {
+    const tAC = Date.now();
+    const acq = await fetchAlpacaCryptoSnapshots(missingCrypto);
+    logApiUsage(db, 'alpaca', 'quote-crypto', missingCrypto.length, acq.length, Date.now() - tAC);
+    for (const q of acq) fetched.add(q.symbol);
+    allQuotes.push(...acq);
+  }
+
+  // Fallback 3: ExchangeRate-API (forex, free)
+  const missingFx = forex.filter(s => !fetched.has(s));
+  if (missingFx.length > 0) {
+    const t3 = Date.now();
+    const erQ = await fetchExchangeRateAPI(missingFx);
+    logApiUsage(db, 'exchangerate-api', 'quote', missingFx.length, erQ.length, Date.now() - t3);
+    for (const q of erQ) fetched.add(q.symbol);
+    allQuotes.push(...erQ);
+  }
+
+  // Fallback 4: Alpha Vantage FX/Commodity
+  const missingFXC = [...forex, ...commodity].filter(s => !fetched.has(s));
+  if (alphaVantageKey && missingFXC.length > 0) {
+    const t4 = Date.now();
+    const avQ = await fetchAlphaVantageForex(missingFXC, alphaVantageKey);
+    logApiUsage(db, 'alphavantage', 'quote-forex', missingFXC.length, avQ.length, Date.now() - t4);
+    for (const q of avQ) fetched.add(q.symbol);
+    allQuotes.push(...avQ);
+  }
+
+  // Fallback 5: Finnhub (stocks)
+  const missingFH = allStockLike.filter(s => !fetched.has(s));
+  if (finnhubKey && missingFH.length > 0) {
+    const t5 = Date.now();
+    const fhQ = await fetchFinnhubQuotes(missingFH, finnhubKey);
+    logApiUsage(db, 'finnhub', 'quote', missingFH.length, fhQ.length, Date.now() - t5);
+    for (const q of fhQ) { if (etfSet.has(q.symbol)) q.asset_type = 'etf'; fetched.add(q.symbol); }
+    allQuotes.push(...fhQ);
+  }
+
+  // Fallback 6: Alpha Vantage stocks (max 5)
+  const missingAV = allStockLike.filter(s => !fetched.has(s));
+  if (alphaVantageKey && missingAV.length > 0) {
+    const t6 = Date.now();
+    const avSQ = await fetchAlphaVantageQuotes(missingAV.slice(0, 5), alphaVantageKey);
+    logApiUsage(db, 'alphavantage', 'quote-stock', Math.min(missingAV.length, 5), avSQ.length, Date.now() - t6);
+    for (const q of avSQ) { if (etfSet.has(q.symbol)) q.asset_type = 'etf'; fetched.add(q.symbol); }
+    allQuotes.push(...avSQ);
+  }
+
+  // Fallback 7: Yahoo batch
+  const missingY = allStockLike.filter(s => !fetched.has(s));
+  if (missingY.length > 0) {
+    const t7 = Date.now();
+    const yQ = await fetchYahooBatch(missingY);
+    logApiUsage(db, 'yahoo-batch', 'quote', missingY.length, yQ.length, Date.now() - t7);
+    for (const q of yQ) { if (etfSet.has(q.symbol)) q.asset_type = 'etf'; fetched.add(q.symbol); }
+    allQuotes.push(...yQ);
+  }
+
+  // Fallback 8: Yahoo chart
+  const missingYC = allStockLike.filter(s => !fetched.has(s));
+  if (missingYC.length > 0) {
+    const t8 = Date.now();
+    const ycQ = await fetchYahooChartParallel(missingYC);
+    logApiUsage(db, 'yahoo-chart', 'quote', missingYC.length, ycQ.length, Date.now() - t8);
+    for (const q of ycQ) { if (etfSet.has(q.symbol)) q.asset_type = 'etf'; fetched.add(q.symbol); }
+    allQuotes.push(...ycQ);
+  }
+
+  // Fallback 9: OHLCV DB cache (48h)
+  const finalMissing = symbols.filter(s => !fetched.has(s));
+  if (finalMissing.length > 0) {
+    const dbQ = await fetchFromDBCache(finalMissing, db);
+    logApiUsage(db, 'db-cache', 'quote', finalMissing.length, dbQ.length, 0);
+    allQuotes.push(...dbQ);
+  }
+
+  return allQuotes;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
