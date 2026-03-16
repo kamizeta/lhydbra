@@ -32,9 +32,11 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const { t } = useI18n();
   const { settings: savedSettings, loading } = useUserSettings();
+  const { preferences: notifPrefs, savePreferences: saveNotifPrefs } = useNotifications();
   const [settings, setSettings] = useState<UserSettings>(savedSettings);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('risk');
+  const [localNotifPrefs, setLocalNotifPrefs] = useState<NotificationPreferences>(notifPrefs);
 
   // Profile state
   const [fullName, setFullName] = useState('');
