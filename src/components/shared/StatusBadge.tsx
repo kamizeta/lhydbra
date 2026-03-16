@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
 type BadgeVariant = 'profit' | 'loss' | 'warning' | 'info' | 'neutral' | 'primary';
@@ -18,21 +19,30 @@ const variantStyles: Record<BadgeVariant, string> = {
   primary: 'bg-primary/15 text-primary border-primary/20',
 };
 
-export default function StatusBadge({ children, variant = 'neutral', className, dot }: StatusBadgeProps) {
-  return (
-    <span className={cn(
-      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium font-mono",
-      variantStyles[variant],
-      className
-    )}>
-      {dot && <span className={cn("h-1.5 w-1.5 rounded-full", {
-        'bg-profit': variant === 'profit',
-        'bg-loss': variant === 'loss',
-        'bg-warning': variant === 'warning',
-        'bg-primary': variant === 'info' || variant === 'primary',
-        'bg-muted-foreground': variant === 'neutral',
-      })} />}
-      {children}
-    </span>
-  );
-}
+const StatusBadge = forwardRef<HTMLSpanElement, StatusBadgeProps>(
+  ({ children, variant = 'neutral', className, dot }, ref) => {
+    return (
+      <span
+        ref={ref}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium font-mono",
+          variantStyles[variant],
+          className
+        )}
+      >
+        {dot && <span className={cn("h-1.5 w-1.5 rounded-full", {
+          'bg-profit': variant === 'profit',
+          'bg-loss': variant === 'loss',
+          'bg-warning': variant === 'warning',
+          'bg-primary': variant === 'info' || variant === 'primary',
+          'bg-muted-foreground': variant === 'neutral',
+        })} />}
+        {children}
+      </span>
+    );
+  }
+);
+
+StatusBadge.displayName = "StatusBadge";
+
+export default StatusBadge;
