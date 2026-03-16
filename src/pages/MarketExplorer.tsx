@@ -85,6 +85,14 @@ export default function MarketExplorer() {
 
   return (
     <div className="p-6 space-y-6 animate-slide-in">
+      {mockCount > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-purple-500/30 bg-purple-500/10 px-4 py-3">
+          <AlertTriangle className="h-4 w-4 text-purple-400 shrink-0" />
+          <p className="text-sm text-purple-300">
+            <span className="font-bold">{mockCount} activos</span> muestran datos <span className="font-bold uppercase">no reales</span> (mock/demo). Los precios marcados en <span className="text-purple-400 font-bold">morado</span> no reflejan el mercado actual.
+          </p>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t.market.title}</h1>
