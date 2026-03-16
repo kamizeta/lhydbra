@@ -172,15 +172,26 @@ async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'fore
 async function fetchYahooChartQuotes(symbols: string[]): Promise<NormalizedQuote[]> {
   const results: NormalizedQuote[] = [];
 
-  await Promise.all(symbols.map(async (symbol) => {
+  for (const symbol of symbols) {
     try {
       const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-      if (!res.ok) return;
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          'Accept': 'application/json,text/plain,*/*',
+        },
+      });
+      if (!res.ok) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        continue;
+      }
 
       const data = await res.json();
       const meta = data?.chart?.result?.[0]?.meta;
-      if (!meta?.regularMarketPrice) return;
+      if (!meta?.regularMarketPrice) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+        continue;
+      }
 
       const price = Number(meta.regularMarketPrice);
       const previousClose = Number(meta.previousClose || meta.chartPreviousClose || price);
@@ -206,7 +217,9 @@ async function fetchYahooChartQuotes(symbols: string[]): Promise<NormalizedQuote
     } catch (e) {
       console.error(`Yahoo chart ${symbol}:`, e);
     }
-  }));
+
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
 
   return results;
 }
