@@ -98,7 +98,7 @@ async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'fore
 
   const results: NormalizedQuote[] = [];
   const seen = new Set<string>();
-  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB']);
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
   const requestUrls = endpoint === 'stock'
     ? [
         // First try without exchange filter because many ETFs trade on ARCA/BATS and were being excluded.
