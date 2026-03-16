@@ -21,6 +21,82 @@ function memSet(key: string, data: unknown) {
   memCache.set(key, { data, ts: Date.now() });
 }
 
+// ─── Request coalescing: prevent duplicate concurrent fetches ───
+const inflightRequests = new Map<string, Promise<NormalizedQuote[]>>();
+
+function coalesce(key: string, fn: () => Promise<NormalizedQuote[]>): Promise<NormalizedQuote[]> {
+  const existing = inflightRequests.get(key);
+  if (existing) return existing;
+  const promise = fn().finally(() => inflightRequests.delete(key));
+  inflightRequests.set(key, promise);
+  return promise;
+}
+
+// ─── DB Cache Layer ───
+async function getFromDBCache(symbols: string[], db: ReturnType<typeof createClient>): Promise<{ cached: NormalizedQuote[]; missing: string[] }> {
+  if (!symbols.length) return { cached: [], missing: [] };
+  const { data } = await db
+    .from('market_cache')
+    .select('*')
+    .in('symbol', symbols)
+    .gt('expires_at', new Date().toISOString());
+
+  const cached: NormalizedQuote[] = [];
+  const foundSymbols = new Set<string>();
+
+  for (const row of (data || [])) {
+    foundSymbols.add(row.symbol);
+    cached.push({
+      symbol: row.symbol,
+      name: row.raw_data?.name || row.symbol,
+      asset_type: row.asset_class,
+      price: Number(row.price),
+      open: Number(row.open_price || row.price),
+      high: Number(row.high_price || row.price),
+      low: Number(row.low_price || row.price),
+      volume: Number(row.volume || 0),
+      change: Number(row.change_val || 0),
+      change_percent: Number(row.change_percent || 0),
+      previous_close: Number(row.previous_close || row.price),
+      is_market_open: row.is_market_open ?? true,
+      source: `cache:${row.provider}`,
+      timestamp: row.updated_at,
+    });
+  }
+
+  const missing = symbols.filter(s => !foundSymbols.has(s));
+  return { cached, missing };
+}
+
+async function persistToDBCache(quotes: NormalizedQuote[], db: ReturnType<typeof createClient>, ttlMinutes = 2) {
+  if (!quotes.length) return;
+  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
+  const rows = quotes.filter(q => !q.source.startsWith('cache:')).map(q => ({
+    symbol: q.symbol,
+    asset_class: q.asset_type,
+    provider: q.source,
+    price: q.price,
+    open_price: q.open,
+    high_price: q.high,
+    low_price: q.low,
+    volume: q.volume,
+    change_val: q.change,
+    change_percent: q.change_percent,
+    previous_close: q.previous_close,
+    is_market_open: q.is_market_open,
+    raw_data: { name: q.name },
+    updated_at: new Date().toISOString(),
+    expires_at: expiresAt,
+    request_count: 1,
+  }));
+
+  if (rows.length > 0) {
+    db.from('market_cache').upsert(rows, { onConflict: 'symbol' }).then(({ error }) => {
+      if (error) console.error('market_cache upsert error:', error.message);
+    });
+  }
+}
+
 interface OHLCVBar {
   symbol: string;
   timeframe: string;
