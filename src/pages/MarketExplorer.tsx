@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X, AlertTriangle, Brain, Zap, Activity, BarChart3, Shield } from "lucide-react";
+import { Search, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X, AlertTriangle, Brain, Zap, Activity, BarChart3, Shield, Target } from "lucide-react";
 import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolume } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import { useMarketFeaturesDB, useRunDataIntelligence } from "@/hooks/useDataIntelligence";
+import { useOpportunityScores, useRunOpportunityScoring } from "@/hooks/useOpportunityScores";
 import { ALL_SYMBOLS } from "@/lib/twelveData";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
@@ -10,7 +11,7 @@ import { useI18n } from "@/i18n";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { toast } from "@/hooks/use-toast";
 
-type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength';
+type SortKey = 'symbol' | 'price' | 'changePercent' | 'volume' | 'rsi' | 'momentum' | 'relativeStrength' | 'score';
 
 // ─── Regime Badge Component ───
 function RegimeBadge({ regime, confidence }: { regime: string; confidence: number }) {
