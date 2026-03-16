@@ -96,6 +96,7 @@ async function fetchCryptoQuotes(symbols: string[], apiKey: string): Promise<Nor
 async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'forex' | 'stock'): Promise<NormalizedQuote[]> {
   if (!symbols.length) return [];
   const results: NormalizedQuote[] = [];
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB']);
   const baseUrl = endpoint === 'stock'
     ? `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&exchange=NASDAQ,NYSE,AMEX&access_key=${apiKey}`
     : `https://fcsapi.com/api-v3/forex/latest?symbol=${encodeURIComponent(symbols.join(','))}&access_key=${apiKey}`;
@@ -113,10 +114,18 @@ async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'fore
       if (close <= 0) continue;
       const matched = symbols.find(sym => s === sym || s.includes(sym)) || s;
       const change = parseFloat(String(item.ch || 0));
+      
+      let assetType: string;
+      if (endpoint === 'stock') {
+        assetType = etfSet.has(matched) ? 'etf' : 'stock';
+      } else {
+        assetType = matched.includes('XAU') || matched.includes('XAG') || ['CL', 'NG', 'HG'].includes(matched) ? 'commodity' : 'forex';
+      }
+      
       results.push({
         symbol: matched,
         name: item.name || matched,
-        asset_type: endpoint === 'stock' ? 'stock' : (matched.includes('XAU') || matched.includes('XAG') || ['CL', 'NG', 'HG'].includes(matched) ? 'commodity' : 'forex'),
+        asset_type: assetType,
         price: close,
         open: parseFloat(String(item.o || close)),
         high: parseFloat(String(item.h || close)),
