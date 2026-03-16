@@ -487,7 +487,7 @@ serve(async (req) => {
         allQuotes.push(...yBatch);
       }
 
-      // Fallback 2: Yahoo chart for still-missing symbols (parallel batches of 5)
+      // Fallback 3: Yahoo chart for still-missing symbols (parallel batches of 5)
       const stillMissing = allStockLike.filter(s => !fetched.has(s));
       if (stillMissing.length > 0) {
         const yChart = await fetchYahooChartParallel(stillMissing);
