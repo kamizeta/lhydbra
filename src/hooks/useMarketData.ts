@@ -33,6 +33,7 @@ function normalizedToAsset(q: NormalizedQuote, info: { symbol: string; name: str
     volatility: parseFloat(volatility.toFixed(2)),
     momentum: Math.round(momentum),
     relativeStrength: Math.round(Math.max(0, Math.min(100, 50 + changePct * 2))),
+    source: q.source,
   };
 }
 

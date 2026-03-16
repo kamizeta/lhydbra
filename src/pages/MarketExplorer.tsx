@@ -433,6 +433,11 @@ export default function MarketExplorer() {
                             NO REAL
                           </span>
                         )}
+                        {!asset.isMock && asset.source?.includes('yahoo') && (
+                          <span className="shrink-0 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold px-1.5 py-0.5 uppercase tracking-wider border border-blue-500/30">
+                            YAHOO
+                          </span>
+                        )}
                         <StatusBadge variant={
                           asset.type === 'crypto' ? 'info' :
                           asset.type === 'stock' ? 'primary' :
@@ -442,7 +447,7 @@ export default function MarketExplorer() {
                           {asset.type === 'commodity' ? 'CMD' : asset.type === 'forex' ? 'FX' : asset.type.toUpperCase()}
                         </StatusBadge>
                         <div>
-                          <div className={cn("font-mono font-medium", asset.isMock ? "text-purple-400" : "text-foreground")}>{asset.symbol}</div>
+                          <div className={cn("font-mono font-medium", asset.isMock ? "text-purple-400" : asset.source?.includes('yahoo') ? "text-blue-400" : "text-foreground")}>{asset.symbol}</div>
                           <div className="text-xs text-muted-foreground">{asset.name}</div>
                         </div>
                       </div>
