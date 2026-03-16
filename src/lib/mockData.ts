@@ -1,7 +1,7 @@
 // Mock data simulating Twelve Data API responses
 // Structured to be easily replaced with real API calls
 
-export type AssetType = 'crypto' | 'stock' | 'etf' | 'commodity';
+export type AssetType = 'crypto' | 'stock' | 'etf' | 'commodity' | 'forex';
 
 export interface Asset {
   symbol: string;
