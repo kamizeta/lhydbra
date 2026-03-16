@@ -15,6 +15,7 @@ import PortfolioPage from "@/pages/PortfolioPage";
 import SettingsPage from "@/pages/SettingsPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import NotFound from "@/pages/NotFound";
+import ApiUsagePage from "@/pages/ApiUsagePage";
 
 const queryClient = new QueryClient();
 
