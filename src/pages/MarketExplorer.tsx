@@ -152,7 +152,7 @@ export default function MarketExplorer() {
 
       {/* Market stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {(['crypto', 'stock', 'etf', 'commodity'] as AssetType[]).map(type => {
+        {(['crypto', 'stock', 'etf', 'forex', 'commodity'] as AssetType[]).map(type => {
           const typeAssets = assets.filter(a => a.type === type);
           const avgChange = typeAssets.length > 0 ? typeAssets.reduce((s, a) => s + a.changePercent, 0) / typeAssets.length : 0;
           return (
