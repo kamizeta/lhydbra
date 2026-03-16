@@ -1,0 +1,1 @@
+DELETE FROM positions WHERE quantity = 0 AND status = 'open';

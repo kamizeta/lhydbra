@@ -223,6 +223,10 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
       toast.error('Hay reglas de riesgo que bloquean esta operación');
       return;
     }
+    if (openPosition && (!quantity || quantity <= 0)) {
+      toast.error('La cantidad debe ser mayor a 0');
+      return;
+    }
     setSaving(true);
 
     if (openPosition) {
