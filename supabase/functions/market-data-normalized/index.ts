@@ -390,6 +390,72 @@ async function fetchTwelveDataQuotes(symbols: string[], apiKey: string): Promise
   return results;
 }
 
+// ─── Finnhub Quote Fetcher ───
+async function fetchFinnhubQuotes(symbols: string[], apiKey: string): Promise<NormalizedQuote[]> {
+  if (!symbols.length || !apiKey) return [];
+  const results: NormalizedQuote[] = [];
+  const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB','SMH','XBI','IBIT','BITO']);
+
+  // Finnhub free: 60 calls/min. Fetch in parallel batches of 10
+  const BATCH = 10;
+  for (let i = 0; i < symbols.length; i += BATCH) {
+    const batch = symbols.slice(i, i + BATCH);
+    const batchResults = await Promise.all(batch.map(async (symbol) => {
+      try {
+        const url = `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const q = await res.json();
+        if (!q.c || q.c <= 0) return null;
+
+        const price = q.c;
+        const prevClose = q.pc || price;
+        const change = q.d || (price - prevClose);
+        const changePct = q.dp || (prevClose > 0 ? (change / prevClose) * 100 : 0);
+
+        return {
+          symbol,
+          name: symbol,
+          asset_type: etfSet.has(symbol) ? 'etf' : 'stock',
+          price,
+          open: q.o || price,
+          high: q.h || price,
+          low: q.l || price,
+          volume: 0,
+          change,
+          change_percent: changePct,
+          previous_close: prevClose,
+          is_market_open: true,
+          source: 'finnhub',
+          timestamp: new Date().toISOString(),
+        } as NormalizedQuote;
+      } catch (e) {
+        console.error(`Finnhub ${symbol}:`, e);
+        return null;
+      }
+    }));
+    results.push(...batchResults.filter((r): r is NormalizedQuote => r !== null));
+    if (i + BATCH < symbols.length) {
+      await new Promise(resolve => setTimeout(resolve, 1200));
+    }
+  }
+  return results;
+}
+
+// ─── API Usage Logger (fire-and-forget) ───
+function logApiUsage(db: ReturnType<typeof createClient>, source: string, action: string, requested: number, returned: number, timeMs: number, error?: string) {
+  db.from('api_usage_log').insert({
+    source,
+    action,
+    symbols_requested: requested,
+    symbols_returned: returned,
+    response_time_ms: timeMs,
+    error_message: error || null,
+  }).then(({ error: e }) => {
+    if (e) console.error('Usage log error:', e.message);
+  });
+}
+
 // ─── OHLCV Historical Fetcher (Twelve Data) ───
 async function fetchOHLCVHistory(symbol: string, timeframe: string, outputsize: number, apiKey: string): Promise<OHLCVBar[]> {
   const interval = timeframe === '1d' ? '1day' : timeframe === '1h' ? '1h' : timeframe === '4h' ? '4h' : '1day';
