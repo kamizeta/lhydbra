@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, Filter, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X } from "lucide-react";
+import { Search, Filter, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X, AlertTriangle } from "lucide-react";
 import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolume, formatMarketCap } from "@/lib/mockData";
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import StatusBadge from "@/components/shared/StatusBadge";
@@ -48,7 +48,8 @@ export default function MarketExplorer() {
   };
 
   const { data: liveAssets, isLoading, isError, refetch } = useQuickQuotes();
-  const assets = liveAssets && liveAssets.length > 0 ? liveAssets : mockAssets;
+  const assets = liveAssets && liveAssets.length > 0 ? liveAssets : mockAssets.map(a => ({ ...a, isMock: true }));
+  const mockCount = assets.filter(a => a.isMock).length;
 
   const filtered = assets
     .filter(a => typeFilter === 'all' || a.type === typeFilter)
@@ -84,6 +85,14 @@ export default function MarketExplorer() {
 
   return (
     <div className="p-6 space-y-6 animate-slide-in">
+      {mockCount > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-purple-500/30 bg-purple-500/10 px-4 py-3">
+          <AlertTriangle className="h-4 w-4 text-purple-400 shrink-0" />
+          <p className="text-sm text-purple-300">
+            <span className="font-bold">{mockCount} activos</span> muestran datos <span className="font-bold uppercase">no reales</span> (mock/demo). Los precios marcados en <span className="text-purple-400 font-bold">morado</span> no reflejan el mercado actual.
+          </p>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t.market.title}</h1>
@@ -195,9 +204,19 @@ export default function MarketExplorer() {
             </thead>
             <tbody>
               {filtered.map(asset => (
-                <tr key={asset.symbol} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
+                <tr key={asset.symbol} className={cn(
+                  "border-b border-border/50 transition-colors",
+                  asset.isMock
+                    ? "bg-purple-500/5 hover:bg-purple-500/10 border-l-2 border-l-purple-500/50"
+                    : "hover:bg-accent/30"
+                )}>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
+                      {asset.isMock && (
+                        <span className="shrink-0 rounded bg-purple-500/20 text-purple-400 text-[10px] font-bold px-1.5 py-0.5 uppercase tracking-wider border border-purple-500/30">
+                          NO REAL
+                        </span>
+                      )}
                       <StatusBadge variant={
                         asset.type === 'crypto' ? 'info' :
                         asset.type === 'stock' ? 'primary' :
@@ -207,7 +226,7 @@ export default function MarketExplorer() {
                         {asset.type === 'commodity' ? 'CMD' : asset.type === 'forex' ? 'FX' : asset.type.toUpperCase()}
                       </StatusBadge>
                       <div>
-                        <div className="font-mono font-medium text-foreground">{asset.symbol}</div>
+                        <div className={cn("font-mono font-medium", asset.isMock ? "text-purple-400" : "text-foreground")}>{asset.symbol}</div>
                         <div className="text-xs text-muted-foreground">{asset.name}</div>
                       </div>
                     </div>
