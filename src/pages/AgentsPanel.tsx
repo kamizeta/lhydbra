@@ -42,15 +42,13 @@ export default function AgentsPanel() {
     if (!user) return;
     supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'open')
       .then(({ data }) => { if (data) setPositions(data); });
-    supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'closed').order('closed_at', { ascending: false }).limit(50)
+    // Fetch trade_journal (richer data than raw closed positions)
+    supabase.from('trade_journal').select('*').eq('user_id', user.id).order('exited_at', { ascending: false }).limit(100)
       .then(({ data }) => { if (data) setClosedTrades(data); });
-    // Fetch computed market features
     supabase.from('market_features').select('*').eq('timeframe', '1d')
       .then(({ data }) => { if (data) setMarketFeatures(data); });
-    // Fetch opportunity scores
     supabase.from('opportunity_scores').select('*').eq('timeframe', '1d').order('total_score', { ascending: false })
       .then(({ data }) => { if (data) setOpportunityScores(data); });
-    // Fetch strategy performance
     supabase.from('strategy_performance').select('*').eq('user_id', user.id)
       .then(({ data }) => { if (data) setStrategyPerformance(data); });
   }, [user]);
