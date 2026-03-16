@@ -15,6 +15,9 @@ import {
   Briefcase,
   LogOut,
   History,
+  Radar,
+  FlaskConical,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
@@ -29,9 +32,12 @@ export default function AppLayout() {
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
+    { to: "/center", icon: LayoutGrid, label: "Control Center" },
     { to: "/market", icon: BarChart3, label: t.nav.market },
+    { to: "/radar", icon: Radar, label: "Radar" },
     { to: "/positions", icon: Briefcase, label: t.dashboard.openPositions },
     { to: "/strategies", icon: Brain, label: t.nav.strategies },
+    { to: "/lab", icon: FlaskConical, label: "Strategy Lab" },
     { to: "/risk", icon: Shield, label: t.nav.risk },
     { to: "/agents", icon: Bot, label: t.nav.agents },
     { to: "/agent-history", icon: History, label: t.agentHistory.title },

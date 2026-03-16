@@ -17,6 +17,9 @@ import TradeIdeas from "@/pages/TradeIdeas";
 import Journal from "@/pages/Journal";
 import SettingsPage from "@/pages/SettingsPage";
 import PositionsPage from "@/pages/PositionsPage";
+import OpportunityRadar from "@/pages/OpportunityRadar";
+import StrategyLab from "@/pages/StrategyLab";
+import ControlCenter from "@/pages/ControlCenter";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +50,9 @@ function ProtectedRoutes() {
         <Route path="/journal" element={<Journal />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/positions" element={<PositionsPage />} />
+        <Route path="/radar" element={<OpportunityRadar />} />
+        <Route path="/lab" element={<StrategyLab />} />
+        <Route path="/center" element={<ControlCenter />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
