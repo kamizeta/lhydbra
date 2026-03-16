@@ -109,6 +109,11 @@ export default function MarketExplorer() {
   const filtered = assets
     .filter(a => typeFilter === 'all' || a.type === typeFilter)
     .filter(a => a.symbol.toLowerCase().includes(search.toLowerCase()) || a.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(a => {
+      if (!regimeFilter) return true;
+      const f = featuresMap?.[a.symbol];
+      return f?.market_regime === regimeFilter;
+    })
     .sort((a, b) => {
       const mul = sortDir === 'asc' ? 1 : -1;
       if (sortKey === 'symbol') return mul * a.symbol.localeCompare(b.symbol);
