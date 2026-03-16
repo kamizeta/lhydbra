@@ -54,6 +54,7 @@ function ProtectedRoutes() {
         <Route path="/radar" element={<OpportunityRadar />} />
         <Route path="/lab" element={<StrategyLab />} />
         <Route path="/center" element={<ControlCenter />} />
+        <Route path="/algo" element={<AlgoEffectiveness />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

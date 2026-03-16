@@ -38,6 +38,7 @@ export default function AppLayout() {
     { to: "/positions", icon: Briefcase, label: t.dashboard.openPositions },
     { to: "/strategies", icon: Brain, label: t.nav.strategies },
     { to: "/lab", icon: FlaskConical, label: "Strategy Lab" },
+    { to: "/algo", icon: Activity, label: "Algo Effectiveness" },
     { to: "/risk", icon: Shield, label: t.nav.risk },
     { to: "/agents", icon: Bot, label: t.nav.agents },
     { to: "/agent-history", icon: History, label: t.agentHistory.title },
