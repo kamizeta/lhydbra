@@ -340,6 +340,54 @@ export default function MarketExplorer() {
         </div>
       )}
 
+      {/* Top Opportunities */}
+      {scoresMap && scoresCount > 0 && (
+        <div className="terminal-border rounded-lg p-4">
+          <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Target className="h-3.5 w-3.5 text-warning" /> Top Opportunities
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {Object.values(scoresMap)
+              .sort((a, b) => b.total_score - a.total_score)
+              .slice(0, 6)
+              .map(s => (
+                <div key={s.symbol} className={cn(
+                  "rounded-lg p-3 border",
+                  s.total_score >= 70 ? "border-profit/30 bg-profit/5" :
+                  s.total_score >= 50 ? "border-warning/30 bg-warning/5" :
+                  "border-loss/30 bg-loss/5"
+                )}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-mono font-bold text-foreground text-sm">{s.symbol}</span>
+                    <span className={cn(
+                      "font-mono font-bold text-lg",
+                      s.total_score >= 70 ? "text-profit" : s.total_score >= 50 ? "text-warning" : "text-loss"
+                    )}>{s.total_score}</span>
+                  </div>
+                  <div className={cn("text-[10px] font-mono", s.direction === 'long' ? "text-profit" : s.direction === 'short' ? "text-loss" : "text-muted-foreground")}>
+                    {s.direction.toUpperCase()} • {s.strategy_family}
+                  </div>
+                  <div className="mt-2 grid grid-cols-4 gap-0.5">
+                    {[
+                      { v: s.structure_score, l: 'STR' },
+                      { v: s.momentum_score, l: 'MOM' },
+                      { v: s.rr_score, l: 'R:R' },
+                      { v: s.volatility_score, l: 'VOL' },
+                    ].map(d => (
+                      <div key={d.l} className="text-center">
+                        <div className="text-[8px] text-muted-foreground">{d.l}</div>
+                        <div className={cn("text-[10px] font-mono font-medium",
+                          d.v >= 65 ? "text-profit" : d.v >= 45 ? "text-foreground" : "text-loss"
+                        )}>{d.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Market stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {(['crypto', 'stock', 'etf', 'forex', 'commodity'] as AssetType[]).map(type => {
