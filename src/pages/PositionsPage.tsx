@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign } from 'lucide-react';
+import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
@@ -10,6 +10,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import { formatCurrency } from '@/lib/mockData';
 import ClosePositionDialog from '@/components/trade/ClosePositionDialog';
 import PositionSignalDetail from '@/components/trade/PositionSignalDetail';
+import PortfolioEngine from '@/components/trade/PortfolioEngine';
 
 interface Position {
   id: string;
@@ -277,6 +278,14 @@ export default function PositionsPage() {
           onConfirm={handlePositionClosed}
         />
       )}
+
+      {/* Portfolio Engine - Rebalancing Recommendations */}
+      <div className="terminal-border rounded-lg p-4">
+        <h2 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
+          <PieChart className="h-4 w-4 text-primary" /> Portfolio Engine — Rebalanceo
+        </h2>
+        <PortfolioEngine />
+      </div>
 
       {/* Signal Detail from Position */}
       {viewSignalId && (

@@ -1,9 +1,12 @@
-import { useState } from "react";
-import { Check, X, ArrowRight } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, X, ArrowRight, Shield, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserSettings } from "@/hooks/useUserSettings";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/mockData";
+import { formatCurrency, formatNumber } from "@/lib/mockData";
+import { cn } from "@/lib/utils";
+import StatusBadge from "@/components/shared/StatusBadge";
 
 interface TradeSignal {
   id: string;
@@ -12,10 +15,21 @@ interface TradeSignal {
   asset_type: string;
   direction: string;
   strategy: string;
+  strategy_family?: string | null;
   entry_price: number;
   stop_loss: number;
   take_profit: number;
+  risk_reward: number;
   position_size: number | null;
+  opportunity_score?: number | null;
+  market_regime?: string | null;
+}
+
+interface RiskViolation {
+  rule: string;
+  current: string;
+  limit: string;
+  severity: 'block' | 'warning';
 }
 
 interface Props {
@@ -26,13 +40,178 @@ interface Props {
 
 export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: Props) {
   const { user } = useAuth();
+  const { settings } = useUserSettings();
   const [entryPrice, setEntryPrice] = useState(signal.entry_price);
-  const [quantity, setQuantity] = useState(signal.position_size || 1);
+  const [quantity, setQuantity] = useState(signal.position_size || 0);
   const [saving, setSaving] = useState(false);
   const [openPosition, setOpenPosition] = useState(true);
+  const [violations, setViolations] = useState<RiskViolation[]>([]);
+  const [openPositionsCount, setOpenPositionsCount] = useState(0);
+  const [existingExposure, setExistingExposure] = useState(0);
+  const [existingRiskDollars, setExistingRiskDollars] = useState(0);
+  const [existingSymbolExposure, setExistingSymbolExposure] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+
+  // Calculate ideal position size
+  const riskPerUnit = Math.abs(entryPrice - signal.stop_loss);
+  const dollarRisk = settings.current_capital * (settings.risk_per_trade / 100);
+  const isFractional = signal.asset_type === 'crypto' || signal.asset_type === 'forex';
+  const idealSize = riskPerUnit > 0 ? dollarRisk / riskPerUnit : 0;
+  const idealSizeDisplay = isFractional ? parseFloat(idealSize.toFixed(6)) : Math.floor(idealSize);
+
+  // Auto-set quantity to ideal on first load
+  useEffect(() => {
+    if (idealSizeDisplay > 0 && quantity === 0) {
+      setQuantity(idealSizeDisplay);
+    }
+  }, [idealSizeDisplay]);
+
+  // Fetch current portfolio state for risk validation
+  useEffect(() => {
+    if (!user) return;
+    const fetchPortfolio = async () => {
+      const { data: positions } = await supabase
+        .from('positions')
+        .select('symbol, asset_type, quantity, avg_entry, stop_loss, direction')
+        .eq('user_id', user.id)
+        .eq('status', 'open');
+
+      if (positions) {
+        setOpenPositionsCount(positions.length);
+        let totalExposure = 0;
+        let totalRisk = 0;
+        let symbolExposure = 0;
+
+        positions.forEach(p => {
+          const value = Number(p.quantity) * Number(p.avg_entry);
+          totalExposure += value;
+          if (p.stop_loss) {
+            totalRisk += Math.abs(Number(p.avg_entry) - Number(p.stop_loss)) * Number(p.quantity);
+          }
+          if (p.symbol === signal.symbol) {
+            symbolExposure += value;
+          }
+        });
+
+        setExistingExposure(totalExposure);
+        setExistingRiskDollars(totalRisk);
+        setExistingSymbolExposure(symbolExposure);
+      }
+      setLoaded(true);
+    };
+    fetchPortfolio();
+  }, [user, signal.symbol]);
+
+  // Run risk validation whenever inputs change
+  useEffect(() => {
+    if (!loaded) return;
+    const v: RiskViolation[] = [];
+    const capital = settings.current_capital;
+
+    // 1. Max positions check
+    if (openPositionsCount >= settings.max_positions) {
+      v.push({
+        rule: 'Máximo de posiciones',
+        current: `${openPositionsCount} abiertas`,
+        limit: `${settings.max_positions} máximo`,
+        severity: 'block',
+      });
+    }
+
+    // 2. Stop loss required
+    if (settings.stop_loss_required && signal.stop_loss <= 0) {
+      v.push({
+        rule: 'Stop Loss requerido',
+        current: 'Sin Stop Loss',
+        limit: 'Obligatorio',
+        severity: 'block',
+      });
+    }
+
+    // 3. Minimum R:R ratio
+    if (signal.risk_reward < settings.min_rr_ratio) {
+      v.push({
+        rule: 'Ratio R:R mínimo',
+        current: `${formatNumber(signal.risk_reward)}:1`,
+        limit: `${settings.min_rr_ratio}:1`,
+        severity: 'block',
+      });
+    }
+
+    // 4. Daily risk check (existing + new)
+    const newRiskDollars = riskPerUnit * quantity;
+    const totalRiskAfter = existingRiskDollars + newRiskDollars;
+    const totalRiskPct = capital > 0 ? (totalRiskAfter / capital) * 100 : 0;
+    if (totalRiskPct > settings.max_daily_risk) {
+      v.push({
+        rule: 'Riesgo diario máximo',
+        current: `${formatNumber(totalRiskPct)}%`,
+        limit: `${settings.max_daily_risk}%`,
+        severity: 'block',
+      });
+    } else if (totalRiskPct > settings.max_daily_risk * 0.8) {
+      v.push({
+        rule: 'Riesgo diario',
+        current: `${formatNumber(totalRiskPct)}%`,
+        limit: `${settings.max_daily_risk}%`,
+        severity: 'warning',
+      });
+    }
+
+    // 5. Single asset concentration
+    const newExposure = quantity * entryPrice;
+    const symbolExposureAfter = existingSymbolExposure + newExposure;
+    const symbolPct = capital > 0 ? (symbolExposureAfter / capital) * 100 : 0;
+    if (symbolPct > settings.max_single_asset) {
+      v.push({
+        rule: 'Concentración en activo',
+        current: `${formatNumber(symbolPct)}% en ${signal.symbol}`,
+        limit: `${settings.max_single_asset}%`,
+        severity: 'warning',
+      });
+    }
+
+    // 6. Position oversized check
+    const posRiskPct = capital > 0 ? (newRiskDollars / capital) * 100 : 0;
+    if (posRiskPct > settings.risk_per_trade * 1.5) {
+      v.push({
+        rule: 'Riesgo por trade excesivo',
+        current: `${formatNumber(posRiskPct)}% (${formatCurrency(newRiskDollars)})`,
+        limit: `${settings.risk_per_trade}% (${formatCurrency(dollarRisk)})`,
+        severity: 'block',
+      });
+    } else if (posRiskPct > settings.risk_per_trade) {
+      v.push({
+        rule: 'Riesgo por trade elevado',
+        current: `${formatNumber(posRiskPct)}%`,
+        limit: `${settings.risk_per_trade}%`,
+        severity: 'warning',
+      });
+    }
+
+    // 7. Leverage check
+    const totalExposureAfter = existingExposure + newExposure;
+    const leverageAfter = capital > 0 ? totalExposureAfter / capital : 0;
+    if (leverageAfter > settings.max_leverage) {
+      v.push({
+        rule: 'Apalancamiento máximo',
+        current: `${formatNumber(leverageAfter)}x`,
+        limit: `${settings.max_leverage}x`,
+        severity: 'block',
+      });
+    }
+
+    setViolations(v);
+  }, [loaded, quantity, entryPrice, openPositionsCount, existingExposure, existingRiskDollars, existingSymbolExposure, settings, signal, riskPerUnit, dollarRisk]);
+
+  const hasBlockers = violations.some(v => v.severity === 'block');
 
   const handleConfirm = async () => {
     if (!user) return;
+    if (hasBlockers && openPosition) {
+      toast.error('Hay reglas de riesgo que bloquean esta operación');
+      return;
+    }
     setSaving(true);
 
     if (openPosition) {
@@ -47,6 +226,8 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         stop_loss: signal.stop_loss,
         take_profit: signal.take_profit,
         strategy: signal.strategy,
+        strategy_family: signal.strategy_family || null,
+        regime_at_entry: signal.market_regime || null,
         status: 'open',
         signal_id: signal.id,
       });
@@ -56,18 +237,24 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         setSaving(false);
         return;
       }
-      toast.success(`Posición abierta: ${signal.symbol} @ ${formatCurrency(entryPrice)}`);
+      toast.success(`Posición abierta: ${signal.symbol} × ${quantity} @ ${formatCurrency(entryPrice)}`);
     }
 
     onConfirm(signal.id);
     setSaving(false);
   };
 
+  const newRiskDollars = riskPerUnit * quantity;
+  const newRiskPct = settings.current_capital > 0 ? (newRiskDollars / settings.current_capital) * 100 : 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-card border border-border rounded-lg p-6 w-full max-w-md space-y-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card border border-border rounded-lg p-6 w-full max-w-lg space-y-4 shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-foreground">Aprobar Trade: {signal.symbol}</h2>
+          <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Shield className="h-4 w-4 text-primary" />
+            Aprobar Trade: {signal.symbol}
+          </h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
@@ -77,7 +264,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         <div className="rounded-md bg-accent/50 p-3 space-y-1.5 text-xs font-mono">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Dirección</span>
-            <span className="text-foreground">{signal.direction.toUpperCase()}</span>
+            <span className={cn("font-medium", signal.direction === 'long' ? "text-profit" : "text-loss")}>{signal.direction.toUpperCase()}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Precio sugerido</span>
@@ -91,7 +278,54 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
             <span className="text-muted-foreground">Take Profit</span>
             <span className="text-profit">{formatCurrency(signal.take_profit)}</span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">R:R</span>
+            <span className={cn(signal.risk_reward >= settings.min_rr_ratio ? "text-profit" : "text-loss")}>{formatNumber(signal.risk_reward)}:1</span>
+          </div>
+          {signal.opportunity_score != null && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Opportunity Score</span>
+              <span className={cn("font-medium", signal.opportunity_score >= 60 ? "text-profit" : signal.opportunity_score >= 45 ? "text-warning" : "text-loss")}>{signal.opportunity_score}/100</span>
+            </div>
+          )}
+          {signal.market_regime && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Régimen</span>
+              <span className="text-foreground">{signal.market_regime}</span>
+            </div>
+          )}
         </div>
+
+        {/* Risk Validation Results */}
+        {loaded && violations.length > 0 && (
+          <div className={cn("rounded-md border p-3 space-y-2", hasBlockers ? "bg-loss/5 border-loss/30" : "bg-warning/5 border-warning/30")}>
+            <h3 className="text-xs font-bold flex items-center gap-1.5">
+              <AlertTriangle className={cn("h-3.5 w-3.5", hasBlockers ? "text-loss" : "text-warning")} />
+              <span className={hasBlockers ? "text-loss" : "text-warning"}>
+                {hasBlockers ? 'Reglas de riesgo violadas — operación bloqueada' : 'Advertencias de riesgo'}
+              </span>
+            </h3>
+            {violations.map((v, i) => (
+              <div key={i} className="flex items-center justify-between text-[10px]">
+                <div className="flex items-center gap-1.5">
+                  <StatusBadge variant={v.severity === 'block' ? 'loss' : 'warning'} dot>
+                    {v.severity === 'block' ? 'BLOCK' : 'WARN'}
+                  </StatusBadge>
+                  <span className="text-foreground font-medium">{v.rule}</span>
+                </div>
+                <span className="font-mono text-muted-foreground">{v.current} / {v.limit}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {loaded && violations.length === 0 && openPosition && (
+          <div className="rounded-md bg-profit/5 border border-profit/30 p-3">
+            <p className="text-xs text-profit flex items-center gap-1.5">
+              <Check className="h-3.5 w-3.5" /> Todas las reglas de riesgo se cumplen
+            </p>
+          </div>
+        )}
 
         {/* Open position toggle */}
         <label className="flex items-center gap-3 cursor-pointer">
@@ -122,7 +356,15 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
               )}
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground font-mono uppercase">Cantidad / Tamaño</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-muted-foreground font-mono uppercase">Cantidad / Tamaño</label>
+                <button
+                  onClick={() => setQuantity(idealSizeDisplay)}
+                  className="text-[10px] text-primary hover:underline font-mono"
+                >
+                  Usar ideal: {idealSizeDisplay}
+                </button>
+              </div>
               <input
                 type="number"
                 step="any"
@@ -130,6 +372,24 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
                 onChange={(e) => setQuantity(Number(e.target.value))}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
+            </div>
+
+            {/* Risk summary for this trade */}
+            <div className="rounded-md bg-accent/30 p-2.5 space-y-1 text-[10px] font-mono">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Riesgo de esta operación</span>
+                <span className={cn(newRiskPct > settings.risk_per_trade ? "text-loss" : "text-foreground")}>
+                  {formatCurrency(newRiskDollars)} ({formatNumber(newRiskPct)}%)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Valor total de la posición</span>
+                <span className="text-foreground">{formatCurrency(quantity * entryPrice)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Posiciones después</span>
+                <span className="text-foreground">{openPositionsCount + 1} / {settings.max_positions}</span>
+              </div>
             </div>
           </div>
         )}
@@ -143,11 +403,19 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           </button>
           <button
             onClick={handleConfirm}
-            disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-profit text-profit-foreground rounded-md text-xs font-bold hover:bg-profit/90 transition-colors disabled:opacity-50"
+            disabled={saving || (hasBlockers && openPosition)}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-xs font-bold transition-colors disabled:opacity-50",
+              hasBlockers && openPosition
+                ? "bg-muted text-muted-foreground cursor-not-allowed"
+                : "bg-profit text-profit-foreground hover:bg-profit/90"
+            )}
           >
-            <Check className="h-3.5 w-3.5" />
-            {saving ? 'Guardando...' : openPosition ? 'Aprobar y Abrir Posición' : 'Aprobar'}
+            {hasBlockers && openPosition ? (
+              <><AlertTriangle className="h-3.5 w-3.5" /> Bloqueado por Riesgo</>
+            ) : (
+              <><Check className="h-3.5 w-3.5" /> {saving ? 'Guardando...' : openPosition ? 'Aprobar y Abrir Posición' : 'Aprobar'}</>
+            )}
           </button>
         </div>
       </div>
