@@ -493,6 +493,7 @@ serve(async (req) => {
     const freeCryptoKey = Deno.env.get("FREE_CRYPTO_API_KEY");
     const fcsKey = Deno.env.get("FCS_API_KEY");
     const twelveKey = Deno.env.get("TWELVE_DATA_API_KEY");
+    const finnhubKey = Deno.env.get("FINNHUB_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const db = createClient(supabaseUrl, supabaseKey);
