@@ -195,7 +195,7 @@ export default function AgentsPanel() {
                   const isRunning = runningAgent === agent.id;
                   const hasResult = result && result.content && !result.content.startsWith('Error');
                   return (
-                    <div key={agent.id} className={cn("terminal-border rounded-lg p-4 cursor-pointer transition-all", selectedAgent === agent.id && "ring-1 ring-primary glow-primary", isRunning && "border-primary/50")} onClick={() => setSelectedAgent(agent.id)}>
+                    <div key={agent.id} className={cn("terminal-border rounded-lg p-4 cursor-pointer transition-all", selectedAgent === agent.id && "ring-2 ring-primary bg-primary/10 border-l-4 border-l-primary shadow-[0_0_15px_-3px_hsl(var(--primary)/0.4)]", isRunning && "border-primary/50")} onClick={() => setSelectedAgent(agent.id)}>
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <div className={cn("rounded-md p-2", isRunning ? "bg-primary/20" : hasResult ? "bg-profit/15" : "bg-primary/10")}>
