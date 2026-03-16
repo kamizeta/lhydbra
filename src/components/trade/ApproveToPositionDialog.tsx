@@ -46,6 +46,8 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
   const [quantityTouched, setQuantityTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [openPosition, setOpenPosition] = useState(true);
+  const [executeOnAlpaca, setExecuteOnAlpaca] = useState(false);
+  const [alpacaPaper, setAlpacaPaper] = useState(true);
   const [violations, setViolations] = useState<RiskViolation[]>([]);
   const [openPositionsCount, setOpenPositionsCount] = useState(0);
   const [existingExposure, setExistingExposure] = useState(0);
