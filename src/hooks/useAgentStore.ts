@@ -255,7 +255,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     }
   },
 
-  runAllAgents: async (marketData, portfolioData, tradeHistory) => {
+  runAllAgents: async (marketData, portfolioData, tradeHistory, marketFeatures, opportunityScores, strategyPerformance) => {
     // New session for full run
     const sessionId = crypto.randomUUID();
     set({ sessionId });
@@ -271,7 +271,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     ];
 
     for (const agent of agentOrder) {
-      await get().runAgent(agent, marketData, portfolioData, tradeHistory);
+      await get().runAgent(agent, marketData, portfolioData, tradeHistory, marketFeatures, opportunityScores, strategyPerformance);
       await new Promise((r) => setTimeout(r, 1500));
     }
   },
