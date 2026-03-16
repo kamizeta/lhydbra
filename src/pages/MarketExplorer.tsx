@@ -124,26 +124,39 @@ export default function MarketExplorer() {
     else { setSortKey(key); setSortDir('desc'); }
   };
 
-  const handleRunIntelligence = () => {
-    // Get symbols for the current filter
-    const symbolsToAnalyze = typeFilter === 'all'
-      ? ALL_SYMBOLS.slice(0, 8).map(s => s.tdSymbol) // Limit to 8 due to rate limits
-      : ALL_SYMBOLS.filter(s => s.type === typeFilter).slice(0, 8).map(s => s.tdSymbol);
+  // Auto-run Data Intelligence + Opportunity Scoring on mount
+  const autoRunRef = useRef(false);
+  useEffect(() => {
+    if (autoRunRef.current) return;
+    autoRunRef.current = true;
 
-    toast({ title: "🧠 Data Intelligence", description: `Analizando ${symbolsToAnalyze.length} activos... Esto puede tomar ~${Math.ceil(symbolsToAnalyze.length / 4) * 15}s` });
+    const allSymbols = ALL_SYMBOLS.map(s => s.tdSymbol);
+    // Run in batches of 8 to respect rate limits
+    const runBatches = async () => {
+      for (let i = 0; i < allSymbols.length; i += 8) {
+        const batch = allSymbols.slice(i, i + 8);
+        try {
+          await runIntelligence.mutateAsync(batch);
+        } catch {
+          // Continue with next batch even if one fails
+        }
+        if (i + 8 < allSymbols.length) {
+          await new Promise(r => setTimeout(r, 15000)); // Wait 15s between batches
+        }
+      }
+      // After all intelligence runs, compute opportunity scores
+      try {
+        await runScoring.mutateAsync(undefined);
+      } catch {
+        // Silent fail
+      }
+    };
 
-    runIntelligence.mutate(symbolsToAnalyze, {
-      onSuccess: (data) => {
-        toast({
-          title: "✅ Análisis completado",
-          description: `${data.processed}/${data.total} activos procesados${data.errors ? ` (${data.errors.length} errores)` : ''}`,
-        });
-      },
-      onError: (err) => {
-        toast({ title: "❌ Error", description: err.message, variant: "destructive" });
-      },
-    });
-  };
+    // Only auto-run if features are stale (none computed or older than 2 hours)
+    if (!featuresMap || Object.keys(featuresMap).length === 0) {
+      runBatches();
+    }
+  }, []);
 
   const TrendIcon = ({ trend }: { trend: string }) => {
     if (trend === 'uptrend') return <TrendingUp className="h-3.5 w-3.5 text-profit" />;
@@ -217,25 +230,19 @@ export default function MarketExplorer() {
         </div>
       </div>
 
-      {/* Data Intelligence Controls */}
+      {/* Auto-analysis status */}
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={handleRunIntelligence}
-          disabled={runIntelligence.isPending}
-          className={cn(
-            "rounded-lg px-4 py-2.5 text-sm font-medium flex items-center gap-2 transition-all",
-            "bg-gradient-to-r from-primary/80 to-primary text-primary-foreground",
-            "hover:from-primary hover:to-primary/90 hover:shadow-lg hover:shadow-primary/20",
-            "disabled:opacity-50 disabled:cursor-not-allowed"
-          )}
-        >
-          {runIntelligence.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Brain className="h-4 w-4" />
-          )}
-          {runIntelligence.isPending ? 'Analizando...' : '🧠 Run Data Intelligence'}
-        </button>
+        {(runIntelligence.isPending || runScoring.isPending) && (
+          <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span className="text-xs font-mono text-muted-foreground">
+              {runIntelligence.isPending ? t.common.analyzing : 'Calculando scores...'}
+            </span>
+            <div className="h-1.5 w-24 rounded-full bg-secondary overflow-hidden">
+              <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }} />
+            </div>
+          </div>
+        )}
 
         <button
           onClick={() => setShowFeatures(!showFeatures)}
@@ -249,39 +256,6 @@ export default function MarketExplorer() {
           <Activity className="h-3.5 w-3.5" />
           {showFeatures ? 'Features ON' : 'Features OFF'}
         </button>
-
-        <button
-          onClick={() => {
-            toast({ title: "🎯 Opportunity Scoring", description: "Calculando scores para todos los activos con features..." });
-            runScoring.mutate(undefined, {
-              onSuccess: (data) => {
-                toast({ title: "✅ Scores calculados", description: `${data.count} activos puntuados` });
-              },
-              onError: (err) => {
-                toast({ title: "❌ Error", description: err.message, variant: "destructive" });
-              },
-            });
-          }}
-          disabled={runScoring.isPending || featuresCount === 0}
-          className={cn(
-            "rounded-lg px-4 py-2.5 text-sm font-medium flex items-center gap-2 transition-all",
-            "bg-gradient-to-r from-warning/80 to-warning text-warning-foreground",
-            "hover:from-warning hover:to-warning/90 hover:shadow-lg hover:shadow-warning/20",
-            "disabled:opacity-50 disabled:cursor-not-allowed"
-          )}
-        >
-          {runScoring.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Target className="h-4 w-4" />}
-          {runScoring.isPending ? 'Scoring...' : '🎯 Run Opportunity Score'}
-        </button>
-
-        {runIntelligence.isPending && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="h-1.5 w-24 rounded-full bg-secondary overflow-hidden">
-              <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }} />
-            </div>
-            <span className="font-mono">Fetching OHLCV + Computing indicators...</span>
-          </div>
-        )}
       </div>
 
       {/* Filters */}
