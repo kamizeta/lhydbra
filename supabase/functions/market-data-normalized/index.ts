@@ -668,7 +668,27 @@ serve(async (req) => {
         allQuotes.push(...tdQuotes);
       }
 
-      // Fallback 2: Finnhub for missing stocks/ETFs
+      // Fallback 2: ExchangeRate-API for missing forex (FREE, no key)
+      const missingForexAfterTD = [...forex].filter(s => !fetched.has(s));
+      if (missingForexAfterTD.length > 0) {
+        const t25 = Date.now();
+        const erQuotes = await fetchExchangeRateAPI(missingForexAfterTD);
+        logApiUsage(db, 'exchangerate-api', 'quote', missingForexAfterTD.length, erQuotes.length, Date.now() - t25);
+        for (const q of erQuotes) fetched.add(q.symbol);
+        allQuotes.push(...erQuotes);
+      }
+
+      // Fallback 3: Alpha Vantage forex/commodity for remaining pairs
+      const missingFXCommodity = [...forex, ...commodity].filter(s => !fetched.has(s));
+      if (alphaVantageKey && missingFXCommodity.length > 0) {
+        const t26 = Date.now();
+        const avFxQuotes = await fetchAlphaVantageForex(missingFXCommodity, alphaVantageKey);
+        logApiUsage(db, 'alphavantage', 'quote-forex', missingFXCommodity.length, avFxQuotes.length, Date.now() - t26);
+        for (const q of avFxQuotes) fetched.add(q.symbol);
+        allQuotes.push(...avFxQuotes);
+      }
+
+      // Fallback 4: Finnhub for missing stocks/ETFs
       const missingForFinnhub = allStockLike.filter(s => !fetched.has(s));
       if (finnhubKey && missingForFinnhub.length > 0) {
         const t3 = Date.now();
@@ -681,12 +701,12 @@ serve(async (req) => {
         allQuotes.push(...fhQuotes);
       }
 
-      // Fallback 3: Alpha Vantage (max 5 symbols, 25/day limit)
+      // Fallback 5: Alpha Vantage stocks (max 5, 25/day limit shared)
       const missingForAV = allStockLike.filter(s => !fetched.has(s));
       if (alphaVantageKey && missingForAV.length > 0) {
         const t35 = Date.now();
         const avQuotes = await fetchAlphaVantageQuotes(missingForAV.slice(0, 5), alphaVantageKey);
-        logApiUsage(db, 'alphavantage', 'quote', Math.min(missingForAV.length, 5), avQuotes.length, Date.now() - t35);
+        logApiUsage(db, 'alphavantage', 'quote-stock', Math.min(missingForAV.length, 5), avQuotes.length, Date.now() - t35);
         for (const q of avQuotes) {
           if (etfSet.has(q.symbol)) q.asset_type = 'etf';
           fetched.add(q.symbol);
