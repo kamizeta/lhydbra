@@ -491,6 +491,75 @@ async function fetchAlphaVantageQuotes(symbols: string[], apiKey: string): Promi
   return results;
 }
 
+// ─── ExchangeRate-API (FREE, no key needed) — forex only ───
+// Updates once/day, no strict rate limit, returns all pairs in one call per base
+async function fetchExchangeRateAPI(symbols: string[]): Promise<NormalizedQuote[]> {
+  if (!symbols.length) return [];
+  const results: NormalizedQuote[] = [];
+  const baseMap = new Map<string, string[]>();
+  for (const s of symbols) {
+    const parts = s.split('/');
+    if (parts.length !== 2) continue;
+    const arr = baseMap.get(parts[0]) || [];
+    arr.push(s);
+    baseMap.set(parts[0], arr);
+  }
+  for (const [base, pairs] of baseMap) {
+    try {
+      const res = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.result !== 'success' || !data.rates) continue;
+      for (const pair of pairs) {
+        const quote = pair.split('/')[1];
+        const rate = data.rates[quote];
+        if (!rate || rate <= 0) continue;
+        results.push({
+          symbol: pair, name: pair, asset_type: 'forex',
+          price: rate, open: rate, high: rate, low: rate, volume: 0,
+          change: 0, change_percent: 0, previous_close: rate,
+          is_market_open: true, source: 'exchangerate-api', timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (e) { console.error(`ExchangeRate-API ${base}:`, e); }
+  }
+  return results;
+}
+
+// ─── Alpha Vantage Forex/Commodity Fetcher ───
+// CURRENCY_EXCHANGE_RATE: 1 pair/call, shares 25/day quota with stock quotes
+async function fetchAlphaVantageForex(symbols: string[], apiKey: string): Promise<NormalizedQuote[]> {
+  if (!symbols.length || !apiKey) return [];
+  const results: NormalizedQuote[] = [];
+  const batch = symbols.slice(0, 3);
+  for (const pair of batch) {
+    try {
+      const [from, to] = pair.split('/');
+      if (!from || !to) continue;
+      const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${from}&to_currency=${to}&apikey=${apiKey}`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const rate = data?.['Realtime Currency Exchange Rate'];
+      if (!rate) continue;
+      const price = parseFloat(rate['5. Exchange Rate'] || '0');
+      if (price <= 0) continue;
+      const isCommodity = pair.includes('XAU') || pair.includes('XAG');
+      results.push({
+        symbol: pair, name: `${from}/${to}`,
+        asset_type: isCommodity ? 'commodity' : 'forex',
+        price, open: price,
+        high: parseFloat(rate['9. Ask Price'] || String(price)),
+        low: parseFloat(rate['8. Bid Price'] || String(price)),
+        volume: 0, change: 0, change_percent: 0, previous_close: price,
+        is_market_open: true, source: 'alphavantage', timestamp: new Date().toISOString(),
+      });
+    } catch (e) { console.error(`AV forex ${pair}:`, e); }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return results;
+}
+
 // ─── API Usage Logger (fire-and-forget) ───
 function logApiUsage(db: ReturnType<typeof createClient>, source: string, action: string, requested: number, returned: number, timeMs: number, error?: string) {
   db.from('api_usage_log').insert({
@@ -599,7 +668,27 @@ serve(async (req) => {
         allQuotes.push(...tdQuotes);
       }
 
-      // Fallback 2: Finnhub for missing stocks/ETFs
+      // Fallback 2: ExchangeRate-API for missing forex (FREE, no key)
+      const missingForexAfterTD = [...forex].filter(s => !fetched.has(s));
+      if (missingForexAfterTD.length > 0) {
+        const t25 = Date.now();
+        const erQuotes = await fetchExchangeRateAPI(missingForexAfterTD);
+        logApiUsage(db, 'exchangerate-api', 'quote', missingForexAfterTD.length, erQuotes.length, Date.now() - t25);
+        for (const q of erQuotes) fetched.add(q.symbol);
+        allQuotes.push(...erQuotes);
+      }
+
+      // Fallback 3: Alpha Vantage forex/commodity for remaining pairs
+      const missingFXCommodity = [...forex, ...commodity].filter(s => !fetched.has(s));
+      if (alphaVantageKey && missingFXCommodity.length > 0) {
+        const t26 = Date.now();
+        const avFxQuotes = await fetchAlphaVantageForex(missingFXCommodity, alphaVantageKey);
+        logApiUsage(db, 'alphavantage', 'quote-forex', missingFXCommodity.length, avFxQuotes.length, Date.now() - t26);
+        for (const q of avFxQuotes) fetched.add(q.symbol);
+        allQuotes.push(...avFxQuotes);
+      }
+
+      // Fallback 4: Finnhub for missing stocks/ETFs
       const missingForFinnhub = allStockLike.filter(s => !fetched.has(s));
       if (finnhubKey && missingForFinnhub.length > 0) {
         const t3 = Date.now();
@@ -612,12 +701,12 @@ serve(async (req) => {
         allQuotes.push(...fhQuotes);
       }
 
-      // Fallback 3: Alpha Vantage (max 5 symbols, 25/day limit)
+      // Fallback 5: Alpha Vantage stocks (max 5, 25/day limit shared)
       const missingForAV = allStockLike.filter(s => !fetched.has(s));
       if (alphaVantageKey && missingForAV.length > 0) {
         const t35 = Date.now();
         const avQuotes = await fetchAlphaVantageQuotes(missingForAV.slice(0, 5), alphaVantageKey);
-        logApiUsage(db, 'alphavantage', 'quote', Math.min(missingForAV.length, 5), avQuotes.length, Date.now() - t35);
+        logApiUsage(db, 'alphavantage', 'quote-stock', Math.min(missingForAV.length, 5), avQuotes.length, Date.now() - t35);
         for (const q of avQuotes) {
           if (etfSet.has(q.symbol)) q.asset_type = 'etf';
           fetched.add(q.symbol);
@@ -625,7 +714,7 @@ serve(async (req) => {
         allQuotes.push(...avQuotes);
       }
 
-      // Fallback 4: Yahoo batch (single request)
+      // Fallback 6: Yahoo batch (single request)
       const stillMissingStocks = allStockLike.filter(s => !fetched.has(s));
       if (stillMissingStocks.length > 0) {
         const t4 = Date.now();
@@ -638,7 +727,7 @@ serve(async (req) => {
         allQuotes.push(...yBatch);
       }
 
-      // Fallback 5: Yahoo chart (parallel batches of 5)
+      // Fallback 7: Yahoo chart (parallel batches of 5)
       const stillMissing = allStockLike.filter(s => !fetched.has(s));
       if (stillMissing.length > 0) {
         const t5 = Date.now();
@@ -651,8 +740,8 @@ serve(async (req) => {
         allQuotes.push(...yChart);
       }
 
-      // Fallback 6: DB cache for anything still missing
-      const finalMissing = allStockLike.filter(s => !fetched.has(s));
+      // Fallback 8: DB cache for anything still missing
+      const finalMissing = [...allStockLike, ...forex, ...commodity].filter(s => !fetched.has(s));
       if (finalMissing.length > 0) {
         const dbQuotes = await fetchFromDBCache(finalMissing, db);
         logApiUsage(db, 'db-cache', 'quote', finalMissing.length, dbQuotes.length, 0);
