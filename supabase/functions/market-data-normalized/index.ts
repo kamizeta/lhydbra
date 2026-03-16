@@ -95,51 +95,69 @@ async function fetchCryptoQuotes(symbols: string[], apiKey: string): Promise<Nor
 
 async function fetchFCSQuotes(symbols: string[], apiKey: string, endpoint: 'forex' | 'stock'): Promise<NormalizedQuote[]> {
   if (!symbols.length) return [];
+
   const results: NormalizedQuote[] = [];
   const etfSet = new Set(['SPY','QQQ','VTI','ARKK','XLE','XLK','IWM','EEM','GLD','TLT','DIA','XLF','XLV','SOXX','VOO','KWEB']);
-  const baseUrl = endpoint === 'stock'
-    ? `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&exchange=NASDAQ,NYSE,AMEX&access_key=${apiKey}`
-    : `https://fcsapi.com/api-v3/forex/latest?symbol=${encodeURIComponent(symbols.join(','))}&access_key=${apiKey}`;
+  const requestUrls = endpoint === 'stock'
+    ? [
+        // First try without exchange filter because many ETFs trade on ARCA/BATS and were being excluded.
+        `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&access_key=${apiKey}`,
+        // Fallback to explicit US exchanges in case the provider needs narrowing.
+        `https://fcsapi.com/api-v3/stock/latest?symbol=${encodeURIComponent(symbols.join(','))}&exchange=NASDAQ,NYSE,AMEX,ARCA,BATS&access_key=${apiKey}`,
+      ]
+    : [
+        `https://fcsapi.com/api-v3/forex/latest?symbol=${encodeURIComponent(symbols.join(','))}&access_key=${apiKey}`,
+      ];
 
   try {
-    const res = await fetch(baseUrl);
-    if (!res.ok) return results;
-    const data = await res.json();
-    if (!data.status || !data.response) return results;
+    for (const url of requestUrls) {
+      const res = await fetch(url);
+      if (!res.ok) continue;
 
-    for (const item of data.response) {
-      const s = item.s || item.symbol;
-      if (!s) continue;
-      const close = parseFloat(String(item.c || 0));
-      if (close <= 0) continue;
-      const matched = symbols.find(sym => s === sym || s.includes(sym)) || s;
-      const change = parseFloat(String(item.ch || 0));
-      
-      let assetType: string;
-      if (endpoint === 'stock') {
-        assetType = etfSet.has(matched) ? 'etf' : 'stock';
-      } else {
-        assetType = matched.includes('XAU') || matched.includes('XAG') || ['CL', 'NG', 'HG'].includes(matched) ? 'commodity' : 'forex';
+      const data = await res.json();
+      if (!data.status || !Array.isArray(data.response) || data.response.length === 0) continue;
+
+      for (const item of data.response) {
+        const s = item.s || item.symbol;
+        if (!s) continue;
+
+        const close = parseFloat(String(item.c || 0));
+        if (close <= 0) continue;
+
+        const matched = symbols.find(sym => s === sym || s.includes(sym) || sym.includes(s)) || s;
+        const change = parseFloat(String(item.ch || 0));
+
+        let assetType: string;
+        if (endpoint === 'stock') {
+          assetType = etfSet.has(matched) ? 'etf' : 'stock';
+        } else {
+          assetType = matched.includes('XAU') || matched.includes('XAG') || ['CL', 'NG', 'HG'].includes(matched) ? 'commodity' : 'forex';
+        }
+
+        results.push({
+          symbol: matched,
+          name: item.name || matched,
+          asset_type: assetType,
+          price: close,
+          open: parseFloat(String(item.o || close)),
+          high: parseFloat(String(item.h || close)),
+          low: parseFloat(String(item.l || close)),
+          volume: parseFloat(String(item.v || 0)),
+          change,
+          change_percent: parseFloat(String(item.cp || 0)),
+          previous_close: close - change,
+          is_market_open: true,
+          source: 'fcsapi',
+          timestamp: new Date().toISOString(),
+        });
       }
-      
-      results.push({
-        symbol: matched,
-        name: item.name || matched,
-        asset_type: assetType,
-        price: close,
-        open: parseFloat(String(item.o || close)),
-        high: parseFloat(String(item.h || close)),
-        low: parseFloat(String(item.l || close)),
-        volume: parseFloat(String(item.v || 0)),
-        change,
-        change_percent: parseFloat(String(item.cp || 0)),
-        previous_close: close - change,
-        is_market_open: true,
-        source: 'fcsapi',
-        timestamp: new Date().toISOString(),
-      });
+
+      if (results.length > 0) break;
     }
-  } catch (e) { console.error(`FCS ${endpoint}:`, e); }
+  } catch (e) {
+    console.error(`FCS ${endpoint}:`, e);
+  }
+
   return results;
 }
 
