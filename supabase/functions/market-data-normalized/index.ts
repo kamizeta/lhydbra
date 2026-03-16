@@ -462,10 +462,24 @@ serve(async (req) => {
       const allQuotes = [...cryptoQ, ...forexQ, ...stockQ];
       const fetched = new Set(allQuotes.map(q => q.symbol));
 
-      // Fallback 1: Yahoo batch for ALL missing stocks/ETFs (single request)
+      // Fallback 1: Twelve Data for missing stocks/ETFs AND missing forex/commodities (batch of 8)
       const missingStockLike = allStockLike.filter(s => !fetched.has(s));
-      if (missingStockLike.length > 0) {
-        const yBatch = await fetchYahooBatch(missingStockLike);
+      const missingForex = [...forex, ...commodity].filter(s => !fetched.has(s));
+      const missingForTwelve = [...missingStockLike, ...missingForex];
+      if (twelveKey && missingForTwelve.length > 0) {
+        // Only fetch first batch (8 symbols) to stay within rate limits
+        const twelveSymbols = missingForTwelve.slice(0, 8);
+        const tdQuotes = await fetchTwelveDataQuotes(twelveSymbols, twelveKey);
+        for (const q of tdQuotes) {
+          fetched.add(q.symbol);
+        }
+        allQuotes.push(...tdQuotes);
+      }
+
+      // Fallback 2: Yahoo batch for remaining missing stocks/ETFs (single request)
+      const stillMissingStocks = allStockLike.filter(s => !fetched.has(s));
+      if (stillMissingStocks.length > 0) {
+        const yBatch = await fetchYahooBatch(stillMissingStocks);
         for (const q of yBatch) {
           if (etfSet.has(q.symbol)) q.asset_type = 'etf';
           fetched.add(q.symbol);
