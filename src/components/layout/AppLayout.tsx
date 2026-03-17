@@ -35,9 +35,13 @@ export default function AppLayout() {
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
     { to: "/market", icon: BarChart3, label: t.nav.market },
+    { to: "/signals", icon: Zap, label: "Signals" },
     { to: "/portfolio", icon: Briefcase, label: "Portafolio" },
+    { to: "/allocation", icon: PieChart, label: "Allocation" },
     { to: "/agents", icon: Bot, label: t.nav.agents },
     { to: "/trade-ideas", icon: Lightbulb, label: t.nav.tradeIdeas },
+    { to: "/strategy-lab", icon: FlaskConical, label: "Strategy Lab" },
+    { to: "/learning", icon: Brain, label: "Learning" },
     { to: "/settings", icon: Settings, label: "Settings" },
   ];
 
