@@ -426,12 +426,21 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
                 </button>
               </div>
               <input
-                type="number"
-                step="any"
-                value={quantity}
+                type="text"
+                inputMode="decimal"
+                value={quantityTouched || quantity !== 0 ? quantity : ''}
                 onChange={(e) => {
-                  setQuantity(Number(e.target.value));
-                  setQuantityTouched(true);
+                  const val = e.target.value;
+                  if (val === '' || val === '.') {
+                    setQuantity(0);
+                    setQuantityTouched(true);
+                    return;
+                  }
+                  const num = Number(val);
+                  if (!isNaN(num) && num >= 0) {
+                    setQuantity(num);
+                    setQuantityTouched(true);
+                  }
                 }}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
