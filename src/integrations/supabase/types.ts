@@ -1004,6 +1004,92 @@ export type Database = {
           },
         ]
       }
+      signals: {
+        Row: {
+          asset: string
+          asset_class: string
+          confidence_score: number
+          created_at: string
+          direction: string
+          entry_price: number
+          expected_r_multiple: number
+          explanation: Json | null
+          id: string
+          invalidation_reason: string | null
+          market_regime: string | null
+          modifiers_applied: Json
+          opportunity_score: number
+          reasoning: string | null
+          score_breakdown: Json
+          status: string
+          stop_loss: number
+          strategy_family: string | null
+          strategy_id: string | null
+          targets: Json
+          updated_at: string
+          user_id: string
+          weight_profile_used: Json
+        }
+        Insert: {
+          asset: string
+          asset_class?: string
+          confidence_score?: number
+          created_at?: string
+          direction?: string
+          entry_price: number
+          expected_r_multiple?: number
+          explanation?: Json | null
+          id?: string
+          invalidation_reason?: string | null
+          market_regime?: string | null
+          modifiers_applied?: Json
+          opportunity_score?: number
+          reasoning?: string | null
+          score_breakdown?: Json
+          status?: string
+          stop_loss: number
+          strategy_family?: string | null
+          strategy_id?: string | null
+          targets?: Json
+          updated_at?: string
+          user_id: string
+          weight_profile_used?: Json
+        }
+        Update: {
+          asset?: string
+          asset_class?: string
+          confidence_score?: number
+          created_at?: string
+          direction?: string
+          entry_price?: number
+          expected_r_multiple?: number
+          explanation?: Json | null
+          id?: string
+          invalidation_reason?: string | null
+          market_regime?: string | null
+          modifiers_applied?: Json
+          opportunity_score?: number
+          reasoning?: string | null
+          score_breakdown?: Json
+          status?: string
+          stop_loss?: number
+          strategy_family?: string | null
+          strategy_id?: string | null
+          targets?: Json
+          updated_at?: string
+          user_id?: string
+          weight_profile_used?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signals_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       strategies: {
         Row: {
           created_at: string
