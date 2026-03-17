@@ -62,7 +62,15 @@ export default function NotificationBell() {
                   onClick={markAllAsRead}
                   className="text-[10px] text-primary hover:underline font-mono flex items-center gap-1"
                 >
-                  <CheckCheck className="h-3 w-3" /> Marcar todas
+                  <CheckCheck className="h-3 w-3" /> Leídas
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  onClick={() => { if (confirm('¿Eliminar todas?')) clearAll(); }}
+                  className="text-[10px] text-loss hover:underline font-mono flex items-center gap-1"
+                >
+                  <Trash2 className="h-3 w-3" /> Borrar
                 </button>
               )}
               <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
