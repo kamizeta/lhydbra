@@ -44,6 +44,7 @@ export default function SettingsPage() {
   const [fullName, setFullName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [profileLoading, setProfileLoading] = useState(true);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // Binance state
   const [binanceKey, setBinanceKey] = useState('');
