@@ -131,6 +131,77 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
       return;
     }
 
+    // Calculate R-multiple if stop_loss exists
+    const riskPerUnit = position.stop_loss
+      ? Math.abs(position.avg_entry - position.stop_loss)
+      : null;
+    const actualRMultiple = riskPerUnit && riskPerUnit > 0
+      ? diff / riskPerUnit
+      : null;
+
+    // Update R-multiple on the position
+    if (actualRMultiple !== null) {
+      await supabase.from('positions').update({
+        actual_r_multiple: Number(actualRMultiple.toFixed(4)),
+      }).eq('id', position.id);
+    }
+
+    // Generate signal_outcome for the adaptive feedback loop
+    try {
+      let signalData: { opportunity_score?: number; score_breakdown?: unknown; confidence?: number; strategy_family?: string; market_regime?: string } | null = null;
+      
+      if (position.signal_id) {
+        const { data } = await supabase.from('trade_signals')
+          .select('opportunity_score, score_breakdown, confidence, strategy_family, market_regime')
+          .eq('id', position.signal_id)
+          .maybeSingle();
+        signalData = data as typeof signalData;
+      }
+
+      // Get current scoring weights for weight_profile_used
+      let weightProfile: Record<string, unknown> = {};
+      const { data: weights } = await supabase.from('scoring_weights')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (weights) {
+        weightProfile = {
+          structure: weights.structure_weight,
+          momentum: weights.momentum_weight,
+          volatility: weights.volatility_weight,
+          strategy: weights.strategy_weight,
+          rr: weights.rr_weight,
+          macro: weights.macro_weight,
+          sentiment: weights.sentiment_weight,
+          historical: weights.historical_weight,
+        };
+      }
+
+      const outcome = pnl >= 0 ? 'win' : 'loss';
+
+      await supabase.from('signal_outcomes').insert({
+        user_id: user.id,
+        signal_id: position.signal_id || null,
+        symbol: position.symbol,
+        predicted_score: signalData?.opportunity_score || null,
+        predicted_direction: position.direction,
+        actual_pnl: Number(pnl.toFixed(2)),
+        actual_r_multiple: actualRMultiple ? Number(actualRMultiple.toFixed(4)) : null,
+        outcome,
+        strategy_family: signalData?.strategy_family || position.strategy_family || position.strategy || null,
+        market_regime: signalData?.market_regime || position.regime_at_entry || null,
+        score_breakdown: (signalData?.score_breakdown || {}) as any,
+        weight_profile_used: weightProfile as any,
+        resolved_at: new Date().toISOString(),
+      });
+
+      console.log(`[FeedbackLoop] Signal outcome recorded: ${position.symbol} → ${outcome}, R: ${actualRMultiple?.toFixed(2) ?? 'N/A'}`);
+    } catch (outcomeErr) {
+      console.warn('[FeedbackLoop] Failed to record signal outcome:', outcomeErr);
+      // Don't block the close flow
+    }
+
     toast.success(`Posición cerrada: ${position.symbol} — PnL: ${formatCurrency(pnl)}`);
     setSaving(false);
     onConfirm();
