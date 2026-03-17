@@ -173,7 +173,7 @@ export default function SignalCenter() {
 
         {/* Detail Panel */}
         <div className="terminal-border rounded-lg p-4 max-h-[700px] overflow-y-auto">
-          <SignalDetailPanel signal={selected} />
+          <SignalDetailPanel signal={selected} onSignalSent={() => { refetch(); setSelected(null); }} />
         </div>
       </div>
     </div>
