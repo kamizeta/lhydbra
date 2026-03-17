@@ -16,6 +16,10 @@ import SettingsPage from "@/pages/SettingsPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import NotFound from "@/pages/NotFound";
 import ApiUsagePage from "@/pages/ApiUsagePage";
+import SignalCenter from "@/pages/SignalCenter";
+import StrategyResearchLab from "@/pages/StrategyResearchLab";
+import LearningDashboard from "@/pages/LearningDashboard";
+import PortfolioAllocation from "@/pages/PortfolioAllocation";
 
 const queryClient = new QueryClient();
 
@@ -39,7 +43,11 @@ function ProtectedRoutes() {
         <Route path="/market" element={<MarketPage />} />
         <Route path="/agents" element={<AgentsPanel />} />
         <Route path="/trade-ideas" element={<TradeIdeas />} />
+        <Route path="/signals" element={<SignalCenter />} />
         <Route path="/portfolio" element={<PortfolioPage />} />
+        <Route path="/allocation" element={<PortfolioAllocation />} />
+        <Route path="/strategy-lab" element={<StrategyResearchLab />} />
+        <Route path="/learning" element={<LearningDashboard />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/api-usage" element={<ApiUsagePage />} />
