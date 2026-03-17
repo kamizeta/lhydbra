@@ -23,6 +23,8 @@ interface Position {
   stop_loss: number | null;
   take_profit: number | null;
   strategy: string | null;
+  strategy_family: string | null;
+  regime_at_entry: string | null;
   status: string;
   opened_at: string;
   signal_id: string | null;
