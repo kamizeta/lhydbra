@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { FlaskConical, Play, Loader2, TrendingUp, BarChart3, Target, Award, Plus, Beaker } from "lucide-react";
+import BacktestCharts from "@/components/strategy/BacktestCharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
