@@ -19,8 +19,17 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t } = useI18n();
   const { user, signOut } = useAuth();
+  const [displayName, setDisplayName] = useState<string | null>(null);
   useRegimeAlerts();
   usePositionAlerts();
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('full_name').eq('id', user.id).single()
+      .then(({ data }) => {
+        if (data?.full_name) setDisplayName(data.full_name);
+      });
+  }, [user]);
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
