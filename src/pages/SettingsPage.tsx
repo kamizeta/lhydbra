@@ -555,24 +555,60 @@ export default function SettingsPage() {
               Perfil de Usuario
             </h2>
 
-            {/* Avatar preview */}
+            {/* Avatar preview & upload */}
             <div className="flex items-center gap-4">
-              <div className="h-16 w-16 rounded-full bg-accent border border-border flex items-center justify-center overflow-hidden">
+              <div className="h-16 w-16 rounded-full bg-accent border border-border flex items-center justify-center overflow-hidden shrink-0">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
                 ) : (
                   <User className="h-8 w-8 text-muted-foreground" />
                 )}
               </div>
-              <div className="flex-1">
-                <label className="text-[10px] text-muted-foreground font-mono uppercase">URL de Avatar</label>
-                <input
-                  type="url"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
-                />
+              <div className="flex-1 space-y-2">
+                <label className="text-[10px] text-muted-foreground font-mono uppercase">Foto de perfil</label>
+                <label className={cn(
+                  "flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md cursor-pointer transition-colors border border-border",
+                  uploadingAvatar ? "bg-muted text-muted-foreground cursor-wait" : "bg-accent/50 hover:bg-accent text-foreground"
+                )}>
+                  {uploadingAvatar ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo...</>
+                  ) : (
+                    <><Upload className="h-3.5 w-3.5" /> Subir imagen</>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingAvatar}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !user) return;
+                      setUploadingAvatar(true);
+                      const ext = file.name.split('.').pop();
+                      const filePath = `${user.id}/avatar.${ext}`;
+                      const { error: uploadError } = await supabase.storage
+                        .from('avatars')
+                        .upload(filePath, file, { upsert: true });
+                      if (uploadError) {
+                        toast.error('Error al subir imagen');
+                        setUploadingAvatar(false);
+                        return;
+                      }
+                      const { data: urlData } = supabase.storage
+                        .from('avatars')
+                        .getPublicUrl(filePath);
+                      const newUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+                      setAvatarUrl(newUrl);
+                      // Auto-save to profile
+                      await supabase.from('profiles').update({
+                        avatar_url: newUrl,
+                        updated_at: new Date().toISOString(),
+                      }).eq('id', user.id);
+                      toast.success('Avatar actualizado ✓');
+                      setUploadingAvatar(false);
+                    }}
+                  />
+                </label>
               </div>
             </div>
 
