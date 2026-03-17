@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, BarChart3, Bot, Lightbulb, Briefcase,
@@ -7,6 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import LanguageSelector from "@/components/LanguageSelector";
 import NotificationBell from "@/components/NotificationBell";
 import lhydbraLogo from "@/assets/lhydbra-logo.png";
@@ -18,8 +19,17 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t } = useI18n();
   const { user, signOut } = useAuth();
+  const [displayName, setDisplayName] = useState<string | null>(null);
   useRegimeAlerts();
   usePositionAlerts();
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('full_name').eq('id', user.id).single()
+      .then(({ data }) => {
+        if (data?.full_name) setDisplayName(data.full_name);
+      });
+  }, [user]);
 
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
@@ -100,7 +110,7 @@ export default function AppLayout() {
             <button onClick={() => setMobileOpen(true)} className="md:hidden p-1 text-muted-foreground hover:text-foreground">
               <Menu className="h-5 w-5" />
             </button>
-            <span className="text-xs font-mono text-muted-foreground hidden sm:inline">{user?.email}</span>
+            <span className="text-xs font-mono text-muted-foreground hidden sm:inline">{displayName || user?.email}</span>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <NotificationBell />
