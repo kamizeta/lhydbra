@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { FlaskConical, Play, Loader2, TrendingUp, BarChart3, Target, Award, Plus, Beaker } from "lucide-react";
+import BacktestCharts from "@/components/strategy/BacktestCharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -280,20 +281,27 @@ export default function StrategyResearchLab() {
                     </div>
                   </div>
                   {selectedBacktest?.id === b.id && b.trade_log && b.trade_log.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-border space-y-1 max-h-[200px] overflow-y-auto">
-                      <div className="grid grid-cols-6 gap-2 text-[10px] text-muted-foreground font-mono uppercase">
-                        <div>Entry</div><div>Exit</div><div>Dir</div><div>PnL</div><div>R</div><div>Exit Reason</div>
-                      </div>
-                      {b.trade_log.slice(0, 20).map((t, i) => (
-                        <div key={i} className="grid grid-cols-6 gap-2 text-[10px] font-mono">
-                          <div className="text-foreground">{t.entry_price.toFixed(2)}</div>
-                          <div className="text-foreground">{t.exit_price.toFixed(2)}</div>
-                          <div className={t.direction === "long" ? "text-profit" : "text-loss"}>{t.direction.toUpperCase()}</div>
-                          <div className={cn(t.pnl >= 0 ? "text-profit" : "text-loss")}>{t.pnl >= 0 ? '+' : ''}{t.pnl.toFixed(2)}</div>
-                          <div className={cn(t.r_multiple >= 0 ? "text-profit" : "text-loss")}>{t.r_multiple.toFixed(2)}R</div>
-                          <div className="text-muted-foreground truncate">{t.exit_reason}</div>
+                    <div className="mt-3 pt-3 border-t border-border space-y-4">
+                      {/* Charts */}
+                      <BacktestCharts tradeLog={b.trade_log} symbol={b.symbol} />
+
+                      {/* Trade Log Table */}
+                      <div className="terminal-border rounded-lg p-3 space-y-1 max-h-[200px] overflow-y-auto">
+                        <h4 className="text-xs font-bold text-muted-foreground uppercase mb-2">Trade Log</h4>
+                        <div className="grid grid-cols-6 gap-2 text-[10px] text-muted-foreground font-mono uppercase">
+                          <div>Entry</div><div>Exit</div><div>Dir</div><div>PnL</div><div>R</div><div>Exit Reason</div>
                         </div>
-                      ))}
+                        {b.trade_log.slice(0, 20).map((t, i) => (
+                          <div key={i} className="grid grid-cols-6 gap-2 text-[10px] font-mono">
+                            <div className="text-foreground">{t.entry_price.toFixed(2)}</div>
+                            <div className="text-foreground">{t.exit_price.toFixed(2)}</div>
+                            <div className={t.direction === "long" ? "text-profit" : "text-loss"}>{t.direction.toUpperCase()}</div>
+                            <div className={cn(t.pnl >= 0 ? "text-profit" : "text-loss")}>{t.pnl >= 0 ? '+' : ''}{t.pnl.toFixed(2)}</div>
+                            <div className={cn(t.r_multiple >= 0 ? "text-profit" : "text-loss")}>{t.r_multiple.toFixed(2)}R</div>
+                            <div className="text-muted-foreground truncate">{t.exit_reason}</div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
