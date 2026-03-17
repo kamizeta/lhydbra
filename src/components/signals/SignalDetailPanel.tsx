@@ -13,7 +13,10 @@ interface Props {
   onSignalSent?: () => void;
 }
 
-export default function SignalDetailPanel({ signal }: Props) {
+export default function SignalDetailPanel({ signal, onSignalSent }: Props) {
+  const { user } = useAuth();
+  const invalidateMutation = useInvalidateSignal();
+  const [sending, setSending] = useState(false);
   if (!signal) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-12 text-center">
