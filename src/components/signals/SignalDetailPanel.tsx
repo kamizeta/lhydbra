@@ -177,7 +177,7 @@ export default function SignalDetailPanel({ signal, onSignalSent }: Props) {
                   ? Math.abs(primaryTarget - signal.entry_price) / Math.abs(signal.entry_price - signal.stop_loss)
                   : signal.expected_r_multiple;
 
-                const { error } = await supabase.from("trade_signals").insert({
+                const { error } = await supabase.from("trade_signals").insert([{
                   user_id: user.id,
                   symbol: signal.asset,
                   name: `${signal.strategy_family?.toUpperCase() || "SIGNAL"} — ${signal.asset}`,
@@ -195,7 +195,7 @@ export default function SignalDetailPanel({ signal, onSignalSent }: Props) {
                   market_regime: signal.market_regime,
                   reasoning: signal.reasoning || signal.explanation?.summary || null,
                   status: "pending",
-                });
+                }]);
                 if (error) throw error;
 
                 // Mark signal as closed (sent)
