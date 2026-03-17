@@ -77,17 +77,17 @@ export default function StrategyResearchLab() {
 
   const adoptTemplate = async (tmpl: StrategyTemplate) => {
     if (!user) return;
-    const { error } = await supabase.from("strategies").insert({
+    const { error } = await supabase.from("strategies").insert([{
       user_id: user.id,
       name: tmpl.name,
       strategy_family: tmpl.strategy_family,
       description: tmpl.description,
-      entry_logic: tmpl.entry_logic,
-      exit_logic: tmpl.exit_logic,
-      risk_model: tmpl.risk_model,
+      entry_logic: tmpl.entry_logic as any,
+      exit_logic: tmpl.exit_logic as any,
+      risk_model: tmpl.risk_model as any,
       preferred_regime: tmpl.preferred_regime,
       status: "active",
-    });
+    }]);
     if (error) { toast.error("Error adopting strategy"); return; }
     toast.success(`Strategy "${tmpl.name}" adopted ✓`);
     const { data } = await supabase.from("strategies").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
