@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, BarChart3, Bot, Lightbulb, Briefcase,
@@ -7,6 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import LanguageSelector from "@/components/LanguageSelector";
 import NotificationBell from "@/components/NotificationBell";
 import lhydbraLogo from "@/assets/lhydbra-logo.png";
