@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+
 import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications, type Notification } from '@/hooks/useNotifications';
