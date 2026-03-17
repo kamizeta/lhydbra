@@ -162,6 +162,75 @@ export default function SignalDetailPanel({ signal, onSignalSent }: Props) {
       <div className="text-[10px] text-muted-foreground font-mono">
         Created: {new Date(signal.created_at).toLocaleString()}
       </div>
+
+      {/* Actions */}
+      {signal.status === "active" && (
+        <div className="pt-3 border-t border-border space-y-2">
+          <button
+            disabled={sending}
+            onClick={async () => {
+              if (!user) return;
+              setSending(true);
+              try {
+                const primaryTarget = signal.targets?.[0] ?? signal.entry_price * (signal.direction === "long" ? 1.05 : 0.95);
+                const rr = Math.abs(signal.entry_price - signal.stop_loss) > 0
+                  ? Math.abs(primaryTarget - signal.entry_price) / Math.abs(signal.entry_price - signal.stop_loss)
+                  : signal.expected_r_multiple;
+
+                const { error } = await supabase.from("trade_signals").insert({
+                  user_id: user.id,
+                  symbol: signal.asset,
+                  name: `${signal.strategy_family?.toUpperCase() || "SIGNAL"} — ${signal.asset}`,
+                  asset_type: signal.asset_class,
+                  direction: signal.direction,
+                  strategy: signal.strategy_family || "hybrid",
+                  strategy_family: signal.strategy_family,
+                  entry_price: signal.entry_price,
+                  stop_loss: signal.stop_loss,
+                  take_profit: primaryTarget,
+                  risk_reward: +rr.toFixed(2),
+                  confidence: Math.round(signal.confidence_score),
+                  opportunity_score: signal.opportunity_score,
+                  score_breakdown: signal.score_breakdown as Record<string, unknown>,
+                  market_regime: signal.market_regime,
+                  reasoning: signal.reasoning || signal.explanation?.summary || null,
+                  status: "pending",
+                });
+                if (error) throw error;
+
+                // Mark signal as closed (sent)
+                await supabase.from("signals").update({
+                  status: "closed",
+                  updated_at: new Date().toISOString(),
+                } as Record<string, unknown>).eq("id", signal.id);
+
+                toast.success(`Señal enviada a Trade Ideas: ${signal.asset}`);
+                onSignalSent?.();
+              } catch (err) {
+                toast.error(`Error: ${(err as Error).message}`);
+              } finally {
+                setSending(false);
+              }
+            }}
+            className={cn(
+              "w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-mono font-medium transition-all",
+              "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            )}
+          >
+            {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            Enviar a Trade Ideas
+          </button>
+          <button
+            onClick={() => {
+              invalidateMutation.mutate({ signalId: signal.id, reason: "Manual invalidation" });
+              toast.info("Señal invalidada");
+            }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-medium transition-all bg-loss/10 text-loss hover:bg-loss/20 border border-loss/20"
+          >
+            <XCircle className="h-3.5 w-3.5" /> Invalidar Señal
+          </button>
+        </div>
+      )}
     </div>
   );
 }
