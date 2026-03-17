@@ -14,6 +14,12 @@ interface Position {
   direction: string;
   quantity: number;
   avg_entry: number;
+  stop_loss: number | null;
+  take_profit: number | null;
+  signal_id: string | null;
+  strategy_family?: string | null;
+  regime_at_entry?: string | null;
+  strategy?: string | null;
 }
 
 interface Props {
