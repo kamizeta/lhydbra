@@ -110,7 +110,7 @@ export default function AppLayout() {
             <button onClick={() => setMobileOpen(true)} className="md:hidden p-1 text-muted-foreground hover:text-foreground">
               <Menu className="h-5 w-5" />
             </button>
-            <span className="text-xs font-mono text-muted-foreground hidden sm:inline">{user?.email}</span>
+            <span className="text-xs font-mono text-muted-foreground hidden sm:inline">{displayName || user?.email}</span>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <NotificationBell />
