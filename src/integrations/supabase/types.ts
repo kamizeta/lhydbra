@@ -136,6 +136,48 @@ export type Database = {
         }
         Relationships: []
       }
+      allocation_plans: {
+        Row: {
+          allocated_capital: number
+          allocations: Json
+          constraints_applied: Json | null
+          created_at: string
+          free_capital: number
+          id: string
+          risk_budget: Json | null
+          status: string
+          total_capital: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allocated_capital?: number
+          allocations?: Json
+          constraints_applied?: Json | null
+          created_at?: string
+          free_capital?: number
+          id?: string
+          risk_budget?: Json | null
+          status?: string
+          total_capital?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allocated_capital?: number
+          allocations?: Json
+          constraints_applied?: Json | null
+          created_at?: string
+          free_capital?: number
+          id?: string
+          risk_budget?: Json | null
+          status?: string
+          total_capital?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       api_usage_log: {
         Row: {
           action: string
@@ -168,6 +210,96 @@ export type Database = {
           symbols_returned?: number
         }
         Relationships: []
+      }
+      backtest_results: {
+        Row: {
+          avg_r_multiple: number | null
+          computed_at: string
+          created_at: string
+          expectancy: number | null
+          id: string
+          losing_trades: number | null
+          max_drawdown: number | null
+          period_end: string | null
+          period_start: string | null
+          profit_factor: number | null
+          sharpe_estimate: number | null
+          status: string
+          strategy_id: string | null
+          symbol: string
+          timeframe: string
+          total_pnl: number | null
+          total_trades: number | null
+          trade_log: Json | null
+          user_id: string
+          variant_id: string | null
+          win_rate: number | null
+          winning_trades: number | null
+        }
+        Insert: {
+          avg_r_multiple?: number | null
+          computed_at?: string
+          created_at?: string
+          expectancy?: number | null
+          id?: string
+          losing_trades?: number | null
+          max_drawdown?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          profit_factor?: number | null
+          sharpe_estimate?: number | null
+          status?: string
+          strategy_id?: string | null
+          symbol: string
+          timeframe?: string
+          total_pnl?: number | null
+          total_trades?: number | null
+          trade_log?: Json | null
+          user_id: string
+          variant_id?: string | null
+          win_rate?: number | null
+          winning_trades?: number | null
+        }
+        Update: {
+          avg_r_multiple?: number | null
+          computed_at?: string
+          created_at?: string
+          expectancy?: number | null
+          id?: string
+          losing_trades?: number | null
+          max_drawdown?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          profit_factor?: number | null
+          sharpe_estimate?: number | null
+          status?: string
+          strategy_id?: string | null
+          symbol?: string
+          timeframe?: string
+          total_pnl?: number | null
+          total_trades?: number | null
+          trade_log?: Json | null
+          user_id?: string
+          variant_id?: string | null
+          win_rate?: number | null
+          winning_trades?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backtest_results_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "backtest_results_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_variants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       market_cache: {
         Row: {
@@ -669,6 +801,96 @@ export type Database = {
         }
         Relationships: []
       }
+      regime_performance: {
+        Row: {
+          asset_type: string
+          avg_r_multiple: number | null
+          expectancy: number | null
+          id: string
+          market_regime: string
+          optimal_weight_modifier: number | null
+          profit_factor: number | null
+          strategy_family: string
+          total_pnl: number | null
+          total_trades: number | null
+          updated_at: string
+          user_id: string
+          win_rate: number | null
+          winning_trades: number | null
+        }
+        Insert: {
+          asset_type?: string
+          avg_r_multiple?: number | null
+          expectancy?: number | null
+          id?: string
+          market_regime: string
+          optimal_weight_modifier?: number | null
+          profit_factor?: number | null
+          strategy_family: string
+          total_pnl?: number | null
+          total_trades?: number | null
+          updated_at?: string
+          user_id: string
+          win_rate?: number | null
+          winning_trades?: number | null
+        }
+        Update: {
+          asset_type?: string
+          avg_r_multiple?: number | null
+          expectancy?: number | null
+          id?: string
+          market_regime?: string
+          optimal_weight_modifier?: number | null
+          profit_factor?: number | null
+          strategy_family?: string
+          total_pnl?: number | null
+          total_trades?: number | null
+          updated_at?: string
+          user_id?: string
+          win_rate?: number | null
+          winning_trades?: number | null
+        }
+        Relationships: []
+      }
+      score_adjustments: {
+        Row: {
+          adjustment_type: string
+          created_at: string
+          id: string
+          market_regime: string | null
+          metrics: Json | null
+          new_weights: Json
+          performance_window: number | null
+          previous_weights: Json
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          adjustment_type?: string
+          created_at?: string
+          id?: string
+          market_regime?: string | null
+          metrics?: Json | null
+          new_weights?: Json
+          performance_window?: number | null
+          previous_weights?: Json
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          adjustment_type?: string
+          created_at?: string
+          id?: string
+          market_regime?: string | null
+          metrics?: Json | null
+          new_weights?: Json
+          performance_window?: number | null
+          previous_weights?: Json
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       scoring_weights: {
         Row: {
           created_at: string
@@ -720,6 +942,131 @@ export type Database = {
         }
         Relationships: []
       }
+      signal_outcomes: {
+        Row: {
+          actual_pnl: number | null
+          actual_r_multiple: number | null
+          created_at: string
+          id: string
+          market_regime: string | null
+          outcome: string | null
+          predicted_direction: string | null
+          predicted_score: number | null
+          resolved_at: string | null
+          score_breakdown: Json | null
+          signal_id: string | null
+          strategy_family: string | null
+          symbol: string
+          user_id: string
+          weight_profile_used: Json | null
+        }
+        Insert: {
+          actual_pnl?: number | null
+          actual_r_multiple?: number | null
+          created_at?: string
+          id?: string
+          market_regime?: string | null
+          outcome?: string | null
+          predicted_direction?: string | null
+          predicted_score?: number | null
+          resolved_at?: string | null
+          score_breakdown?: Json | null
+          signal_id?: string | null
+          strategy_family?: string | null
+          symbol: string
+          user_id: string
+          weight_profile_used?: Json | null
+        }
+        Update: {
+          actual_pnl?: number | null
+          actual_r_multiple?: number | null
+          created_at?: string
+          id?: string
+          market_regime?: string | null
+          outcome?: string | null
+          predicted_direction?: string | null
+          predicted_score?: number | null
+          resolved_at?: string | null
+          score_breakdown?: Json | null
+          signal_id?: string | null
+          strategy_family?: string | null
+          symbol?: string
+          user_id?: string
+          weight_profile_used?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_outcomes_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "trade_signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategies: {
+        Row: {
+          created_at: string
+          description: string | null
+          entry_logic: Json
+          exit_logic: Json
+          historical_expectancy: number | null
+          historical_max_drawdown: number | null
+          historical_profit_factor: number | null
+          historical_sharpe: number | null
+          historical_win_rate: number | null
+          id: string
+          name: string
+          preferred_regime: string[] | null
+          risk_model: Json
+          status: string
+          strategy_family: string
+          total_trades: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          entry_logic?: Json
+          exit_logic?: Json
+          historical_expectancy?: number | null
+          historical_max_drawdown?: number | null
+          historical_profit_factor?: number | null
+          historical_sharpe?: number | null
+          historical_win_rate?: number | null
+          id?: string
+          name: string
+          preferred_regime?: string[] | null
+          risk_model?: Json
+          status?: string
+          strategy_family?: string
+          total_trades?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          entry_logic?: Json
+          exit_logic?: Json
+          historical_expectancy?: number | null
+          historical_max_drawdown?: number | null
+          historical_profit_factor?: number | null
+          historical_sharpe?: number | null
+          historical_win_rate?: number | null
+          id?: string
+          name?: string
+          preferred_regime?: string[] | null
+          risk_model?: Json
+          status?: string
+          strategy_family?: string
+          total_trades?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       strategy_performance: {
         Row: {
           avg_r_multiple: number | null
@@ -767,6 +1114,83 @@ export type Database = {
           winning_trades?: number
         }
         Relationships: []
+      }
+      strategy_templates: {
+        Row: {
+          created_at: string
+          description: string | null
+          entry_logic: Json
+          exit_logic: Json
+          id: string
+          is_system: boolean | null
+          name: string
+          preferred_regime: string[] | null
+          risk_model: Json
+          strategy_family: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          entry_logic?: Json
+          exit_logic?: Json
+          id?: string
+          is_system?: boolean | null
+          name: string
+          preferred_regime?: string[] | null
+          risk_model?: Json
+          strategy_family: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          entry_logic?: Json
+          exit_logic?: Json
+          id?: string
+          is_system?: boolean | null
+          name?: string
+          preferred_regime?: string[] | null
+          risk_model?: Json
+          strategy_family?: string
+        }
+        Relationships: []
+      }
+      strategy_variants: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          parameters: Json
+          status: string
+          strategy_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          parameters?: Json
+          status?: string
+          strategy_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          parameters?: Json
+          status?: string
+          strategy_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_variants_strategy_id_fkey"
+            columns: ["strategy_id"]
+            isOneToOne: false
+            referencedRelation: "strategies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       symbol_mapping: {
         Row: {
