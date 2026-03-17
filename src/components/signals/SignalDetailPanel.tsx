@@ -1,10 +1,16 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Signal } from "@/hooks/useSignalEngine";
+import { useInvalidateSignal } from "@/hooks/useSignalEngine";
 import StatusBadge from "@/components/shared/StatusBadge";
-import { Zap, Target, TrendingUp, TrendingDown, Info } from "lucide-react";
+import { Zap, Target, TrendingUp, TrendingDown, Info, Send, XCircle, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 interface Props {
   signal: Signal | null;
+  onSignalSent?: () => void;
 }
 
 export default function SignalDetailPanel({ signal }: Props) {
