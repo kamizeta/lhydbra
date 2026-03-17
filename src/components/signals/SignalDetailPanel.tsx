@@ -191,7 +191,7 @@ export default function SignalDetailPanel({ signal, onSignalSent }: Props) {
                   risk_reward: +rr.toFixed(2),
                   confidence: Math.round(signal.confidence_score),
                   opportunity_score: signal.opportunity_score,
-                  score_breakdown: signal.score_breakdown as Record<string, unknown>,
+                  score_breakdown: signal.score_breakdown as unknown as Record<string, number>,
                   market_regime: signal.market_regime,
                   reasoning: signal.reasoning || signal.explanation?.summary || null,
                   status: "pending",
