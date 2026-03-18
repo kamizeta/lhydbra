@@ -342,7 +342,7 @@ export default function PositionsPage() {
               </div>
 
               {/* Row 2: Key metrics grid */}
-              <div className="grid grid-cols-4 gap-2 text-[10px] font-mono">
+              <div className="grid grid-cols-5 gap-2 text-[10px] font-mono">
                 <div>
                   <span className="text-muted-foreground">Qty</span>
                   <div className="text-foreground">{pos.quantity}</div>
@@ -358,6 +358,10 @@ export default function PositionsPage() {
                 <div>
                   <span className="text-muted-foreground">Strat</span>
                   <div className="text-foreground truncate">{pos.strategy || '—'}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Fecha</span>
+                  <div className="text-foreground">{new Date(pos.opened_at).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</div>
                 </div>
               </div>
 
