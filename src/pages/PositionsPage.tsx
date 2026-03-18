@@ -30,6 +30,9 @@ interface Position {
   signal_id: string | null;
 }
 
+type SortKey = 'symbol' | 'direction' | 'quantity' | 'avg_entry' | 'capital' | 'current' | 'pnl' | 'pnlPercent' | 'stop_loss' | 'take_profit' | 'strategy' | 'opened_at';
+type SortDir = 'asc' | 'desc';
+
 export default function PositionsPage() {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -41,6 +44,8 @@ export default function PositionsPage() {
   const [editingSlTp, setEditingSlTp] = useState<{ id: string; sl: string; tp: string } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ changes: { action: string; symbol: string; detail: string }[]; synced_at: string } | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>('opened_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [form, setForm] = useState({
     symbol: '', name: '', asset_type: 'stock', direction: 'long',
     quantity: 0, avg_entry: 0, stop_loss: 0, take_profit: 0, strategy: '',
