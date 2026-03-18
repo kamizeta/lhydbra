@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart, Pencil, Check, RefreshCw, Loader2 } from 'lucide-react';
+import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart, Pencil, Check, RefreshCw, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
@@ -30,6 +30,9 @@ interface Position {
   signal_id: string | null;
 }
 
+type SortKey = 'symbol' | 'direction' | 'quantity' | 'avg_entry' | 'capital' | 'current' | 'pnl' | 'pnlPercent' | 'stop_loss' | 'take_profit' | 'strategy' | 'opened_at';
+type SortDir = 'asc' | 'desc';
+
 export default function PositionsPage() {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -41,6 +44,8 @@ export default function PositionsPage() {
   const [editingSlTp, setEditingSlTp] = useState<{ id: string; sl: string; tp: string } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ changes: { action: string; symbol: string; detail: string }[]; synced_at: string } | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>('opened_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [form, setForm] = useState({
     symbol: '', name: '', asset_type: 'stock', direction: 'long',
     quantity: 0, avg_entry: 0, stop_loss: 0, take_profit: 0, strategy: '',
@@ -77,7 +82,30 @@ export default function PositionsPage() {
     return { totalPnL: total, totalPnLPercent: totalCapital > 0 ? (total / totalCapital) * 100 : 0 };
   }, [positions, priceMap]);
 
-  useEffect(() => { if (user) loadPositions(); }, [user]);
+  const sortedPositions = useMemo(() => {
+    return [...positions].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      const pnlA = getPnL(a);
+      const pnlB = getPnL(b);
+      switch (sortKey) {
+        case 'symbol': return dir * a.symbol.localeCompare(b.symbol);
+        case 'direction': return dir * a.direction.localeCompare(b.direction);
+        case 'quantity': return dir * (a.quantity - b.quantity);
+        case 'avg_entry': return dir * (a.avg_entry - b.avg_entry);
+        case 'capital': return dir * ((a.quantity * a.avg_entry) - (b.quantity * b.avg_entry));
+        case 'current': return dir * ((pnlA?.currentPrice || 0) - (pnlB?.currentPrice || 0));
+        case 'pnl': return dir * ((pnlA?.pnl || 0) - (pnlB?.pnl || 0));
+        case 'pnlPercent': return dir * ((pnlA?.pnlPercent || 0) - (pnlB?.pnlPercent || 0));
+        case 'stop_loss': return dir * ((Number(a.stop_loss) || 0) - (Number(b.stop_loss) || 0));
+        case 'take_profit': return dir * ((Number(a.take_profit) || 0) - (Number(b.take_profit) || 0));
+        case 'strategy': return dir * ((a.strategy || '').localeCompare(b.strategy || ''));
+        case 'opened_at': return dir * (new Date(a.opened_at).getTime() - new Date(b.opened_at).getTime());
+        default: return 0;
+      }
+    });
+  }, [positions, sortKey, sortDir, priceMap]);
+
+
 
   const loadPositions = async () => {
     const { data } = await supabase
@@ -304,7 +332,7 @@ export default function PositionsPage() {
                 {pnlData && (
                   <div className="text-right">
                     <span className={cn("font-mono font-bold text-sm", pnlData.pnl >= 0 ? "text-profit" : "text-loss")}>
-                      {pnlData.pnl >= 0 ? '+' : ''}{fmtPrice(Math.abs(pnlData.pnl))}
+                      {pnlData.pnl >= 0 ? '+' : '-'}{fmtPrice(Math.abs(pnlData.pnl))}
                     </span>
                     <div className={cn("text-[10px] font-mono", pnlData.pnlPercent >= 0 ? "text-profit" : "text-loss")}>
                       {pnlData.pnlPercent >= 0 ? '+' : ''}{pnlData.pnlPercent.toFixed(2)}%
@@ -314,7 +342,7 @@ export default function PositionsPage() {
               </div>
 
               {/* Row 2: Key metrics grid */}
-              <div className="grid grid-cols-4 gap-2 text-[10px] font-mono">
+              <div className="grid grid-cols-5 gap-2 text-[10px] font-mono">
                 <div>
                   <span className="text-muted-foreground">Qty</span>
                   <div className="text-foreground">{pos.quantity}</div>
@@ -330,6 +358,10 @@ export default function PositionsPage() {
                 <div>
                   <span className="text-muted-foreground">Strat</span>
                   <div className="text-foreground truncate">{pos.strategy || '—'}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Fecha</span>
+                  <div className="text-foreground">{new Date(pos.opened_at).toLocaleDateString('es', { day: '2-digit', month: 'short' })}</div>
                 </div>
               </div>
 
@@ -387,23 +419,34 @@ export default function PositionsPage() {
         <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="border-b border-border text-[10px] text-muted-foreground uppercase tracking-wider">
-              <th className="text-left p-2 w-[14%]">{t.common.asset}</th>
-              <th className="text-center p-2 w-[7%]">Dir</th>
-              <th className="text-right p-2 w-[7%]">Qty</th>
-              <th className="text-right p-2 w-[9%]">{t.common.entry}</th>
-              <th className="text-right p-2 w-[9%]">Capital</th>
-              <th className="text-right p-2 w-[9%]">Actual</th>
-              <th className="text-right p-2 w-[11%]">PnL</th>
-              <th className="text-right p-2 w-[8%]">SL</th>
-              <th className="text-right p-2 w-[8%]">TP</th>
-              <th className="text-right p-2 w-[8%]">{t.common.strategy}</th>
-              <th className="text-center p-2 w-[10%]">Actions</th>
+              {([
+                { key: 'symbol' as SortKey, label: t.common.asset, align: 'text-left', w: 'w-[12%]' },
+                { key: 'direction' as SortKey, label: 'Dir', align: 'text-center', w: 'w-[6%]' },
+                { key: 'quantity' as SortKey, label: 'Qty', align: 'text-right', w: 'w-[6%]' },
+                { key: 'avg_entry' as SortKey, label: t.common.entry, align: 'text-right', w: 'w-[8%]' },
+                { key: 'capital' as SortKey, label: 'Capital', align: 'text-right', w: 'w-[8%]' },
+                { key: 'current' as SortKey, label: 'Actual', align: 'text-right', w: 'w-[8%]' },
+                { key: 'pnl' as SortKey, label: 'PnL', align: 'text-right', w: 'w-[10%]' },
+                { key: 'stop_loss' as SortKey, label: 'SL', align: 'text-right', w: 'w-[7%]' },
+                { key: 'take_profit' as SortKey, label: 'TP', align: 'text-right', w: 'w-[7%]' },
+                { key: 'strategy' as SortKey, label: t.common.strategy, align: 'text-right', w: 'w-[8%]' },
+                { key: 'opened_at' as SortKey, label: 'Fecha', align: 'text-right', w: 'w-[8%]' },
+              ]).map(col => (
+                <th key={col.key} className={cn(col.align, 'p-2 cursor-pointer select-none hover:text-foreground transition-colors', col.w)}
+                  onClick={() => { if (sortKey === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortKey(col.key); setSortDir('desc'); } }}>
+                  <span className="inline-flex items-center gap-0.5">
+                    {col.label}
+                    {sortKey === col.key ? (sortDir === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />) : <ArrowUpDown className="h-2.5 w-2.5 opacity-30" />}
+                  </span>
+                </th>
+              ))}
+              <th className="text-center p-2 w-[8%]">Actions</th>
             </tr>
           </thead>
           <tbody>
             {positions.length === 0 ? (
-              <tr><td colSpan={11} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
-            ) : positions.map((pos) => {
+              <tr><td colSpan={12} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
+            ) : sortedPositions.map((pos) => {
               const pnlData = getPnL(pos);
               const capitalUsed = pos.quantity * pos.avg_entry;
               const { hitSl, hitTp } = checkSlTpHit(pos, pnlData?.currentPrice);
@@ -481,6 +524,9 @@ export default function PositionsPage() {
                     )}
                   </td>
                   <td className="text-right p-2"><StatusBadge variant="info">{pos.strategy || '—'}</StatusBadge></td>
+                  <td className="text-right p-2 font-mono text-[10px] text-muted-foreground">
+                    {new Date(pos.opened_at).toLocaleDateString('es', { day: '2-digit', month: 'short' })}
+                  </td>
                   <td className="text-center p-2" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-0.5">
                       {isEditing ? (
