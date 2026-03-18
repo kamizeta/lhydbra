@@ -82,7 +82,30 @@ export default function PositionsPage() {
     return { totalPnL: total, totalPnLPercent: totalCapital > 0 ? (total / totalCapital) * 100 : 0 };
   }, [positions, priceMap]);
 
-  useEffect(() => { if (user) loadPositions(); }, [user]);
+  const sortedPositions = useMemo(() => {
+    return [...positions].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      const pnlA = getPnL(a);
+      const pnlB = getPnL(b);
+      switch (sortKey) {
+        case 'symbol': return dir * a.symbol.localeCompare(b.symbol);
+        case 'direction': return dir * a.direction.localeCompare(b.direction);
+        case 'quantity': return dir * (a.quantity - b.quantity);
+        case 'avg_entry': return dir * (a.avg_entry - b.avg_entry);
+        case 'capital': return dir * ((a.quantity * a.avg_entry) - (b.quantity * b.avg_entry));
+        case 'current': return dir * ((pnlA?.currentPrice || 0) - (pnlB?.currentPrice || 0));
+        case 'pnl': return dir * ((pnlA?.pnl || 0) - (pnlB?.pnl || 0));
+        case 'pnlPercent': return dir * ((pnlA?.pnlPercent || 0) - (pnlB?.pnlPercent || 0));
+        case 'stop_loss': return dir * ((Number(a.stop_loss) || 0) - (Number(b.stop_loss) || 0));
+        case 'take_profit': return dir * ((Number(a.take_profit) || 0) - (Number(b.take_profit) || 0));
+        case 'strategy': return dir * ((a.strategy || '').localeCompare(b.strategy || ''));
+        case 'opened_at': return dir * (new Date(a.opened_at).getTime() - new Date(b.opened_at).getTime());
+        default: return 0;
+      }
+    });
+  }, [positions, sortKey, sortDir, priceMap]);
+
+
 
   const loadPositions = async () => {
     const { data } = await supabase
