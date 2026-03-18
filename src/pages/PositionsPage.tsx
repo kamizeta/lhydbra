@@ -309,7 +309,7 @@ export default function PositionsPage() {
                 {pnlData && (
                   <div className="text-right">
                     <span className={cn("font-mono font-bold text-sm", pnlData.pnl >= 0 ? "text-profit" : "text-loss")}>
-                      {pnlData.pnl >= 0 ? '+' : ''}{fmtPrice(Math.abs(pnlData.pnl))}
+                      {pnlData.pnl >= 0 ? '+' : '-'}{fmtPrice(Math.abs(pnlData.pnl))}
                     </span>
                     <div className={cn("text-[10px] font-mono", pnlData.pnlPercent >= 0 ? "text-profit" : "text-loss")}>
                       {pnlData.pnlPercent >= 0 ? '+' : ''}{pnlData.pnlPercent.toFixed(2)}%
