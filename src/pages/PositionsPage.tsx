@@ -392,23 +392,34 @@ export default function PositionsPage() {
         <table className="w-full text-sm table-fixed">
           <thead>
             <tr className="border-b border-border text-[10px] text-muted-foreground uppercase tracking-wider">
-              <th className="text-left p-2 w-[14%]">{t.common.asset}</th>
-              <th className="text-center p-2 w-[7%]">Dir</th>
-              <th className="text-right p-2 w-[7%]">Qty</th>
-              <th className="text-right p-2 w-[9%]">{t.common.entry}</th>
-              <th className="text-right p-2 w-[9%]">Capital</th>
-              <th className="text-right p-2 w-[9%]">Actual</th>
-              <th className="text-right p-2 w-[11%]">PnL</th>
-              <th className="text-right p-2 w-[8%]">SL</th>
-              <th className="text-right p-2 w-[8%]">TP</th>
-              <th className="text-right p-2 w-[8%]">{t.common.strategy}</th>
-              <th className="text-center p-2 w-[10%]">Actions</th>
+              {([
+                { key: 'symbol' as SortKey, label: t.common.asset, align: 'text-left', w: 'w-[12%]' },
+                { key: 'direction' as SortKey, label: 'Dir', align: 'text-center', w: 'w-[6%]' },
+                { key: 'quantity' as SortKey, label: 'Qty', align: 'text-right', w: 'w-[6%]' },
+                { key: 'avg_entry' as SortKey, label: t.common.entry, align: 'text-right', w: 'w-[8%]' },
+                { key: 'capital' as SortKey, label: 'Capital', align: 'text-right', w: 'w-[8%]' },
+                { key: 'current' as SortKey, label: 'Actual', align: 'text-right', w: 'w-[8%]' },
+                { key: 'pnl' as SortKey, label: 'PnL', align: 'text-right', w: 'w-[10%]' },
+                { key: 'stop_loss' as SortKey, label: 'SL', align: 'text-right', w: 'w-[7%]' },
+                { key: 'take_profit' as SortKey, label: 'TP', align: 'text-right', w: 'w-[7%]' },
+                { key: 'strategy' as SortKey, label: t.common.strategy, align: 'text-right', w: 'w-[8%]' },
+                { key: 'opened_at' as SortKey, label: 'Fecha', align: 'text-right', w: 'w-[8%]' },
+              ]).map(col => (
+                <th key={col.key} className={cn(col.align, 'p-2 cursor-pointer select-none hover:text-foreground transition-colors', col.w)}
+                  onClick={() => { if (sortKey === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortKey(col.key); setSortDir('desc'); } }}>
+                  <span className="inline-flex items-center gap-0.5">
+                    {col.label}
+                    {sortKey === col.key ? (sortDir === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />) : <ArrowUpDown className="h-2.5 w-2.5 opacity-30" />}
+                  </span>
+                </th>
+              ))}
+              <th className="text-center p-2 w-[8%]">Actions</th>
             </tr>
           </thead>
           <tbody>
             {positions.length === 0 ? (
-              <tr><td colSpan={11} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
-            ) : positions.map((pos) => {
+              <tr><td colSpan={12} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
+            ) : sortedPositions.map((pos) => {
               const pnlData = getPnL(pos);
               const capitalUsed = pos.quantity * pos.avg_entry;
               const { hitSl, hitTp } = checkSlTpHit(pos, pnlData?.currentPrice);
@@ -486,6 +497,9 @@ export default function PositionsPage() {
                     )}
                   </td>
                   <td className="text-right p-2"><StatusBadge variant="info">{pos.strategy || '—'}</StatusBadge></td>
+                  <td className="text-right p-2 font-mono text-[10px] text-muted-foreground">
+                    {new Date(pos.opened_at).toLocaleDateString('es', { day: '2-digit', month: 'short' })}
+                  </td>
                   <td className="text-center p-2" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-0.5">
                       {isEditing ? (
