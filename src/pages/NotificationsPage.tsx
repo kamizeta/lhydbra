@@ -20,6 +20,7 @@ export default function NotificationsPage() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, clearAll } = useNotifications();
   const [filter, setFilter] = useState('all');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const filtered = notifications.filter(n => {
     if (filter !== 'all' && n.category !== filter) return false;
