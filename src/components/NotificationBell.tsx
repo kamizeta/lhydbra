@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-
 import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications, type Notification } from '@/hooks/useNotifications';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
