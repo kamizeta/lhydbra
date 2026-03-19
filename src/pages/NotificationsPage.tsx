@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Bell, Check, CheckCheck, Trash2, Filter } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
@@ -19,6 +20,7 @@ export default function NotificationsPage() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, clearAll } = useNotifications();
   const [filter, setFilter] = useState('all');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const filtered = notifications.filter(n => {
     if (filter !== 'all' && n.category !== filter) return false;
@@ -49,7 +51,7 @@ export default function NotificationsPage() {
           )}
           {notifications.length > 0 && (
             <button
-              onClick={() => { if (confirm('¿Eliminar todas las notificaciones?')) clearAll(); }}
+              onClick={() => setConfirmClear(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-loss border border-loss/30 rounded-md hover:bg-loss/10 transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" /> Limpiar todo
@@ -141,6 +143,19 @@ export default function NotificationsPage() {
           ))
         )}
       </div>
+
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar todas las notificaciones?</AlertDialogTitle>
+            <AlertDialogDescription>Se borrarán todas las notificaciones. Esta acción no se puede deshacer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { clearAll(); setConfirmClear(false); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

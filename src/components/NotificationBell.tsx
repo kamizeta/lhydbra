@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-
 import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications, type Notification } from '@/hooks/useNotifications';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -25,6 +25,7 @@ const categoryIcons: Record<string, string> = {
 export default function NotificationBell() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, clearAll } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function NotificationBell() {
               )}
               {notifications.length > 0 && (
                 <button
-                  onClick={() => { if (confirm('¿Eliminar todas?')) clearAll(); }}
+onClick={() => setConfirmClear(true)}
                   className="text-[10px] text-loss hover:underline font-mono flex items-center gap-1"
                 >
                   <Trash2 className="h-3 w-3" /> Borrar
@@ -139,6 +140,19 @@ export default function NotificationBell() {
           )}
         </div>
       )}
+
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar todas?</AlertDialogTitle>
+            <AlertDialogDescription>Se borrarán todas las notificaciones. Esta acción no se puede deshacer.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { clearAll(); setConfirmClear(false); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
