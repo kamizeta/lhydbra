@@ -68,7 +68,7 @@ export default function NotificationBell() {
               )}
               {notifications.length > 0 && (
                 <button
-70:                   onClick={() => setConfirmClear(true)}
+onClick={() => setConfirmClear(true)}
                   className="text-[10px] text-loss hover:underline font-mono flex items-center gap-1"
                 >
                   <Trash2 className="h-3 w-3" /> Borrar
