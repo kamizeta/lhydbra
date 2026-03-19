@@ -40,6 +40,7 @@ export default function TradeIdeas() {
   const [loading, setLoading] = useState(true);
   const [selectedSignal, setSelectedSignal] = useState<TradeSignal | null>(null);
   const [approveSignal, setApproveSignal] = useState<TradeSignal | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   const loadSignals = async () => {
     if (!user) return;
