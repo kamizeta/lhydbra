@@ -8,6 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import ApproveToPositionDialog from "@/components/trade/ApproveToPositionDialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface TradeSignal {
   id: string;
@@ -36,6 +40,7 @@ export default function TradeIdeas() {
   const [loading, setLoading] = useState(true);
   const [selectedSignal, setSelectedSignal] = useState<TradeSignal | null>(null);
   const [approveSignal, setApproveSignal] = useState<TradeSignal | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   const loadSignals = async () => {
     if (!user) return;
@@ -100,6 +105,20 @@ export default function TradeIdeas() {
     }
   };
 
+  const deleteAllSignals = async () => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('trade_signals')
+      .delete()
+      .eq('user_id', user.id);
+    if (!error) {
+      setSignals([]);
+      setSelectedSignal(null);
+      toast.success('Todas las ideas de trade eliminadas');
+    }
+    setConfirmDeleteAll(false);
+  };
+
   const handlePositionCreated = async (signalId: string) => {
     await updateStatus(signalId, 'approved');
     setApproveSignal(null);
@@ -115,9 +134,20 @@ export default function TradeIdeas() {
 
   return (
     <div className="p-6 space-y-6 animate-slide-in">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">{t.tradeIdeas.title}</h1>
-        <p className="text-sm text-muted-foreground font-mono">{t.tradeIdeas.subtitle}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">{t.tradeIdeas.title}</h1>
+          <p className="text-sm text-muted-foreground font-mono">{t.tradeIdeas.subtitle}</p>
+        </div>
+        {signals.length > 0 && (
+          <button
+            onClick={() => setConfirmDeleteAll(true)}
+            className="flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/20 transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Borrar todas
+          </button>
+        )}
       </div>
 
       {/* Investment Flow */}
@@ -319,6 +349,22 @@ export default function TradeIdeas() {
           onConfirm={handlePositionCreated}
         />
       )}
+      <AlertDialog open={confirmDeleteAll} onOpenChange={setConfirmDeleteAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar todas las ideas?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará todas las ideas de trade. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteAllSignals} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar todas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
