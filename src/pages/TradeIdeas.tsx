@@ -105,6 +105,20 @@ export default function TradeIdeas() {
     }
   };
 
+  const deleteAllSignals = async () => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('trade_signals')
+      .delete()
+      .eq('user_id', user.id);
+    if (!error) {
+      setSignals([]);
+      setSelectedSignal(null);
+      toast.success('Todas las ideas de trade eliminadas');
+    }
+    setConfirmDeleteAll(false);
+  };
+
   const handlePositionCreated = async (signalId: string) => {
     await updateStatus(signalId, 'approved');
     setApproveSignal(null);
