@@ -134,9 +134,20 @@ export default function TradeIdeas() {
 
   return (
     <div className="p-6 space-y-6 animate-slide-in">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">{t.tradeIdeas.title}</h1>
-        <p className="text-sm text-muted-foreground font-mono">{t.tradeIdeas.subtitle}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">{t.tradeIdeas.title}</h1>
+          <p className="text-sm text-muted-foreground font-mono">{t.tradeIdeas.subtitle}</p>
+        </div>
+        {signals.length > 0 && (
+          <button
+            onClick={() => setConfirmDeleteAll(true)}
+            className="flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/20 transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Borrar todas
+          </button>
+        )}
       </div>
 
       {/* Investment Flow */}
