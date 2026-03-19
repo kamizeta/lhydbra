@@ -107,16 +107,40 @@ export default function PositionsPage() {
 
 
 
-  const loadPositions = async () => {
-    const { data } = await supabase
+  const loadPositions = useCallback(async () => {
+    if (!user) {
+      setPositions([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
       .from('positions')
       .select('*')
-      .eq('user_id', user!.id)
+      .eq('user_id', user.id)
       .eq('status', 'open')
       .order('opened_at', { ascending: false });
-    setPositions((data as Position[]) || []);
+
+    if (error) {
+      toast.error('Error loading positions');
+      setPositions([]);
+    } else {
+      setPositions((data as Position[]) || []);
+    }
+
     setLoading(false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setPositions([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    void loadPositions();
+  }, [user, loadPositions]);
 
   const addPosition = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,7 +155,7 @@ export default function PositionsPage() {
       toast.success('Position added');
       setShowForm(false);
       setForm({ symbol: '', name: '', asset_type: 'stock', direction: 'long', quantity: 0, avg_entry: 0, stop_loss: 0, take_profit: 0, strategy: '' });
-      loadPositions();
+      void loadPositions();
     }
   };
 
@@ -150,23 +174,23 @@ export default function PositionsPage() {
       } else {
         const changes = data?.changes || [];
         setSyncResult({ changes, synced_at: data?.synced_at });
+        await loadPositions();
         if (changes.length > 0) {
           toast.success(`Alpaca sync: ${changes.length} cambio(s)`);
-          loadPositions();
         } else {
           toast.info('Alpaca sync: sin cambios');
         }
       }
     } catch { toast.error('Error sync Alpaca'); }
     setSyncing(false);
-  }, [user]);
+  }, [loadPositions]);
 
   useEffect(() => {
-    if (user && positions.length >= 0 && !loading) {
-      const timer = setTimeout(() => syncAlpaca(true), 2000);
+    if (user && !loading) {
+      const timer = setTimeout(() => void syncAlpaca(true), 2000);
       return () => clearTimeout(timer);
     }
-  }, [user, loading]);
+  }, [user, loading, syncAlpaca]);
 
   const handlePositionClosed = () => { setClosingPosition(null); loadPositions(); };
 
