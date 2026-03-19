@@ -349,6 +349,22 @@ export default function TradeIdeas() {
           onConfirm={handlePositionCreated}
         />
       )}
+      <AlertDialog open={confirmDeleteAll} onOpenChange={setConfirmDeleteAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar todas las ideas?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará todas las ideas de trade. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteAllSignals} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar todas
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
