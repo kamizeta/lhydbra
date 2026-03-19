@@ -51,7 +51,7 @@ export default function NotificationsPage() {
           )}
           {notifications.length > 0 && (
             <button
-              onClick={() => { if (confirm('¿Eliminar todas las notificaciones?')) clearAll(); }}
+              onClick={() => setConfirmClear(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-loss border border-loss/30 rounded-md hover:bg-loss/10 transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" /> Limpiar todo
