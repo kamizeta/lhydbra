@@ -245,6 +245,17 @@ Deno.serve(async (req) => {
 
     const targetSymbols = symbols && symbols.length > 0 ? symbols : [];
 
+    // Fetch open positions to avoid duplicating signals for assets already held
+    const { data: openPositions } = await supabase
+      .from("positions")
+      .select("symbol, direction")
+      .eq("user_id", user_id)
+      .eq("status", "open");
+    const openPositionMap = new Map<string, string>();
+    for (const pos of (openPositions || [])) {
+      openPositionMap.set(pos.symbol, pos.direction);
+    }
+
     // Fetch market features
     let featuresQuery = supabase.from("market_features").select("*").eq("timeframe", "1d");
     if (targetSymbols.length > 0) featuresQuery = featuresQuery.in("symbol", targetSymbols);
