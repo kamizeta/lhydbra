@@ -290,6 +290,13 @@ Deno.serve(async (req) => {
 
       const enriched = { ...feat, current_price: currentPrice };
       const direction = determineDirection(enriched);
+
+      // Skip if user already has an open position in the same direction
+      if (openPositionMap.has(symbol) && openPositionMap.get(symbol) === direction) {
+        rejections.push({ asset: symbol, reason: `Already has open ${direction} position` });
+        continue;
+      }
+
       const strategyFamily = determineBestStrategy(enriched);
       const setups = generateSetups(enriched, direction);
       if (setups.length === 0) continue;
