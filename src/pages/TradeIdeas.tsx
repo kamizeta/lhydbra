@@ -261,12 +261,17 @@ export default function TradeIdeas() {
                   </div>
                 </div>
 
-                <div className="flex gap-4 mt-3 text-xs font-mono">
-                  <span className="text-muted-foreground">{t.common.entry}: <span className="text-foreground">{formatCurrency(signal.entry_price)}</span></span>
-                  <span className="text-muted-foreground">SL: <span className="text-loss">{formatCurrency(signal.stop_loss)}</span></span>
-                  <span className="text-muted-foreground">TP: <span className="text-profit">{formatCurrency(signal.take_profit)}</span></span>
-                  {signal.position_size && <span className="text-muted-foreground">{t.common.size}: <span className="text-foreground">{signal.position_size}</span></span>}
-                  {signal.risk_percent && <span className="text-muted-foreground">{t.common.risk}: <span className="text-warning">{signal.risk_percent}%</span></span>}
+                <div className="flex items-center justify-between mt-3">
+                  <div className="flex gap-4 text-xs font-mono flex-wrap">
+                    <span className="text-muted-foreground">{t.common.entry}: <span className="text-foreground">{formatCurrency(signal.entry_price)}</span></span>
+                    <span className="text-muted-foreground">SL: <span className="text-loss">{formatCurrency(signal.stop_loss)}</span></span>
+                    <span className="text-muted-foreground">TP: <span className="text-profit">{formatCurrency(signal.take_profit)}</span></span>
+                    {signal.position_size && <span className="text-muted-foreground">{t.common.size}: <span className="text-foreground">{signal.position_size}</span></span>}
+                    {signal.risk_percent && <span className="text-muted-foreground">{t.common.risk}: <span className="text-warning">{signal.risk_percent}%</span></span>}
+                  </div>
+                  <span className="text-[10px] font-mono text-muted-foreground shrink-0 ml-2">
+                    {new Date(signal.created_at).toLocaleDateString()} {new Date(signal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
               </div>
               );
