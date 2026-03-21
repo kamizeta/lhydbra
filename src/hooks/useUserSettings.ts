@@ -15,13 +15,22 @@ export interface UserSettings {
   max_correlation: number;
   stop_loss_required: boolean;
   min_rr_ratio: number;
+  // Operator mode fields
+  max_trades_per_day: number;
+  loss_cooldown_count: number;
+  operator_mode: boolean;
+  auto_execute: boolean;
+  consecutive_losses: number;
+  trades_today: number;
+  last_trade_date: string | null;
+  daily_risk_used: number;
 }
 
 const defaultSettings: UserSettings = {
   initial_capital: 10000,
   current_capital: 10000,
-  risk_per_trade: 1.5,
-  max_daily_risk: 5,
+  risk_per_trade: 1,
+  max_daily_risk: 2,
   max_weekly_risk: 10,
   max_drawdown: 15,
   max_positions: 10,
@@ -29,8 +38,42 @@ const defaultSettings: UserSettings = {
   max_single_asset: 25,
   max_correlation: 80,
   stop_loss_required: true,
-  min_rr_ratio: 1.5,
+  min_rr_ratio: 1.8,
+  // Operator mode defaults
+  max_trades_per_day: 3,
+  loss_cooldown_count: 2,
+  operator_mode: false,
+  auto_execute: false,
+  consecutive_losses: 0,
+  trades_today: 0,
+  last_trade_date: null,
+  daily_risk_used: 0,
 };
+
+function parseSettings(data: Record<string, unknown>): UserSettings {
+  return {
+    initial_capital: Number(data.initial_capital),
+    current_capital: Number(data.current_capital),
+    risk_per_trade: Number(data.risk_per_trade),
+    max_daily_risk: Number(data.max_daily_risk),
+    max_weekly_risk: Number(data.max_weekly_risk),
+    max_drawdown: Number(data.max_drawdown),
+    max_positions: Number(data.max_positions),
+    max_leverage: Number(data.max_leverage),
+    max_single_asset: Number(data.max_single_asset),
+    max_correlation: Number(data.max_correlation),
+    stop_loss_required: Boolean(data.stop_loss_required),
+    min_rr_ratio: Number(data.min_rr_ratio),
+    max_trades_per_day: Number(data.max_trades_per_day ?? 3),
+    loss_cooldown_count: Number(data.loss_cooldown_count ?? 2),
+    operator_mode: Boolean(data.operator_mode),
+    auto_execute: Boolean(data.auto_execute),
+    consecutive_losses: Number(data.consecutive_losses ?? 0),
+    trades_today: Number(data.trades_today ?? 0),
+    last_trade_date: data.last_trade_date ? String(data.last_trade_date) : null,
+    daily_risk_used: Number(data.daily_risk_used ?? 0),
+  };
+}
 
 export function useUserSettings() {
   const { user } = useAuth();
@@ -46,20 +89,7 @@ export function useUserSettings() {
       .maybeSingle();
 
     if (data) {
-      setSettings({
-        initial_capital: Number(data.initial_capital),
-        current_capital: Number(data.current_capital),
-        risk_per_trade: Number(data.risk_per_trade),
-        max_daily_risk: Number(data.max_daily_risk),
-        max_weekly_risk: Number(data.max_weekly_risk),
-        max_drawdown: Number(data.max_drawdown),
-        max_positions: Number(data.max_positions),
-        max_leverage: Number(data.max_leverage),
-        max_single_asset: Number(data.max_single_asset),
-        max_correlation: Number(data.max_correlation),
-        stop_loss_required: Boolean(data.stop_loss_required),
-        min_rr_ratio: Number(data.min_rr_ratio),
-      });
+      setSettings(parseSettings(data as unknown as Record<string, unknown>));
     }
     setLoading(false);
   }, [user]);
@@ -68,7 +98,6 @@ export function useUserSettings() {
     loadSettings();
   }, [loadSettings]);
 
-  // Realtime subscription for instant updates
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -83,21 +112,7 @@ export function useUserSettings() {
         },
         (payload) => {
           if (payload.eventType === 'DELETE') return;
-          const data = payload.new as any;
-          setSettings({
-            initial_capital: Number(data.initial_capital),
-            current_capital: Number(data.current_capital),
-            risk_per_trade: Number(data.risk_per_trade),
-            max_daily_risk: Number(data.max_daily_risk),
-            max_weekly_risk: Number(data.max_weekly_risk),
-            max_drawdown: Number(data.max_drawdown),
-            max_positions: Number(data.max_positions),
-            max_leverage: Number(data.max_leverage),
-            max_single_asset: Number(data.max_single_asset),
-            max_correlation: Number(data.max_correlation),
-            stop_loss_required: Boolean(data.stop_loss_required),
-            min_rr_ratio: Number(data.min_rr_ratio),
-          });
+          setSettings(parseSettings(payload.new as unknown as Record<string, unknown>));
         }
       )
       .subscribe();
