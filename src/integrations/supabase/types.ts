@@ -136,6 +136,105 @@ export type Database = {
         }
         Relationships: []
       }
+      allocation_items: {
+        Row: {
+          adjusted_priority: number | null
+          allocated_capital: number | null
+          allocation_priority: number | null
+          asset_type: string
+          confidence_score: number | null
+          correlation_penalty: number | null
+          created_at: string
+          direction: string
+          expected_r_multiple: number | null
+          explanation: Json | null
+          final_weight: number | null
+          id: string
+          opportunity_score: number | null
+          plan_id: string
+          position_size: number | null
+          priority_rank: number | null
+          rejection_reason: string | null
+          risk_percent: number | null
+          risk_used: number | null
+          score_multiplier: number | null
+          signal_id: string | null
+          status: string
+          strategy_family: string | null
+          symbol: string
+          user_id: string
+        }
+        Insert: {
+          adjusted_priority?: number | null
+          allocated_capital?: number | null
+          allocation_priority?: number | null
+          asset_type?: string
+          confidence_score?: number | null
+          correlation_penalty?: number | null
+          created_at?: string
+          direction?: string
+          expected_r_multiple?: number | null
+          explanation?: Json | null
+          final_weight?: number | null
+          id?: string
+          opportunity_score?: number | null
+          plan_id: string
+          position_size?: number | null
+          priority_rank?: number | null
+          rejection_reason?: string | null
+          risk_percent?: number | null
+          risk_used?: number | null
+          score_multiplier?: number | null
+          signal_id?: string | null
+          status?: string
+          strategy_family?: string | null
+          symbol: string
+          user_id: string
+        }
+        Update: {
+          adjusted_priority?: number | null
+          allocated_capital?: number | null
+          allocation_priority?: number | null
+          asset_type?: string
+          confidence_score?: number | null
+          correlation_penalty?: number | null
+          created_at?: string
+          direction?: string
+          expected_r_multiple?: number | null
+          explanation?: Json | null
+          final_weight?: number | null
+          id?: string
+          opportunity_score?: number | null
+          plan_id?: string
+          position_size?: number | null
+          priority_rank?: number | null
+          rejection_reason?: string | null
+          risk_percent?: number | null
+          risk_used?: number | null
+          score_multiplier?: number | null
+          signal_id?: string | null
+          status?: string
+          strategy_family?: string | null
+          symbol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "allocation_items_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "allocation_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "allocation_items_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "trade_signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       allocation_plans: {
         Row: {
           allocated_capital: number
@@ -300,6 +399,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      correlation_matrix: {
+        Row: {
+          asset_class_a: string
+          asset_class_b: string
+          computed_at: string
+          correlation: number
+          id: string
+          symbol_a: string
+          symbol_b: string
+        }
+        Insert: {
+          asset_class_a?: string
+          asset_class_b?: string
+          computed_at?: string
+          correlation?: number
+          id?: string
+          symbol_a: string
+          symbol_b: string
+        }
+        Update: {
+          asset_class_a?: string
+          asset_class_b?: string
+          computed_at?: string
+          correlation?: number
+          id?: string
+          symbol_a?: string
+          symbol_b?: string
+        }
+        Relationships: []
       }
       market_cache: {
         Row: {
