@@ -1,4 +1,5 @@
 import { MessageSquare, AlertTriangle, Lightbulb, Award } from 'lucide-react';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -20,6 +21,8 @@ const gradeColors: Record<string, string> = {
 };
 
 export default function CoachingPanel({ grade, message, mistakes, suggestions, loading, className }: Props) {
+  const { t } = useI18n();
+
   if (loading) {
     return (
       <div className={cn("terminal-border rounded-lg p-4 animate-pulse", className)}>
@@ -36,7 +39,7 @@ export default function CoachingPanel({ grade, message, mistakes, suggestions, l
     <div className={cn("terminal-border rounded-lg p-4 space-y-3", className)}>
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-bold text-foreground flex items-center gap-2">
-          <MessageSquare className="h-3.5 w-3.5 text-primary" /> AI Coach
+          <MessageSquare className="h-3.5 w-3.5 text-primary" /> {t.coaching.aiCoach}
         </h2>
         {grade && (
           <span className={cn(
@@ -54,7 +57,7 @@ export default function CoachingPanel({ grade, message, mistakes, suggestions, l
       {mistakes && mistakes.length > 0 && (
         <div className="space-y-1">
           <span className="text-[10px] font-mono text-loss uppercase flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" /> Issues Detected
+            <AlertTriangle className="h-3 w-3" /> {t.coaching.issuesDetected}
           </span>
           {mistakes.map((m, i) => (
             <div key={i} className="text-[10px] font-mono text-loss/80 pl-4">• {m}</div>
@@ -65,7 +68,7 @@ export default function CoachingPanel({ grade, message, mistakes, suggestions, l
       {suggestions && suggestions.length > 0 && (
         <div className="space-y-1">
           <span className="text-[10px] font-mono text-primary uppercase flex items-center gap-1">
-            <Lightbulb className="h-3 w-3" /> Suggestions
+            <Lightbulb className="h-3 w-3" /> {t.coaching.suggestions}
           </span>
           {suggestions.map((s, i) => (
             <div key={i} className="text-[10px] font-mono text-muted-foreground pl-4">• {s}</div>

@@ -32,18 +32,17 @@ export default function AppLayout() {
       });
   }, [user]);
 
-  // Simplified nav: focused on operator workflow
   const navItems = [
-    { to: "/", icon: LayoutDashboard, label: "Operator" },
+    { to: "/", icon: LayoutDashboard, label: t.nav.operator },
     { to: "/market", icon: BarChart3, label: t.nav.market },
-    { to: "/trade-ideas", icon: Activity, label: "Trade Ideas" },
-    { to: "/signals", icon: Zap, label: "Signals" },
-    { to: "/portfolio", icon: Briefcase, label: "Portfolio" },
-    { to: "/allocation", icon: PieChart, label: "Allocation" },
-    { to: "/agents", icon: Bot, label: "Agents" },
-    { to: "/strategy-lab", icon: FlaskConical, label: "Strategy Lab" },
-    { to: "/learning", icon: Brain, label: "Learning" },
-    { to: "/settings", icon: Settings, label: "Settings" },
+    { to: "/trade-ideas", icon: Activity, label: t.nav.tradeIdeas },
+    { to: "/signals", icon: Zap, label: t.nav.signals },
+    { to: "/portfolio", icon: Briefcase, label: t.nav.portfolio },
+    { to: "/allocation", icon: PieChart, label: t.nav.allocation },
+    { to: "/agents", icon: Bot, label: t.nav.agents },
+    { to: "/strategy-lab", icon: FlaskConical, label: t.nav.strategyLab },
+    { to: "/learning", icon: Brain, label: t.nav.learning },
+    { to: "/settings", icon: Settings, label: t.nav.settings },
   ];
 
   return (
@@ -118,7 +117,7 @@ export default function AppLayout() {
             <LanguageSelector collapsed={false} variant="header" />
             <button onClick={signOut} className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-loss border border-border rounded-md hover:bg-accent transition-colors">
               <LogOut className="h-3.5 w-3.5" />
-              <span className="font-mono hidden sm:inline">Logout</span>
+              <span className="font-mono hidden sm:inline">{t.common.logout}</span>
             </button>
           </div>
         </header>

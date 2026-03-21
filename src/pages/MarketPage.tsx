@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BarChart3, Radar, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n";
 import MarketExplorer from "@/pages/MarketExplorer";
 import OpportunityRadar from "@/pages/OpportunityRadar";
 import ApiUsagePage from "@/pages/ApiUsagePage";
@@ -9,11 +10,12 @@ type TabId = 'explorer' | 'radar' | 'api-usage';
 
 export default function MarketPage() {
   const [activeTab, setActiveTab] = useState<TabId>('explorer');
+  const { t } = useI18n();
 
   const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
-    { id: 'explorer', label: 'Explorer', icon: BarChart3 },
-    { id: 'radar', label: 'Radar', icon: Radar },
-    { id: 'api-usage', label: 'API Usage', icon: Activity },
+    { id: 'explorer', label: t.market.explorer, icon: BarChart3 },
+    { id: 'radar', label: t.market.radar, icon: Radar },
+    { id: 'api-usage', label: t.market.apiUsage, icon: Activity },
   ];
 
   return (
