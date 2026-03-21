@@ -36,10 +36,11 @@ export default function AppLayout() {
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Operator" },
     { to: "/market", icon: BarChart3, label: t.nav.market },
-    { to: "/portfolio", icon: Briefcase, label: "Portfolio" },
+    { to: "/trade-ideas", icon: Activity, label: "Trade Ideas" },
     { to: "/signals", icon: Zap, label: "Signals" },
-    { to: "/agents", icon: Bot, label: "Agents" },
+    { to: "/portfolio", icon: Briefcase, label: "Portfolio" },
     { to: "/allocation", icon: PieChart, label: "Allocation" },
+    { to: "/agents", icon: Bot, label: "Agents" },
     { to: "/strategy-lab", icon: FlaskConical, label: "Strategy Lab" },
     { to: "/learning", icon: Brain, label: "Learning" },
     { to: "/settings", icon: Settings, label: "Settings" },
