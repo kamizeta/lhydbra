@@ -14,6 +14,7 @@ import CoachingPanel from "@/components/operator/CoachingPanel";
 import DailyRoutine from "@/components/operator/DailyRoutine";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAuth } from "@/hooks/useAuth";
+import { useI18n } from "@/i18n";
 import { useOperatorMode } from "@/hooks/useOperatorMode";
 import { useGoalProfile } from "@/hooks/useGoalProfile";
 import { usePerformanceCoach } from "@/hooks/usePerformanceCoach";
@@ -38,6 +39,7 @@ interface Position {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const { settings } = useUserSettings();
   const { goal, exists: goalExists, loading: goalLoading } = useGoalProfile();
   const { result: coachResult, loading: coachLoading, getPreMarket, getDailyReview } = usePerformanceCoach();
@@ -79,7 +81,6 @@ export default function Dashboard() {
     fetchStatus();
   }, [user, fetchStatus]);
 
-  // Realtime positions
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -122,27 +123,25 @@ export default function Dashboard() {
   const handleRunOperator = async () => {
     await runOperator(true);
     if (opError) toast.error(opError);
-    else toast.success("Operator cycle complete");
+    else toast.success(t.operator.operatorCycleComplete);
   };
 
   const cooldownActive = operatorStatus?.cooldown_active || false;
   const dailyCapReached = (operatorStatus?.trades_today || 0) >= (operatorStatus?.max_trades_per_day || 3);
 
-  // Determine market phase
   const hour = new Date().getHours();
   const phase: 'pre_market' | 'market_open' | 'post_market' =
     hour < 9 ? 'pre_market' : hour < 16 ? 'market_open' : 'post_market';
 
   const tradingDaysPassed = Math.floor(new Date().getDate() * 22 / 30);
 
-  // Show goal setup if no goal exists
   if (!goalLoading && !goalExists && !showGoalSetup) {
     return (
       <div className="p-3 md:p-6 space-y-4 animate-slide-in max-w-2xl mx-auto">
         <div className="text-center space-y-2 mb-6">
           <Target className="h-10 w-10 text-primary mx-auto" />
-          <h1 className="text-xl font-bold text-foreground">Welcome to LHYDBRA Operator</h1>
-          <p className="text-sm text-muted-foreground">Set your trading goal to get started. The system will create a personalized plan.</p>
+          <h1 className="text-xl font-bold text-foreground">{t.operator.welcomeTitle}</h1>
+          <p className="text-sm text-muted-foreground">{t.operator.welcomeDesc}</p>
         </div>
         <GoalSetup onComplete={() => setShowGoalSetup(false)} />
       </div>
@@ -154,22 +153,22 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg md:text-2xl font-bold text-foreground">Operator Dashboard</h1>
+          <h1 className="text-lg md:text-2xl font-bold text-foreground">{t.operator.title}</h1>
           <p className="text-[10px] md:text-xs text-muted-foreground font-mono">
-            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
             <span className="text-primary ml-2">● {goal.automation_level.toUpperCase()}</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {cooldownActive && <StatusBadge variant="loss" dot>COOLDOWN</StatusBadge>}
-          {dailyCapReached && <StatusBadge variant="warning" dot>CAP</StatusBadge>}
+          {cooldownActive && <StatusBadge variant="loss" dot>{t.operator.cooldown}</StatusBadge>}
+          {dailyCapReached && <StatusBadge variant="warning" dot>{t.operator.cap}</StatusBadge>}
           <button
             onClick={() => phase === 'post_market' ? getDailyReview() : getPreMarket()}
             disabled={coachLoading}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-mono border border-border hover:bg-accent/50 transition-colors text-muted-foreground"
           >
             {coachLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : phase === 'post_market' ? <Moon className="h-3 w-3" /> : <Sun className="h-3 w-3" />}
-            {phase === 'post_market' ? 'Review' : 'Briefing'}
+            {phase === 'post_market' ? t.operator.review : t.operator.briefing}
           </button>
           <button
             onClick={handleRunOperator}
@@ -182,7 +181,7 @@ export default function Dashboard() {
             )}
           >
             {opLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-            Run
+            {t.operator.run}
           </button>
         </div>
       </div>
@@ -200,36 +199,35 @@ export default function Dashboard() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
-        <MetricCard label="Portfolio" value={formatCurrency(portfolioValue)}
+        <MetricCard label={t.nav.portfolio} value={formatCurrency(portfolioValue)}
           change={`${(closedPnl + unrealizedPnl) >= 0 ? '+' : ''}${formatCurrency(closedPnl + unrealizedPnl)}`}
           changeType={(closedPnl + unrealizedPnl) >= 0 ? "positive" : "negative"} icon={DollarSign} />
-        <MetricCard label="Today" value={operatorStatus ? `${operatorStatus.today_pnl >= 0 ? '+' : ''}${formatCurrency(operatorStatus.today_pnl)}` : '—'}
-          change={`${operatorStatus?.trades_today || 0}/${operatorStatus?.max_trades_per_day || 3} trades`}
+        <MetricCard label={t.dashboard.today} value={operatorStatus ? `${operatorStatus.today_pnl >= 0 ? '+' : ''}${formatCurrency(operatorStatus.today_pnl)}` : '—'}
+          change={`${operatorStatus?.trades_today || 0}/${operatorStatus?.max_trades_per_day || 3} ${t.common.trades}`}
           changeType={(operatorStatus?.today_pnl || 0) >= 0 ? "positive" : "negative"} icon={Activity} />
-        <MetricCard label="Week" value={`${weeklyPnl >= 0 ? '+' : ''}${formatCurrency(weeklyPnl)}`}
+        <MetricCard label={t.operator.week} value={`${weeklyPnl >= 0 ? '+' : ''}${formatCurrency(weeklyPnl)}`}
           changeType={weeklyPnl >= 0 ? "positive" : "negative"} icon={TrendingUp} />
-        <MetricCard label="Month" value={`${monthlyPnl >= 0 ? '+' : ''}${formatCurrency(monthlyPnl)}`}
+        <MetricCard label={t.operator.month} value={`${monthlyPnl >= 0 ? '+' : ''}${formatCurrency(monthlyPnl)}`}
           change={goalExists ? `/ $${goal.monthly_target.toLocaleString()}` : undefined}
           changeType={monthlyPnl >= 0 ? "positive" : "negative"} icon={TrendingUp} />
-        <MetricCard label="Win Rate" value={journalStats.total > 0 ? `${winRate.toFixed(0)}%` : '—'}
-          change={`${journalStats.total} trades`} changeType={winRate >= 50 ? "positive" : "negative"} icon={Target} />
-        <MetricCard label="Risk" value={`${exposurePct.toFixed(0)}%`}
+        <MetricCard label={t.operator.winRate} value={journalStats.total > 0 ? `${winRate.toFixed(0)}%` : '—'}
+          change={`${journalStats.total} ${t.common.trades}`} changeType={winRate >= 50 ? "positive" : "negative"} icon={Target} />
+        <MetricCard label={t.common.risk} value={`${exposurePct.toFixed(0)}%`}
           change={`DD ${drawdownPct.toFixed(1)}%`}
           changeType={drawdownPct > settings.max_drawdown * 0.8 ? "negative" : "positive"} icon={Shield} />
       </div>
 
       {/* Risk Gauges */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <ProgressBar value={operatorStatus?.daily_risk_used || 0} max={settings.max_daily_risk} label="Daily Risk" />
-        <ProgressBar value={positions.length} max={settings.max_positions} label="Positions" />
-        <ProgressBar value={drawdownPct} max={settings.max_drawdown} label="Drawdown" />
-        <ProgressBar value={operatorStatus?.consecutive_losses || 0} max={settings.loss_cooldown_count} label="Loss Streak" />
+        <ProgressBar value={operatorStatus?.daily_risk_used || 0} max={settings.max_daily_risk} label={t.riskMgmt.dailyRisk} />
+        <ProgressBar value={positions.length} max={settings.max_positions} label={t.riskMgmt.positions} />
+        <ProgressBar value={drawdownPct} max={settings.max_drawdown} label={t.riskMgmt.drawdown} />
+        <ProgressBar value={operatorStatus?.consecutive_losses || 0} max={settings.loss_cooldown_count} label={t.riskMgmt.lossStreak} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left: Active Trades */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Goal Progress */}
           {goalExists && (
             <GoalProgress
               monthlyTarget={goal.monthly_target}
@@ -244,24 +242,24 @@ export default function Dashboard() {
           <div className="terminal-border rounded-lg">
             <div className="flex items-center justify-between border-b border-border p-3">
               <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
-                <Briefcase className="h-3.5 w-3.5 text-primary" /> Active Trades
+                <Briefcase className="h-3.5 w-3.5 text-primary" /> {t.operator.activeTrades}
               </h2>
-              <button onClick={() => navigate('/portfolio')} className="text-[10px] font-mono text-primary hover:underline">View All →</button>
+              <button onClick={() => navigate('/portfolio')} className="text-[10px] font-mono text-primary hover:underline">{t.common.viewAll} →</button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border text-[10px] text-muted-foreground uppercase tracking-wider">
-                    <th className="text-left p-2.5">Symbol</th>
-                    <th className="text-center p-2.5">Dir</th>
-                    <th className="text-right p-2.5">Entry</th>
-                    <th className="text-right p-2.5">SL</th>
+                    <th className="text-left p-2.5">{t.operator.symbol}</th>
+                    <th className="text-center p-2.5">{t.operator.dir}</th>
+                    <th className="text-right p-2.5">{t.common.entry}</th>
+                    <th className="text-right p-2.5">{t.operator.sl}</th>
                     <th className="text-right p-2.5">PnL</th>
                   </tr>
                 </thead>
                 <tbody>
                   {positions.length === 0 ? (
-                    <tr><td colSpan={5} className="p-6 text-center text-muted-foreground font-mono">No active trades</td></tr>
+                    <tr><td colSpan={5} className="p-6 text-center text-muted-foreground font-mono">{t.operator.noActiveTrades}</td></tr>
                   ) : positions.slice(0, 8).map(pos => {
                     const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
                     const livePnl = currentPrice
@@ -290,7 +288,7 @@ export default function Dashboard() {
           {runResult && (
             <div className="terminal-border rounded-lg p-3">
               <h2 className="text-xs font-bold text-foreground flex items-center gap-2 mb-3">
-                <Zap className="h-3.5 w-3.5 text-primary" /> Last Run
+                <Zap className="h-3.5 w-3.5 text-primary" /> {t.operator.lastRun}
                 <StatusBadge variant={runResult.status === 'executed' ? 'profit' : runResult.status === 'blocked' ? 'loss' : 'info'}>
                   {runResult.status.toUpperCase()}
                 </StatusBadge>
@@ -302,23 +300,23 @@ export default function Dashboard() {
               )}
               {runResult.trades && runResult.trades.length > 0 ? (
                 <div className="space-y-2">
-                  {runResult.trades.map((t, i) => (
+                  {runResult.trades.map((trd, i) => (
                     <div key={i} className="bg-accent/30 rounded-md p-2 space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-xs text-foreground">{t.symbol}</span>
-                        <StatusBadge variant={t.direction === 'long' ? 'profit' : 'loss'}>{t.direction.toUpperCase()}</StatusBadge>
+                        <span className="font-mono font-bold text-xs text-foreground">{trd.symbol}</span>
+                        <StatusBadge variant={trd.direction === 'long' ? 'profit' : 'loss'}>{trd.direction === 'long' ? t.common.long : t.common.short}</StatusBadge>
                       </div>
                       <div className="grid grid-cols-3 gap-1 text-[10px] font-mono text-muted-foreground">
-                        <span>Score: <strong className="text-foreground">{t.score}</strong></span>
-                        <span>R: <strong className="text-foreground">{t.expected_r}</strong></span>
-                        <span>Risk: <strong className="text-foreground">{t.risk_pct}%</strong></span>
+                        <span>{t.common.score}: <strong className="text-foreground">{trd.score}</strong></span>
+                        <span>R: <strong className="text-foreground">{trd.expected_r}</strong></span>
+                        <span>{t.common.risk}: <strong className="text-foreground">{trd.risk_pct}%</strong></span>
                       </div>
                       {runResult.execution && runResult.execution[i] && (
                         <div className="flex items-center gap-1 text-[10px] font-mono">
                           {runResult.execution[i].success ? (
-                            <><CheckCircle className="h-3 w-3 text-profit" /><span className="text-profit">Executed</span></>
+                            <><CheckCircle className="h-3 w-3 text-profit" /><span className="text-profit">{t.operator.executed}</span></>
                           ) : (
-                            <><XCircle className="h-3 w-3 text-loss" /><span className="text-loss">{runResult.execution[i].error || 'Failed'}</span></>
+                            <><XCircle className="h-3 w-3 text-loss" /><span className="text-loss">{runResult.execution[i].error || t.operator.failed}</span></>
                           )}
                         </div>
                       )}
@@ -326,7 +324,7 @@ export default function Dashboard() {
                   ))}
                 </div>
               ) : runResult.status === 'no_opportunities' ? (
-                <p className="text-[10px] font-mono text-muted-foreground">{runResult.message || 'No quality signals found'}</p>
+                <p className="text-[10px] font-mono text-muted-foreground">{runResult.message || t.operator.noQualitySignals}</p>
               ) : null}
             </div>
           )}
@@ -334,7 +332,6 @@ export default function Dashboard() {
 
         {/* Right sidebar */}
         <div className="space-y-4">
-          {/* Daily Routine */}
           <DailyRoutine
             phase={phase}
             tradesToday={operatorStatus?.trades_today || 0}
@@ -344,7 +341,6 @@ export default function Dashboard() {
             cooldownActive={cooldownActive}
           />
 
-          {/* AI Coach */}
           <CoachingPanel
             grade={coachResult?.grade}
             message={coachResult?.message}
@@ -356,15 +352,15 @@ export default function Dashboard() {
           {/* Performance Summary */}
           <div className="terminal-border rounded-lg p-3">
             <h2 className="text-xs font-bold text-foreground flex items-center gap-2 mb-3">
-              <Target className="h-3.5 w-3.5 text-primary" /> Performance
+              <Target className="h-3.5 w-3.5 text-primary" /> {t.operator.performance}
             </h2>
             <div className="space-y-2 text-xs">
               {[
-                { label: 'Total PnL', value: `${closedPnl >= 0 ? '+' : ''}${formatCurrency(closedPnl)}`, ok: closedPnl >= 0 },
-                { label: 'Open PnL', value: `${unrealizedPnl >= 0 ? '+' : ''}${formatCurrency(unrealizedPnl)}`, ok: unrealizedPnl >= 0 },
-                { label: 'Win Rate', value: journalStats.total > 0 ? `${winRate.toFixed(0)}%` : '—', ok: winRate >= 50 },
-                { label: 'Avg R', value: journalStats.avgR !== 0 ? `${journalStats.avgR >= 0 ? '+' : ''}${journalStats.avgR.toFixed(2)}R` : '—', ok: journalStats.avgR >= 0 },
-                { label: 'Drawdown', value: `${drawdownPct.toFixed(1)}%`, ok: drawdownPct < settings.max_drawdown * 0.8 },
+                { label: t.operator.totalPnl, value: `${closedPnl >= 0 ? '+' : ''}${formatCurrency(closedPnl)}`, ok: closedPnl >= 0 },
+                { label: t.operator.openPnl, value: `${unrealizedPnl >= 0 ? '+' : ''}${formatCurrency(unrealizedPnl)}`, ok: unrealizedPnl >= 0 },
+                { label: t.operator.winRate, value: journalStats.total > 0 ? `${winRate.toFixed(0)}%` : '—', ok: winRate >= 50 },
+                { label: t.operator.avgR, value: journalStats.avgR !== 0 ? `${journalStats.avgR >= 0 ? '+' : ''}${journalStats.avgR.toFixed(2)}R` : '—', ok: journalStats.avgR >= 0 },
+                { label: t.riskMgmt.drawdown, value: `${drawdownPct.toFixed(1)}%`, ok: drawdownPct < settings.max_drawdown * 0.8 },
               ].map((item, i) => (
                 <div key={i} className="flex items-center justify-between">
                   <span className="text-muted-foreground">{item.label}</span>
@@ -379,22 +375,21 @@ export default function Dashboard() {
             onClick={() => setShowGoalSetup(!showGoalSetup)}
             className="w-full text-[10px] font-mono text-center py-2 rounded-md border border-border hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground"
           >
-            {showGoalSetup ? 'Hide Goal Setup' : goalExists ? 'Edit Goal →' : 'Set Goal →'}
+            {showGoalSetup ? t.operator.hideGoalSetup : goalExists ? t.operator.editGoal : t.operator.setGoal}
           </button>
 
           {/* Quick Links */}
           <div className="grid grid-cols-2 gap-2">
             <button onClick={() => navigate('/portfolio')} className="text-[10px] font-mono text-center py-2 rounded-md border border-border hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground">
-              Portfolio →
+              {t.nav.portfolio} →
             </button>
             <button onClick={() => navigate('/signals')} className="text-[10px] font-mono text-center py-2 rounded-md border border-border hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground">
-              Signals →
+              {t.nav.signals} →
             </button>
           </div>
         </div>
       </div>
 
-      {/* Goal Setup Overlay */}
       {showGoalSetup && (
         <div className="max-w-2xl mx-auto">
           <GoalSetup onComplete={() => setShowGoalSetup(false)} />
