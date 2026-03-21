@@ -125,24 +125,30 @@ export default function SignalCenter() {
           </h1>
           <p className="text-sm text-muted-foreground font-mono">Quantitative signal generation • Adaptive scoring • Explainable AI</p>
         </div>
-        <button
-          onClick={handleGenerate}
-          disabled={generateMutation.isPending}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm font-medium transition-all",
-            "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          )}
-        >
-          {generateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-          Generate Signals
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard label="Active Signals" value={`${activeCount}`} icon={Zap} />
-        <MetricCard label="Avg Score" value={`${formatNumber(avgScore)}`} icon={BarChart3} changeType={avgScore >= 65 ? "positive" : "negative"} />
-        <MetricCard label="Avg Confidence" value={`${formatNumber(avgConfidence)}%`} icon={Target} changeType={avgConfidence >= 60 ? "positive" : "negative"} />
-        <MetricCard label="Avg Expected R" value={`${avgR.toFixed(2)}:1`} icon={Shield} changeType={avgR >= 2 ? "positive" : "negative"} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSendAllToTradeIdeas}
+            disabled={sending || signals.filter((s: Signal) => s.status === "active").length === 0}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm font-medium transition-all border",
+              "border-primary/30 text-primary hover:bg-primary/10 disabled:opacity-50"
+            )}
+          >
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Send All to Trade Ideas
+          </button>
+          <button
+            onClick={handleGenerate}
+            disabled={generateMutation.isPending}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm font-medium transition-all",
+              "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            )}
+          >
+            {generateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            Generate Signals
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
