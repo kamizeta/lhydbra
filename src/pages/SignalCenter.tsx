@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Zap, Target, BarChart3, Shield, Loader2, CheckCircle, XCircle, Clock, Play, TrendingUp, TrendingDown } from "lucide-react";
+import { Zap, Target, BarChart3, Shield, Loader2, CheckCircle, XCircle, Clock, Play, TrendingUp, TrendingDown, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
