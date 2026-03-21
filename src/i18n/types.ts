@@ -37,6 +37,17 @@ export interface Translations {
     returnToHome: string;
     pageNotFound: string;
     oopsNotFound: string;
+    loading: string;
+    save: string;
+    saving: string;
+    close: string;
+    viewAll: string;
+    noData: string;
+    long: string;
+    short: string;
+    score: string;
+    direction: string;
+    logout: string;
   };
   // Nav
   nav: {
@@ -47,8 +58,15 @@ export interface Translations {
     agents: string;
     tradeIdeas: string;
     journal: string;
+    operator: string;
+    signals: string;
+    portfolio: string;
+    allocation: string;
+    strategyLab: string;
+    learning: string;
+    settings: string;
   };
-  // Dashboard
+  // Dashboard / Operator
   dashboard: {
     title: string;
     subtitle: string;
@@ -73,6 +91,95 @@ export interface Translations {
     alloc: string;
     pnl: string;
   };
+  // Operator Mode
+  operator: {
+    title: string;
+    welcomeTitle: string;
+    welcomeDesc: string;
+    run: string;
+    cooldown: string;
+    cap: string;
+    review: string;
+    briefing: string;
+    operatorCycleComplete: string;
+    activeTrades: string;
+    noActiveTrades: string;
+    lastRun: string;
+    noQualitySignals: string;
+    executed: string;
+    failed: string;
+    performance: string;
+    totalPnl: string;
+    openPnl: string;
+    winRate: string;
+    avgR: string;
+    hideGoalSetup: string;
+    editGoal: string;
+    setGoal: string;
+    week: string;
+    month: string;
+    symbol: string;
+    dir: string;
+    sl: string;
+  };
+  // Goal
+  goal: {
+    setTitle: string;
+    updateTitle: string;
+    monthlyTarget: string;
+    availableCapital: string;
+    riskTolerance: string;
+    conservative: string;
+    conservativeDesc: string;
+    moderate: string;
+    moderateDesc: string;
+    aggressive: string;
+    aggressiveDesc: string;
+    automationLevel: string;
+    guided: string;
+    guidedDesc: string;
+    assisted: string;
+    assistedDesc: string;
+    fullAuto: string;
+    fullAutoDesc: string;
+    tradingPlan: string;
+    dailyTarget: string;
+    riskPerTrade: string;
+    requiredRDay: string;
+    tradesPerDay: string;
+    unrealisticWarning: string;
+    updateGoal: string;
+    setGoalStart: string;
+    goalSaved: string;
+    monthlyGoal: string;
+    ahead: string;
+    onTrack: string;
+    behind: string;
+    earned: string;
+    target: string;
+    complete: string;
+    remaining: string;
+    todayLabel: string;
+    targetLabel: string;
+    reqDaily: string;
+    daysLeft: string;
+  };
+  // Coaching
+  coaching: {
+    aiCoach: string;
+    issuesDetected: string;
+    suggestions: string;
+  };
+  // Daily Routine
+  routine: {
+    title: string;
+    cooldownActive: string;
+    preMarket: string;
+    preMarketDesc: string;
+    marketOpen: string;
+    postMarket: string;
+    postMarketDesc: string;
+  };
   // Market Explorer
   market: {
     title: string;
@@ -81,6 +188,9 @@ export interface Translations {
     trend: string;
     momentum: string;
     volatility: string;
+    explorer: string;
+    radar: string;
+    apiUsage: string;
   };
   // Strategies
   strategies: {
@@ -140,6 +250,8 @@ export interface Translations {
     stopLossRequired: string;
     minRRRatio: string;
     required: string;
+    positions: string;
+    lossStreak: string;
   };
   // Agents
   agents: {
@@ -199,5 +311,13 @@ export interface Translations {
     agents: string;
     noHistory: string;
     noHistoryDesc: string;
+  };
+  // Signal Detail
+  signalDetail: {
+    originalTradeIdea: string;
+    signalNotFound: string;
+    reasoning: string;
+    agentAnalysis: string;
+    created: string;
   };
 }
