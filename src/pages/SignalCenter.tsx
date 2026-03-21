@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Zap, Target, BarChart3, Shield, Loader2, CheckCircle, XCircle, Clock, Play, TrendingUp, TrendingDown } from "lucide-react";
+import { Zap, Target, BarChart3, Shield, Loader2, CheckCircle, XCircle, Clock, Play, TrendingUp, TrendingDown, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -52,6 +52,68 @@ export default function SignalCenter() {
     }
   };
 
+  const [sending, setSending] = useState(false);
+
+  const handleSendAllToTradeIdeas = async () => {
+    if (!user) return;
+    const activeSignals = signals.filter((s: Signal) => s.status === "active");
+    if (activeSignals.length === 0) {
+      toast.warning("No hay señales activas para enviar");
+      return;
+    }
+
+    setSending(true);
+    let sent = 0;
+    let skipped = 0;
+
+    for (const sig of activeSignals) {
+      // Check if already exists in trade_signals
+      const { data: existing } = await supabase
+        .from("trade_signals")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("symbol", sig.asset)
+        .eq("direction", sig.direction)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (existing) {
+        skipped++;
+        continue;
+      }
+
+      const targets = Array.isArray(sig.targets) ? sig.targets : [];
+      const tp = targets.length > 0 ? targets[targets.length - 1] : sig.entry_price * (sig.direction === "long" ? 1.05 : 0.95);
+
+      const { error } = await supabase.from("trade_signals").insert({
+        user_id: user.id,
+        symbol: sig.asset,
+        name: `${sig.asset} ${sig.direction.toUpperCase()} — ${sig.strategy_family}`,
+        asset_type: sig.asset_class,
+        direction: sig.direction,
+        entry_price: sig.entry_price,
+        stop_loss: sig.stop_loss,
+        take_profit: tp,
+        risk_reward: sig.expected_r_multiple,
+        confidence: Math.round(sig.confidence_score),
+        strategy: sig.strategy_family || "signal-engine",
+        strategy_family: sig.strategy_family,
+        market_regime: sig.market_regime,
+        opportunity_score: sig.opportunity_score,
+        score_breakdown: sig.score_breakdown || {},
+        reasoning: sig.reasoning || sig.explanation?.summary || null,
+        status: "pending",
+      });
+
+      if (!error) sent++;
+    }
+
+    setSending(false);
+    if (sent > 0) toast.success(`${sent} señales enviadas a Trade Ideas${skipped > 0 ? ` (${skipped} duplicadas omitidas)` : ""}`);
+    else if (skipped > 0) toast.info(`${skipped} señales ya existen en Trade Ideas`);
+    else toast.error("No se pudieron enviar las señales");
+  };
+
   if (loading) return <div className="p-6 flex items-center justify-center min-h-[400px]"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
   return (
@@ -63,17 +125,30 @@ export default function SignalCenter() {
           </h1>
           <p className="text-sm text-muted-foreground font-mono">Quantitative signal generation • Adaptive scoring • Explainable AI</p>
         </div>
-        <button
-          onClick={handleGenerate}
-          disabled={generateMutation.isPending}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm font-medium transition-all",
-            "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          )}
-        >
-          {generateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-          Generate Signals
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSendAllToTradeIdeas}
+            disabled={sending || signals.filter((s: Signal) => s.status === "active").length === 0}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm font-medium transition-all border",
+              "border-primary/30 text-primary hover:bg-primary/10 disabled:opacity-50"
+            )}
+          >
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Send All to Trade Ideas
+          </button>
+          <button
+            onClick={handleGenerate}
+            disabled={generateMutation.isPending}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm font-medium transition-all",
+              "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            )}
+          >
+            {generateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            Generate Signals
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
