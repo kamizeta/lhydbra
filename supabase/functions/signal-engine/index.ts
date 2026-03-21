@@ -15,13 +15,15 @@ const REGIME_WEIGHTS: Record<string, Record<string, number>> = {
   default:        { market_structure: 0.20, momentum: 0.12, volatility_suitability: 0.10, strategy_confluence: 0.18, macro_context: 0.08, sentiment_flow: 0.10, risk_reward: 0.12, historical_performance: 0.10 },
 };
 
-// ─── Asset Class Weight Adjustments ───
 const ASSET_CLASS_ADJUSTMENTS: Record<string, Record<string, number>> = {
   crypto:     { sentiment_flow: 0.04, volatility_suitability: 0.03, macro_context: -0.04, market_structure: -0.03 },
   stock:      { macro_context: 0.04, market_structure: 0.03, sentiment_flow: -0.04, volatility_suitability: -0.03 },
   commodity:  { macro_context: 0.04, momentum: 0.03, sentiment_flow: -0.04, strategy_confluence: -0.03 },
   forex:      { macro_context: 0.03, volatility_suitability: 0.02, historical_performance: -0.03, sentiment_flow: -0.02 },
 };
+
+// ─── OPERATOR MODE: Regimes where trading is blocked ───
+const UNCLEAR_REGIMES = new Set(['undefined', 'transitional']);
 
 function clamp(val: number, min: number, max: number) { return Math.max(min, Math.min(max, val)); }
 
@@ -31,7 +33,6 @@ function getWeightsForContext(regime: string, assetClass: string): Record<string
   for (const [k, v] of Object.entries(adj)) {
     base[k] = (base[k] || 0) + v;
   }
-  // Normalize to sum=1
   const total = Object.values(base).reduce((s, v) => s + v, 0);
   for (const k of Object.keys(base)) base[k] /= total;
   return base;
@@ -235,7 +236,16 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { symbols, user_id, min_score = 60, min_r = 1.5 } = await req.json();
+    const { 
+      symbols, 
+      user_id, 
+      // OPERATOR MODE: Stricter defaults
+      min_score = 70, 
+      min_r = 1.8, 
+      min_confidence = 60,
+      max_signals = 3,
+      operator_mode = false,
+    } = await req.json();
     if (!user_id) throw new Error("user_id required");
 
     const supabase = createClient(
@@ -245,7 +255,7 @@ Deno.serve(async (req) => {
 
     const targetSymbols = symbols && symbols.length > 0 ? symbols : [];
 
-    // Fetch open positions to avoid duplicating signals for assets already held
+    // Fetch open positions to avoid duplicating signals
     const { data: openPositions } = await supabase
       .from("positions")
       .select("symbol, direction")
@@ -256,6 +266,47 @@ Deno.serve(async (req) => {
       openPositionMap.set(pos.symbol, pos.direction);
     }
 
+    // OPERATOR MODE: Check daily trade cap and cooldown
+    let tradesToday = 0;
+    let consecutiveLosses = 0;
+    let maxTradesPerDay = 3;
+    let lossCooldownCount = 2;
+    
+    if (operator_mode) {
+      const { data: userSettings } = await supabase
+        .from("user_settings")
+        .select("max_trades_per_day, loss_cooldown_count, consecutive_losses, trades_today, last_trade_date")
+        .eq("user_id", user_id)
+        .maybeSingle();
+      
+      if (userSettings) {
+        maxTradesPerDay = Number(userSettings.max_trades_per_day || 3);
+        lossCooldownCount = Number(userSettings.loss_cooldown_count || 2);
+        consecutiveLosses = Number(userSettings.consecutive_losses || 0);
+        
+        const today = new Date().toISOString().split('T')[0];
+        tradesToday = userSettings.last_trade_date === today ? Number(userSettings.trades_today || 0) : 0;
+      }
+
+      // Block if cooldown active
+      if (consecutiveLosses >= lossCooldownCount) {
+        return new Response(JSON.stringify({ 
+          signals: [], count: 0, rejected: 0,
+          blocked: true,
+          reason: `Loss cooldown active: ${consecutiveLosses} consecutive losses (limit: ${lossCooldownCount}). Wait for reset.`
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Block if daily cap reached
+      if (tradesToday >= maxTradesPerDay) {
+        return new Response(JSON.stringify({ 
+          signals: [], count: 0, rejected: 0,
+          blocked: true,
+          reason: `Daily trade cap reached: ${tradesToday}/${maxTradesPerDay}`
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     // Fetch market features
     let featuresQuery = supabase.from("market_features").select("*").eq("timeframe", "1d");
     if (targetSymbols.length > 0) featuresQuery = featuresQuery.in("symbol", targetSymbols);
@@ -264,13 +315,13 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ signals: [], count: 0, message: "No market features available" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Fetch market cache for current prices
+    // Fetch prices
     const featureSymbols = featuresData.map((f: Record<string, unknown>) => String(f.symbol));
     const { data: priceData } = await supabase.from("market_cache").select("symbol, price").in("symbol", featureSymbols);
     const priceMap: Record<string, number> = {};
     for (const p of (priceData || [])) priceMap[p.symbol] = Number(p.price);
 
-    // Fetch strategy performance for modifiers
+    // Fetch strategy performance
     const { data: perfData } = await supabase.from("strategy_performance").select("*").eq("user_id", user_id);
     const perfMap: Record<string, Record<string, unknown>> = {};
     for (const p of (perfData || [])) perfMap[`${p.strategy_family}:${p.market_regime}`] = p as Record<string, unknown>;
@@ -278,7 +329,15 @@ Deno.serve(async (req) => {
     // Fetch user scoring weights
     const { data: userWeights } = await supabase.from("scoring_weights").select("*").eq("user_id", user_id).eq("is_active", true).limit(1);
 
-    const generatedSignals: Record<string, unknown>[] = [];
+    // ANTI-OVERTRADING: Fetch correlation matrix for duplicate detection
+    const { data: corrData } = await supabase.from("correlation_matrix").select("symbol_a, symbol_b, correlation");
+    const correlationMap = new Map<string, number>();
+    for (const c of (corrData || [])) {
+      correlationMap.set(`${c.symbol_a}:${c.symbol_b}`, Number(c.correlation));
+      correlationMap.set(`${c.symbol_b}:${c.symbol_a}`, Number(c.correlation));
+    }
+
+    const candidates: { signal: Record<string, unknown>; finalScore: number; confidenceScore: number }[] = [];
     const rejections: { asset: string; reason: string }[] = [];
 
     for (const feat of featuresData) {
@@ -288,10 +347,16 @@ Deno.serve(async (req) => {
       const currentPrice = priceMap[symbol] || Number(feat.sma_20 || 0);
       if (currentPrice <= 0) continue;
 
+      // OPERATOR MODE: Block unclear regimes
+      if (operator_mode && UNCLEAR_REGIMES.has(regime)) {
+        rejections.push({ asset: symbol, reason: `Unclear regime: ${regime}` });
+        continue;
+      }
+
       const enriched = { ...feat, current_price: currentPrice };
       const direction = determineDirection(enriched);
 
-      // Skip if user already has an open position in the same direction
+      // Skip if already has position
       if (openPositionMap.has(symbol) && openPositionMap.get(symbol) === direction) {
         rejections.push({ asset: symbol, reason: `Already has open ${direction} position` });
         continue;
@@ -309,7 +374,6 @@ Deno.serve(async (req) => {
       const targetDist = Math.abs(avgTarget - setup.entry);
       const expectedR = +(targetDist / stopDist).toFixed(2);
 
-      // Validate min R
       if (expectedR < min_r) {
         rejections.push({ asset: symbol, reason: `R:R ${expectedR} < ${min_r}` });
         continue;
@@ -321,13 +385,13 @@ Deno.serve(async (req) => {
         momentum: computeMomentum(enriched),
         volatility_suitability: computeVolatilitySuitability(enriched, strategyFamily),
         strategy_confluence: computeStrategyConfluence(enriched, strategyFamily),
-        macro_context: 55, // Would need external macro data
-        sentiment_flow: 50, // Would need sentiment API
+        macro_context: 45, // Conservative: penalize lack of real data
+        sentiment_flow: 45, // Conservative: penalize lack of real data
         risk_reward: computeRiskReward(expectedR, setup.targets, setup.entry, setup.sl),
         historical_performance: 50,
       };
 
-      // Enrich historical_performance from perfData
+      // Enrich historical from perfData
       const perfKey = `${strategyFamily}:${regime}`;
       const perf = perfMap[perfKey] || perfMap[`${strategyFamily}:all`] || null;
       if (perf) {
@@ -335,10 +399,8 @@ Deno.serve(async (req) => {
         subscores.historical_performance = clamp(wr, 0, 100);
       }
 
-      // Get weights
       const weights = getWeightsForContext(regime, assetClass);
 
-      // Apply user weight overrides if available
       if (userWeights && userWeights.length > 0) {
         const uw = userWeights[0];
         const totalUW = Number(uw.structure_weight) + Number(uw.momentum_weight) + Number(uw.volatility_weight) + Number(uw.strategy_weight) + Number(uw.macro_weight) + Number(uw.sentiment_weight) + Number(uw.rr_weight) + Number(uw.historical_weight);
@@ -354,26 +416,23 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Base score
       let baseScore = 0;
       for (const [k, w] of Object.entries(weights)) {
         baseScore += w * (subscores[k as keyof typeof subscores] || 50);
       }
 
-      // Modifiers
       const stratMod = computeStrategyModifier(strategyFamily, regime, perf);
       const regimeMod = computeRegimeModifier(regime, Number(feat.regime_confidence || 50));
       const histMod = computeHistoricalModifier(perf);
 
       const finalScore = clamp(baseScore + stratMod + regimeMod + histMod, 0, 100);
 
-      // Validate min score
       if (finalScore < min_score) {
         rejections.push({ asset: symbol, reason: `Score ${finalScore.toFixed(1)} < ${min_score}` });
         continue;
       }
 
-      // Validate stop distance (max 10% of price)
+      // Validate stop distance
       if (stopDist / currentPrice > 0.10) {
         rejections.push({ asset: symbol, reason: `Stop distance ${((stopDist/currentPrice)*100).toFixed(1)}% > 10%` });
         continue;
@@ -381,7 +440,12 @@ Deno.serve(async (req) => {
 
       const confidenceScore = computeConfidenceScore(enriched, regime);
 
-      // Build explanation
+      // OPERATOR MODE: Enforce min confidence
+      if (confidenceScore < min_confidence) {
+        rejections.push({ asset: symbol, reason: `Confidence ${confidenceScore.toFixed(1)} < ${min_confidence}` });
+        continue;
+      }
+
       const sortedSubscores = Object.entries(subscores).sort((a, b) => b[1] - a[1]);
       const explanation = {
         top_contributors: sortedSubscores.slice(0, 3).map(([k, v]) => ({ factor: k, score: +v.toFixed(1) })),
@@ -414,8 +478,38 @@ Deno.serve(async (req) => {
         status: 'active',
       };
 
-      generatedSignals.push(signal);
+      candidates.push({ signal, finalScore, confidenceScore });
     }
+
+    // OPERATOR MODE: Sort by score and take only top N
+    candidates.sort((a, b) => b.finalScore - a.finalScore);
+
+    // ANTI-OVERTRADING: Remove correlated signals (keep highest scored)
+    const selectedSymbols: string[] = [];
+    const filteredCandidates: typeof candidates = [];
+    
+    for (const c of candidates) {
+      const symbol = String(c.signal.asset);
+      let tooCorrelated = false;
+      
+      for (const existing of selectedSymbols) {
+        const corr = correlationMap.get(`${symbol}:${existing}`) || 0;
+        if (Math.abs(corr) > 0.75) {
+          tooCorrelated = true;
+          rejections.push({ asset: symbol, reason: `High correlation (${(corr * 100).toFixed(0)}%) with ${existing}` });
+          break;
+        }
+      }
+      
+      if (!tooCorrelated) {
+        filteredCandidates.push(c);
+        selectedSymbols.push(symbol);
+      }
+    }
+
+    // Take top max_signals
+    const finalCandidates = filteredCandidates.slice(0, max_signals);
+    const generatedSignals = finalCandidates.map(c => c.signal);
 
     // Store valid signals
     if (generatedSignals.length > 0) {
@@ -429,6 +523,8 @@ Deno.serve(async (req) => {
         count: generatedSignals.length,
         rejected: rejections.length,
         rejections: rejections.slice(0, 20),
+        operator_mode,
+        filters_applied: { min_score, min_r, min_confidence, max_signals },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

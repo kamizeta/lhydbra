@@ -22,11 +22,47 @@ function alpacaHeaders() {
   };
 }
 
+// ─── Retry helper ───
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 1000): Promise<Response> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, options);
+      if (res.ok || res.status < 500) return res;
+      if (attempt < retries) {
+        console.warn(`Alpaca retry ${attempt}/${retries} for ${url} (status ${res.status})`);
+        await new Promise(r => setTimeout(r, delayMs * attempt));
+      } else {
+        return res;
+      }
+    } catch (err) {
+      if (attempt === retries) throw err;
+      console.warn(`Alpaca fetch error attempt ${attempt}/${retries}:`, err);
+      await new Promise(r => setTimeout(r, delayMs * attempt));
+    }
+  }
+  throw new Error("Retry exhausted");
+}
+
+// ─── Poll order until filled or terminal ───
+async function pollOrderStatus(baseUrl: string, orderId: string, headers: Record<string, string>, maxAttempts = 10): Promise<Record<string, unknown>> {
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    const res = await fetch(`${baseUrl}/v2/orders/${orderId}`, { headers });
+    if (!res.ok) continue;
+    const order = await res.json();
+    const status = String(order.status);
+    if (['filled', 'canceled', 'expired', 'rejected', 'stopped'].includes(status)) {
+      return order;
+    }
+  }
+  return { status: 'polling_timeout', id: orderId };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Auth check
+    // Auth check - fixed: use getUser instead of getClaims
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return jsonRes({ error: "Unauthorized" }, 401);
@@ -38,9 +74,8 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return jsonRes({ error: "Unauthorized" }, 401);
     }
 
@@ -51,7 +86,7 @@ serve(async (req) => {
 
     // ─── ACTION: test_connection ───
     if (action === "test_connection") {
-      const res = await fetch(`${baseUrl}/v2/account`, { headers });
+      const res = await fetchWithRetry(`${baseUrl}/v2/account`, { headers });
       const data = await res.json();
       if (!res.ok) {
         return jsonRes({ error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
@@ -75,7 +110,7 @@ serve(async (req) => {
 
     // ─── ACTION: get_positions ───
     if (action === "get_positions") {
-      const res = await fetch(`${baseUrl}/v2/positions`, { headers });
+      const res = await fetchWithRetry(`${baseUrl}/v2/positions`, { headers });
       const data = await res.json();
       if (!res.ok) {
         return jsonRes({ error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
@@ -91,12 +126,23 @@ serve(async (req) => {
         return jsonRes({ error: "Missing required: symbol, qty, side" }, 400);
       }
 
+      // Pre-trade validation: check account buying power
+      const acctRes = await fetchWithRetry(`${baseUrl}/v2/account`, { headers });
+      if (acctRes.ok) {
+        const acct = await acctRes.json();
+        const buyingPower = Number(acct.buying_power || 0);
+        // Simple check: if buying power is very low, block
+        if (buyingPower < 10) {
+          return jsonRes({ error: "Insufficient buying power" }, 400);
+        }
+      }
+
       const orderBody: Record<string, unknown> = {
         symbol,
         qty: String(qty),
-        side, // "buy" or "sell"
-        type, // "market", "limit", "stop", "stop_limit"
-        time_in_force, // "day", "gtc", "ioc", "fok"
+        side,
+        type,
+        time_in_force,
       };
 
       if (type === "limit" || type === "stop_limit") {
@@ -115,7 +161,7 @@ serve(async (req) => {
 
       console.log("Alpaca order payload:", JSON.stringify(orderBody));
 
-      const res = await fetch(`${baseUrl}/v2/orders`, {
+      const res = await fetchWithRetry(`${baseUrl}/v2/orders`, {
         method: "POST",
         headers,
         body: JSON.stringify(orderBody),
@@ -127,20 +173,30 @@ serve(async (req) => {
         return jsonRes({ error: `Alpaca order error [${res.status}]: ${data.message || JSON.stringify(data)}` }, res.status);
       }
 
+      // Poll for fill confirmation
+      let finalOrder = data;
+      if (data.status === 'accepted' || data.status === 'new' || data.status === 'pending_new') {
+        const polled = await pollOrderStatus(baseUrl, data.id, headers);
+        if (polled && polled.status !== 'polling_timeout') {
+          finalOrder = polled;
+        }
+      }
+
       return jsonRes({
         success: true,
         order: {
-          id: data.id,
-          client_order_id: data.client_order_id,
-          symbol: data.symbol,
-          qty: data.qty,
-          filled_qty: data.filled_qty,
-          side: data.side,
-          type: data.type,
-          status: data.status,
-          submitted_at: data.submitted_at,
-          filled_avg_price: data.filled_avg_price,
-          order_class: data.order_class,
+          id: finalOrder.id,
+          client_order_id: finalOrder.client_order_id,
+          symbol: finalOrder.symbol,
+          qty: finalOrder.qty,
+          filled_qty: finalOrder.filled_qty,
+          side: finalOrder.side,
+          type: finalOrder.type,
+          status: finalOrder.status,
+          submitted_at: finalOrder.submitted_at,
+          filled_at: finalOrder.filled_at,
+          filled_avg_price: finalOrder.filled_avg_price,
+          order_class: finalOrder.order_class,
         },
       });
     }
@@ -155,7 +211,7 @@ serve(async (req) => {
         ? `${baseUrl}/v2/positions/${encodeURIComponent(symbol)}?qty=${absQty}`
         : `${baseUrl}/v2/positions/${encodeURIComponent(symbol)}`;
 
-      const res = await fetch(url, { method: "DELETE", headers });
+      const res = await fetchWithRetry(url, { method: "DELETE", headers });
       const data = await res.json();
 
       if (!res.ok) {
@@ -168,7 +224,7 @@ serve(async (req) => {
     // ─── ACTION: get_orders ───
     if (action === "get_orders") {
       const { status: orderStatus = "all", limit = 50 } = body;
-      const res = await fetch(`${baseUrl}/v2/orders?status=${orderStatus}&limit=${limit}`, { headers });
+      const res = await fetchWithRetry(`${baseUrl}/v2/orders?status=${orderStatus}&limit=${limit}`, { headers });
       const data = await res.json();
       if (!res.ok) {
         return jsonRes({ error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
@@ -176,7 +232,19 @@ serve(async (req) => {
       return jsonRes({ success: true, orders: data });
     }
 
-    return jsonRes({ error: "Invalid action. Use: test_connection, get_positions, place_order, close_position, get_orders" }, 400);
+    // ─── ACTION: get_order_status ───
+    if (action === "get_order_status") {
+      const { order_id } = body;
+      if (!order_id) return jsonRes({ error: "Missing: order_id" }, 400);
+      const res = await fetchWithRetry(`${baseUrl}/v2/orders/${order_id}`, { headers });
+      const data = await res.json();
+      if (!res.ok) {
+        return jsonRes({ error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
+      }
+      return jsonRes({ success: true, order: data });
+    }
+
+    return jsonRes({ error: "Invalid action. Use: test_connection, get_positions, place_order, close_position, get_orders, get_order_status" }, 400);
   } catch (e) {
     console.error("Alpaca trade error:", e);
     return jsonRes({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
