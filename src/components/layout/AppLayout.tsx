@@ -79,7 +79,7 @@ export default function AppLayout() {
         </div>
 
         <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
-          {navItems.map((item) => (
+          {mainNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -98,10 +98,44 @@ export default function AppLayout() {
           ))}
         </nav>
 
-        <div className="hidden md:block border-t border-border p-2">
-          <button onClick={() => setCollapsed(!collapsed)} className="flex w-full items-center justify-center rounded-md py-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        {/* LHYDRA PRO v3 collapsible section */}
+        <div className="border-t border-border">
+          <button
+            onClick={() => collapsed ? null : setProOpen(!proOpen)}
+            className={cn(
+              "flex w-full items-center gap-2 px-3 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-colors",
+              "text-terminal-gold hover:bg-sidebar-accent",
+              collapsed && !mobileOpen && "justify-center"
+            )}
+          >
+            <Zap className="h-3 w-3 shrink-0 text-terminal-gold" />
+            {(!collapsed || mobileOpen) && (
+              <>
+                <span className="flex-1 text-left">LHYDRA PRO v3</span>
+                {proOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+              </>
+            )}
           </button>
+          {(proOpen || (collapsed && !mobileOpen)) && (
+            <div className="space-y-1 px-2 pb-2">
+              {proNavItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      isActive ? "bg-primary/10 text-primary glow-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    )
+                  }
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {(!collapsed || mobileOpen) && <span>{item.label}</span>}
+                </NavLink>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="border-t border-border p-3">
