@@ -1,124 +1,91 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  DollarSign, TrendingUp, TrendingDown, Shield, Activity, PieChart,
-  AlertTriangle, Zap, Bot, Lock, BarChart3, ChevronDown, ChevronUp,
+  DollarSign, TrendingUp, TrendingDown, Shield, Activity,
+  AlertTriangle, Zap, Play, Loader2, CheckCircle, XCircle,
+  Clock, Briefcase, Target,
 } from "lucide-react";
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import ProgressBar from "@/components/shared/ProgressBar";
-import OnboardingTutorial from "@/components/OnboardingTutorial";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAuth } from "@/hooks/useAuth";
+import { useOperatorMode } from "@/hooks/useOperatorMode";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatNumber } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
-import { useI18n } from "@/i18n";
 import { useMarketData } from "@/hooks/useMarketData";
+import { toast } from "sonner";
 
-interface DBPosition {
+interface Position {
   id: string;
   symbol: string;
-  name: string;
-  asset_type: string;
   direction: string;
   quantity: number;
   avg_entry: number;
   stop_loss: number | null;
   take_profit: number | null;
   strategy: string | null;
-  status: string;
   pnl: number | null;
-}
-
-interface DBTradeSignal {
-  id: string;
-  symbol: string;
-  name: string;
-  direction: string;
-  strategy: string;
-  risk_reward: number;
-  confidence: number;
-  status: string;
-}
-
-interface DBAgentAnalysis {
-  id: string;
-  agent_type: string;
-  content: string;
-  created_at: string;
-}
-
-const AGENT_LABELS: Record<string, string> = {
-  'market-analyst': 'Market Analyst',
-  'asset-selector': 'Asset Selector',
-  'strategy-engine': 'Strategy Engine',
-  'risk-manager': 'Risk Manager',
-  'order-preparer': 'Order Preparer',
-  'portfolio-manager': 'Portfolio Manager',
-  'learning-agent': 'Learning Agent',
-};
-
-function getAgentSeverity(agentType: string, content: string): 'info' | 'warning' | 'critical' {
-  const lower = content.toLowerCase();
-  if (agentType === 'risk-manager' || lower.includes('warning') || lower.includes('advertencia') || lower.includes('riesgo alto') || lower.includes('correlación')) return 'warning';
-  if (lower.includes('critical') || lower.includes('crítico') || lower.includes('urgente')) return 'critical';
-  return 'info';
-}
-
-function extractTitle(content: string): string {
-  const headingMatch = content.match(/^#{1,3}\s+(.+)/m);
-  if (headingMatch) return headingMatch[1].slice(0, 60);
-  const firstLine = content.split('\n').find(l => l.trim().length > 10);
-  if (firstLine) return firstLine.replace(/[#*_]/g, '').trim().slice(0, 60);
-  return 'Análisis';
+  opened_at: string;
 }
 
 export default function Dashboard() {
-  const { t, language } = useI18n();
   const { user } = useAuth();
   const { settings } = useUserSettings();
   const navigate = useNavigate();
   const { data: marketAssets } = useMarketData();
-  const [positions, setPositions] = useState<DBPosition[]>([]);
-  const [pendingSignals, setPendingSignals] = useState<DBTradeSignal[]>([]);
-  const [agentOutputs, setAgentOutputs] = useState<DBAgentAnalysis[]>([]);
-  const [closedPositions, setClosedPositions] = useState<{ pnl: number | null }[]>([]);
-  const [showRiskDetail, setShowRiskDetail] = useState(false);
+  const { status: operatorStatus, runResult, loading: opLoading, error: opError, fetchStatus, runOperator } = useOperatorMode();
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [closedPnl, setClosedPnl] = useState(0);
+  const [weeklyPnl, setWeeklyPnl] = useState(0);
+  const [monthlyPnl, setMonthlyPnl] = useState(0);
+  const [journalStats, setJournalStats] = useState({ total: 0, wins: 0, avgR: 0 });
 
-  const fetchDashboardData = useMemo(() => {
-    if (!user) return () => {};
-    return () => {
-      Promise.all([
-        supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false }),
-        supabase.from('trade_signals').select('id, symbol, name, direction, strategy, risk_reward, confidence, status').eq('user_id', user.id).eq('status', 'pending').order('created_at', { ascending: false }).limit(5),
-        supabase.from('agent_analyses').select('id, agent_type, content, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('positions').select('pnl').eq('user_id', user.id).eq('status', 'closed'),
-      ]).then(([posRes, sigRes, agentRes, closedRes]) => {
-        setPositions((posRes.data as DBPosition[]) || []);
-        setPendingSignals((sigRes.data as DBTradeSignal[]) || []);
-        setAgentOutputs((agentRes.data as DBAgentAnalysis[]) || []);
-        setClosedPositions((closedRes.data as { pnl: number | null }[]) || []);
-      });
-    };
-  }, [user]);
-
+  // Load data
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    if (!user) return;
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
+    const monthAgo = new Date(now.getTime() - 30 * 86400000).toISOString();
 
-  // Realtime: positions, signals, agent analyses
+    Promise.all([
+      supabase.from('positions').select('id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false }),
+      supabase.from('positions').select('pnl').eq('user_id', user.id).eq('status', 'closed'),
+      supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id).gte('entered_at', weekAgo),
+      supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id).gte('entered_at', monthAgo),
+      supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id),
+    ]).then(([posRes, closedRes, weekRes, monthRes, allRes]) => {
+      setPositions((posRes.data || []) as Position[]);
+      setClosedPnl((closedRes.data || []).reduce((s, p) => s + (p.pnl || 0), 0));
+      setWeeklyPnl((weekRes.data || []).reduce((s, t) => s + (t.pnl || 0), 0));
+      setMonthlyPnl((monthRes.data || []).reduce((s, t) => s + (t.pnl || 0), 0));
+
+      const all = (allRes.data || []) as { pnl: number | null; r_multiple: number | null }[];
+      const wins = all.filter(t => (t.pnl || 0) > 0).length;
+      const rTrades = all.filter(t => t.r_multiple != null);
+      setJournalStats({
+        total: all.length,
+        wins,
+        avgR: rTrades.length > 0 ? rTrades.reduce((s, t) => s + (t.r_multiple || 0), 0) / rTrades.length : 0,
+      });
+    });
+
+    fetchStatus();
+  }, [user, fetchStatus]);
+
+  // Realtime
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel('dashboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'positions', filter: `user_id=eq.${user.id}` }, () => fetchDashboardData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trade_signals', filter: `user_id=eq.${user.id}` }, () => fetchDashboardData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_analyses', filter: `user_id=eq.${user.id}` }, () => fetchDashboardData())
+      .channel('dashboard-operator')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'positions', filter: `user_id=eq.${user.id}` }, () => {
+        supabase.from('positions').select('id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false })
+          .then(({ data }) => setPositions((data || []) as Position[]));
+      })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
-  }, [user, fetchDashboardData]);
+  }, [user]);
 
   const priceMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -141,299 +108,245 @@ export default function Dashboard() {
     return total;
   }, [positions, priceMap]);
 
-  const dateLocale = language === 'es' ? 'es-ES' : language === 'pt' ? 'pt-BR' : language === 'fr' ? 'fr-FR' : 'en-US';
-
-  const totalRealizedPnl = closedPositions.reduce((sum, p) => sum + (p.pnl || 0), 0);
-  const portfolioValue = settings.current_capital + totalRealizedPnl + unrealizedPnl;
-  const pnlPercent = settings.initial_capital > 0 ? ((portfolioValue - settings.initial_capital) / settings.initial_capital) * 100 : 0;
-
+  const portfolioValue = settings.current_capital + closedPnl + unrealizedPnl;
   const totalExposure = positions.reduce((sum, p) => sum + (p.quantity * p.avg_entry), 0);
-  const exposurePercent = portfolioValue > 0 ? (totalExposure / portfolioValue) * 100 : 0;
-  const dailyRiskUsed = portfolioValue > 0 ? Math.min(exposurePercent * (settings.risk_per_trade / 100), settings.max_daily_risk) : 0;
+  const exposurePct = portfolioValue > 0 ? (totalExposure / portfolioValue) * 100 : 0;
+  const winRate = journalStats.total > 0 ? (journalStats.wins / journalStats.total) * 100 : 0;
+  const drawdownPct = settings.initial_capital > 0 ? Math.max(0, ((settings.initial_capital - portfolioValue) / settings.initial_capital) * 100) : 0;
 
-  const warnings = agentOutputs.filter(a =>
-    a.agent_type === 'risk-manager' || getAgentSeverity(a.agent_type, a.content) !== 'info'
-  ).slice(0, 5);
+  const handleRunOperator = async () => {
+    await runOperator(true);
+    if (opError) toast.error(opError);
+    else toast.success("Operator cycle complete");
+  };
 
-  // Risk detail calculations
-  const exposureByType: Record<string, number> = {};
-  positions.forEach(p => {
-    const value = p.quantity * p.avg_entry;
-    exposureByType[p.asset_type] = (exposureByType[p.asset_type] || 0) + value;
-  });
-
-  let totalRiskDollars = 0;
-  positions.forEach(p => {
-    if (p.stop_loss) {
-      const riskPerUnit = Math.abs(p.avg_entry - Number(p.stop_loss));
-      totalRiskDollars += riskPerUnit * p.quantity;
-    }
-  });
-  const totalRiskPct = portfolioValue > 0 ? (totalRiskDollars / portfolioValue) * 100 : 0;
-  const leverageUsed = portfolioValue > 0 ? totalExposure / portfolioValue : 0;
-  const positionsWithoutSL = positions.filter(p => !p.stop_loss).length;
-  const dollarRiskPerTrade = portfolioValue * (settings.risk_per_trade / 100);
-
-  // Alerts from positions
-  const riskAlerts: string[] = [];
-  if (positions.length >= settings.max_positions) riskAlerts.push(`Max posiciones alcanzado (${positions.length}/${settings.max_positions})`);
-  if (positionsWithoutSL > 0 && settings.stop_loss_required) riskAlerts.push(`${positionsWithoutSL} posición(es) sin Stop Loss`);
-  if (exposurePercent > 100) riskAlerts.push(`Exposición al ${exposurePercent.toFixed(0)}% — excede capital`);
-  if (leverageUsed > settings.max_leverage) riskAlerts.push(`Apalancamiento ${leverageUsed.toFixed(1)}x excede límite ${settings.max_leverage}x`);
-
-  const typeLabels: Record<string, string> = { crypto: 'Crypto', stock: 'Acciones', etf: 'ETFs', forex: 'Forex', commodity: 'Commodities' };
+  const cooldownActive = operatorStatus?.cooldown_active || false;
+  const dailyCapReached = (operatorStatus?.trades_today || 0) >= (operatorStatus?.max_trades_per_day || 3);
 
   return (
-    <div className="p-3 md:p-6 space-y-4 md:space-y-6 animate-slide-in">
-      <OnboardingTutorial />
+    <div className="p-3 md:p-6 space-y-4 md:space-y-5 animate-slide-in">
+      {/* Header */}
       <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <h1 className="text-lg md:text-2xl font-bold text-foreground">{t.dashboard.title}</h1>
-          <p className="text-[10px] md:text-sm text-muted-foreground font-mono truncate">{new Date().toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' })}</p>
+        <div>
+          <h1 className="text-lg md:text-2xl font-bold text-foreground">Operator Dashboard</h1>
+          <p className="text-[10px] md:text-xs text-muted-foreground font-mono">
+            {new Date().toLocaleDateString('es-ES', { weekday: 'short', month: 'short', day: 'numeric' })}
+            {settings.operator_mode && <span className="text-primary ml-2">● OPERATOR MODE</span>}
+          </p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <StatusBadge variant="profit" dot><span className="hidden sm:inline">{t.common.marketOpen}</span><span className="sm:hidden">Live</span></StatusBadge>
-          {(warnings.length > 0 || riskAlerts.length > 0) && (
-            <StatusBadge variant="warning" dot>{warnings.length + riskAlerts.length}</StatusBadge>
+        <div className="flex items-center gap-2">
+          {cooldownActive && (
+            <StatusBadge variant="loss" dot>COOLDOWN</StatusBadge>
           )}
+          {dailyCapReached && (
+            <StatusBadge variant="warning" dot>CAP REACHED</StatusBadge>
+          )}
+          <button
+            onClick={handleRunOperator}
+            disabled={opLoading || cooldownActive || dailyCapReached}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all",
+              cooldownActive || dailyCapReached
+                ? "bg-muted text-muted-foreground cursor-not-allowed"
+                : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg"
+            )}
+          >
+            {opLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+            Run Operator
+          </button>
         </div>
       </div>
 
-      {/* Risk Alerts Banner */}
-      {riskAlerts.length > 0 && (
+      {/* Alerts */}
+      {operatorStatus?.preflight_warnings && operatorStatus.preflight_warnings.length > 0 && (
         <div className="bg-loss/10 border border-loss/30 rounded-lg p-3 space-y-1">
-          {riskAlerts.map((a, i) => (
+          {operatorStatus.preflight_warnings.map((w, i) => (
             <div key={i} className="flex items-center gap-2 text-xs font-mono text-loss">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              <span>{a}</span>
+              <span>{w}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* Top metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
-        <div className="cursor-pointer" onClick={() => navigate('/settings')}>
-          <MetricCard label="Portfolio" value={formatCurrency(portfolioValue)} change={`PnL ${totalRealizedPnl >= 0 ? '+' : ''}${formatCurrency(totalRealizedPnl)}`} changeType={totalRealizedPnl + unrealizedPnl >= 0 ? "positive" : "negative"} icon={DollarSign} />
-        </div>
-        <div className="cursor-pointer" onClick={() => navigate('/portfolio')}>
-          <MetricCard label="PnL" value={totalRealizedPnl >= 0 ? `+${formatCurrency(totalRealizedPnl)}` : formatCurrency(totalRealizedPnl)} change={`${pnlPercent >= 0 ? '+' : ''}${formatNumber(pnlPercent)}%`} changeType={totalRealizedPnl >= 0 ? "positive" : "negative"} icon={totalRealizedPnl >= 0 ? TrendingUp : TrendingDown} />
-        </div>
-        <div className="cursor-pointer relative" onClick={() => setShowRiskDetail(!showRiskDetail)}>
-          <MetricCard label="Riesgo" value={`${formatNumber(dailyRiskUsed)}%`} change={`${exposurePercent.toFixed(0)}% exp`} changeType="neutral" icon={Shield} />
-          <div className="absolute top-2 right-2 text-muted-foreground">
-            {showRiskDetail ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          </div>
-        </div>
-        <div className="cursor-pointer" onClick={() => navigate('/portfolio')}>
-          <MetricCard label="Posiciones" value={`${positions.length}/${settings.max_positions}`} change={`${pendingSignals.length} ideas`} changeType="neutral" icon={Activity} />
-        </div>
+      {/* Key Metrics — 6 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
+        <MetricCard label="Portfolio" value={formatCurrency(portfolioValue)} 
+          change={`${(closedPnl + unrealizedPnl) >= 0 ? '+' : ''}${formatCurrency(closedPnl + unrealizedPnl)}`}
+          changeType={(closedPnl + unrealizedPnl) >= 0 ? "positive" : "negative"} icon={DollarSign} />
+        <MetricCard label="Today" value={operatorStatus ? `${operatorStatus.today_pnl >= 0 ? '+' : ''}${formatCurrency(operatorStatus.today_pnl)}` : '—'}
+          change={`${operatorStatus?.trades_today || 0}/${operatorStatus?.max_trades_per_day || 3} trades`}
+          changeType={(operatorStatus?.today_pnl || 0) >= 0 ? "positive" : "negative"} icon={Activity} />
+        <MetricCard label="Week" value={`${weeklyPnl >= 0 ? '+' : ''}${formatCurrency(weeklyPnl)}`}
+          changeType={weeklyPnl >= 0 ? "positive" : "negative"} icon={TrendingUp} />
+        <MetricCard label="Month" value={`${monthlyPnl >= 0 ? '+' : ''}${formatCurrency(monthlyPnl)}`}
+          changeType={monthlyPnl >= 0 ? "positive" : "negative"} icon={TrendingUp} />
+        <MetricCard label="Win Rate" value={journalStats.total > 0 ? `${winRate.toFixed(0)}%` : '—'}
+          change={`${journalStats.total} trades`} changeType={winRate >= 50 ? "positive" : "negative"} icon={Target} />
+        <MetricCard label="Risk" value={`${exposurePct.toFixed(0)}%`}
+          change={`DD ${drawdownPct.toFixed(1)}%`}
+          changeType={drawdownPct > settings.max_drawdown * 0.8 ? "negative" : "positive"} icon={Shield} />
       </div>
 
-      {/* Collapsible Risk Detail Section */}
-      {showRiskDetail && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 terminal-border rounded-lg bg-accent/5 animate-slide-in">
-          {/* Risk Meters */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-              <Shield className="h-4 w-4 text-primary" /> Medidores de Riesgo
-            </h3>
-            <ProgressBar value={dailyRiskUsed} max={settings.max_daily_risk} label="Riesgo Diario" />
-            <ProgressBar value={exposurePercent > 100 ? 100 : exposurePercent} max={100} label="Exposición Total" />
-            <ProgressBar value={leverageUsed} max={settings.max_leverage} label="Apalancamiento" />
-            <ProgressBar value={positions.length} max={settings.max_positions} label="Posiciones" />
-          </div>
+      {/* Risk Gauges */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <ProgressBar value={operatorStatus?.daily_risk_used || 0} max={settings.max_daily_risk} label="Daily Risk" />
+        <ProgressBar value={positions.length} max={settings.max_positions} label="Positions" />
+        <ProgressBar value={drawdownPct} max={settings.max_drawdown} label="Drawdown" />
+        <ProgressBar value={operatorStatus?.consecutive_losses || 0} max={settings.loss_cooldown_count} label="Loss Streak" />
+      </div>
 
-          {/* Risk Rules */}
-          <div>
-            <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3">
-              <Lock className="h-4 w-4 text-primary" /> Reglas
-            </h3>
-            <div className="space-y-1.5">
-              {[
-                { label: 'Riesgo/Trade', value: `${settings.risk_per_trade}%`, ok: true },
-                { label: 'Max Diario', value: `${settings.max_daily_risk}%`, ok: dailyRiskUsed <= settings.max_daily_risk * 0.8 },
-                { label: 'Max Drawdown', value: `${settings.max_drawdown}%`, ok: true },
-                { label: 'Max Posiciones', value: `${settings.max_positions}`, ok: positions.length < settings.max_positions },
-                { label: 'Max Leverage', value: `${settings.max_leverage}x`, ok: leverageUsed <= settings.max_leverage },
-                { label: 'Stop Loss', value: settings.stop_loss_required ? 'Requerido' : 'No', ok: positionsWithoutSL === 0 },
-                { label: 'R:R Mínimo', value: `${settings.min_rr_ratio}:1`, ok: true },
-              ].map((rule, i) => (
-                <div key={i} className="flex items-center justify-between py-1 text-xs">
-                  <span className="text-muted-foreground">{rule.label}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-foreground">{rule.value}</span>
-                    <div className={cn("h-1.5 w-1.5 rounded-full", rule.ok ? "bg-profit" : "bg-loss")} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Exposure by Type */}
-          <div>
-            <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3">
-              <BarChart3 className="h-4 w-4 text-primary" /> Exposición por Mercado
-            </h3>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between text-muted-foreground"><span>Capital</span><span className="font-mono text-foreground">{formatCurrency(portfolioValue)}</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>Invertido</span><span className="font-mono text-foreground">{formatCurrency(totalExposure)}</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>Riesgo Abierto</span><span className={cn("font-mono", totalRiskPct > settings.max_daily_risk ? "text-loss" : "text-warning")}>{formatCurrency(totalRiskDollars)} ({formatNumber(totalRiskPct)}%)</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>$/Trade</span><span className="font-mono text-foreground">{formatCurrency(dollarRiskPerTrade)}</span></div>
-              <div className="border-t border-border pt-2 mt-2 space-y-1">
-                {Object.entries(exposureByType).map(([type, value]) => {
-                  const pct = portfolioValue > 0 ? (value / portfolioValue) * 100 : 0;
-                  return (
-                    <div key={type} className="flex items-center justify-between">
-                      <span className="text-muted-foreground">{typeLabels[type] || type}</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div className={cn("h-full rounded-full", pct > settings.max_single_asset ? "bg-warning" : "bg-primary")} style={{ width: `${Math.min(pct, 100)}%` }} />
-                        </div>
-                        <span className="font-mono text-foreground w-12 text-right">{formatNumber(pct)}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        {/* Portfolio Positions */}
-        <div className="lg:col-span-2 terminal-border rounded-lg cursor-pointer" onClick={() => navigate('/portfolio')}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Active Positions */}
+        <div className="lg:col-span-2 terminal-border rounded-lg">
           <div className="flex items-center justify-between border-b border-border p-3">
             <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
-              <PieChart className="h-3.5 w-3.5 text-primary" />
-              Posiciones
+              <Briefcase className="h-3.5 w-3.5 text-primary" /> Active Trades
             </h2>
-            <span className="text-[10px] font-mono text-muted-foreground">{positions.length} abiertas</span>
+            <button onClick={() => navigate('/portfolio')} className="text-[10px] font-mono text-primary hover:underline">
+              View All →
+            </button>
           </div>
-          {/* Mobile: card layout */}
-          <div className="md:hidden p-2 space-y-2">
-            {positions.length === 0 ? (
-              <p className="text-center text-muted-foreground text-[10px] font-mono py-4">Sin posiciones</p>
-            ) : positions.map((pos) => (
-              <div key={pos.id} className="flex items-center justify-between py-1.5 px-2 border-b border-border/50 last:border-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-medium text-xs text-foreground">{pos.symbol}</span>
-                  <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
-                    {pos.direction === 'long' ? '▲' : '▼'}
-                  </StatusBadge>
-                </div>
-                <span className="text-[10px] font-mono text-muted-foreground">${Number(pos.avg_entry).toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-          {/* Desktop: table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-border text-xs text-muted-foreground uppercase tracking-wider">
-                  <th className="text-left p-3">{t.common.asset}</th>
-                  <th className="text-center p-3">Dir</th>
-                  <th className="text-right p-3">Qty</th>
-                  <th className="text-right p-3">{t.common.entry}</th>
-                  <th className="text-right p-3">{t.common.strategy}</th>
+                <tr className="border-b border-border text-[10px] text-muted-foreground uppercase tracking-wider">
+                  <th className="text-left p-2.5">Symbol</th>
+                  <th className="text-center p-2.5">Dir</th>
+                  <th className="text-right p-2.5">Entry</th>
+                  <th className="text-right p-2.5">SL</th>
+                  <th className="text-right p-2.5">PnL</th>
                 </tr>
               </thead>
               <tbody>
                 {positions.length === 0 ? (
-                  <tr><td colSpan={5} className="p-6 text-center text-muted-foreground text-xs font-mono">Sin posiciones abiertas</td></tr>
-                ) : positions.map((pos) => (
-                  <tr key={pos.id} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
-                    <td className="p-3">
-                      <div className="font-mono font-medium text-foreground">{pos.symbol}</div>
-                      <div className="text-xs text-muted-foreground">{pos.name}</div>
-                    </td>
-                    <td className="text-center p-3">
-                      <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
-                        {pos.direction.toUpperCase()}
-                      </StatusBadge>
-                    </td>
-                    <td className="text-right p-3 font-mono text-foreground">{pos.quantity}</td>
-                    <td className="text-right p-3 font-mono text-foreground">${Number(pos.avg_entry).toFixed(2)}</td>
-                    <td className="text-right p-3">
-                      <StatusBadge variant="info">{pos.strategy || '—'}</StatusBadge>
-                    </td>
-                  </tr>
-                ))}
+                  <tr><td colSpan={5} className="p-6 text-center text-muted-foreground font-mono">No active trades</td></tr>
+                ) : positions.slice(0, 8).map(pos => {
+                  const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
+                  const livePnl = currentPrice
+                    ? (pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice) * pos.quantity
+                    : pos.pnl || 0;
+                  return (
+                    <tr key={pos.id} className="border-b border-border/30 hover:bg-accent/20">
+                      <td className="p-2.5 font-mono font-medium text-foreground">{pos.symbol}</td>
+                      <td className="text-center p-2.5">
+                        <StatusBadge variant={pos.direction === 'long' ? 'profit' : 'loss'}>
+                          {pos.direction === 'long' ? '▲' : '▼'}
+                        </StatusBadge>
+                      </td>
+                      <td className="text-right p-2.5 font-mono text-muted-foreground">{formatCurrency(pos.avg_entry)}</td>
+                      <td className="text-right p-2.5 font-mono text-loss/70">{pos.stop_loss ? formatCurrency(pos.stop_loss) : '—'}</td>
+                      <td className={cn("text-right p-2.5 font-mono font-bold", livePnl >= 0 ? "text-profit" : "text-loss")}>
+                        {livePnl >= 0 ? '+' : ''}{formatCurrency(livePnl)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Right column */}
-        <div className="space-y-4 md:space-y-6">
-          {/* Pending Ideas */}
-          <div className="terminal-border rounded-lg p-3 space-y-2 cursor-pointer" onClick={() => navigate('/trade-ideas')}>
-            <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
-              <Zap className="h-3.5 w-3.5 text-primary" />
-              Ideas
-            </h2>
-            {pendingSignals.length === 0 ? (
-              <p className="text-xs text-muted-foreground font-mono">Sin ideas pendientes. Ejecuta los agentes para generar nuevas.</p>
-            ) : pendingSignals.map((signal) => (
-              <div key={signal.id} className="rounded-md bg-accent/50 border border-border p-3">
-                <div className="flex items-center justify-between">
-                  <div className="font-mono font-medium text-sm text-foreground">{signal.symbol}</div>
-                  <StatusBadge variant={signal.direction === 'long' ? 'profit' : 'loss'}>
-                    {signal.direction.toUpperCase()}
-                  </StatusBadge>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">{signal.strategy} • R/R {formatNumber(Number(signal.risk_reward))}</div>
-                <div className="mt-1 text-xs font-mono text-muted-foreground">{t.common.confidence}: {signal.confidence}%</div>
-              </div>
-            ))}
-          </div>
+        {/* Right: Operator Run Result / Opportunities */}
+        <div className="space-y-4">
+          {/* Latest Run Result */}
+          {runResult && (
+            <div className="terminal-border rounded-lg p-3">
+              <h2 className="text-xs font-bold text-foreground flex items-center gap-2 mb-3">
+                <Zap className="h-3.5 w-3.5 text-primary" />
+                Last Run
+                <StatusBadge variant={runResult.status === 'executed' ? 'profit' : runResult.status === 'blocked' ? 'loss' : 'info'}>
+                  {runResult.status.toUpperCase()}
+                </StatusBadge>
+              </h2>
 
-          {/* Capital & Risk Summary */}
-          <div className="terminal-border rounded-lg p-3 space-y-2 cursor-pointer" onClick={() => navigate('/settings')}>
-            <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
-              <DollarSign className="h-3.5 w-3.5 text-primary" />
-              Capital
+              {runResult.reasons && runResult.reasons.length > 0 && (
+                <div className="space-y-1 mb-3">
+                  {runResult.reasons.map((r, i) => (
+                    <div key={i} className="text-[10px] font-mono text-loss">{r}</div>
+                  ))}
+                </div>
+              )}
+
+              {runResult.trades && runResult.trades.length > 0 ? (
+                <div className="space-y-2">
+                  {runResult.trades.map((t, i) => (
+                    <div key={i} className="bg-accent/30 rounded-md p-2 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold text-xs text-foreground">{t.symbol}</span>
+                        <StatusBadge variant={t.direction === 'long' ? 'profit' : 'loss'}>
+                          {t.direction.toUpperCase()}
+                        </StatusBadge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 text-[10px] font-mono text-muted-foreground">
+                        <span>Score: <strong className="text-foreground">{t.score}</strong></span>
+                        <span>R: <strong className="text-foreground">{t.expected_r}</strong></span>
+                        <span>Risk: <strong className="text-foreground">{t.risk_pct}%</strong></span>
+                      </div>
+                      {runResult.execution && runResult.execution[i] && (
+                        <div className="flex items-center gap-1 text-[10px] font-mono">
+                          {runResult.execution[i].success ? (
+                            <><CheckCircle className="h-3 w-3 text-profit" /><span className="text-profit">Executed</span></>
+                          ) : (
+                            <><XCircle className="h-3 w-3 text-loss" /><span className="text-loss">{runResult.execution[i].error || 'Failed'}</span></>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : runResult.status === 'no_opportunities' ? (
+                <p className="text-[10px] font-mono text-muted-foreground">{runResult.message || 'No quality signals found'}</p>
+              ) : null}
+
+              {runResult.daily_summary && (
+                <div className="mt-3 pt-2 border-t border-border text-[10px] font-mono text-muted-foreground space-y-0.5">
+                  <div>Trades: {runResult.daily_summary.trades_today}/{runResult.daily_summary.max_trades}</div>
+                  <div>Risk Used: {Number(runResult.daily_summary.daily_risk_used).toFixed(1)}%/{runResult.daily_summary.max_daily_risk}%</div>
+                  <div>Loss Streak: {runResult.daily_summary.consecutive_losses}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Performance Summary */}
+          <div className="terminal-border rounded-lg p-3">
+            <h2 className="text-xs font-bold text-foreground flex items-center gap-2 mb-3">
+              <Target className="h-3.5 w-3.5 text-primary" /> Performance
             </h2>
-            <div className="space-y-2 text-xs font-mono">
-              <div className="flex justify-between"><span className="text-muted-foreground">Capital Inicial</span><span className="text-foreground">{formatCurrency(settings.initial_capital)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Capital Actual</span><span className="text-foreground">{formatCurrency(settings.current_capital)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Riesgo/Trade</span><span className="text-warning">{settings.risk_per_trade}%</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">$ en Riesgo</span><span className="text-loss">{formatCurrency(dollarRiskPerTrade)}</span></div>
+            <div className="space-y-2 text-xs">
+              {[
+                { label: 'Total PnL', value: `${closedPnl >= 0 ? '+' : ''}${formatCurrency(closedPnl)}`, ok: closedPnl >= 0 },
+                { label: 'Open PnL', value: `${unrealizedPnl >= 0 ? '+' : ''}${formatCurrency(unrealizedPnl)}`, ok: unrealizedPnl >= 0 },
+                { label: 'Win Rate', value: journalStats.total > 0 ? `${winRate.toFixed(0)}%` : '—', ok: winRate >= 50 },
+                { label: 'Avg R', value: journalStats.avgR !== 0 ? `${journalStats.avgR >= 0 ? '+' : ''}${journalStats.avgR.toFixed(2)}R` : '—', ok: journalStats.avgR >= 0 },
+                { label: 'Drawdown', value: `${drawdownPct.toFixed(1)}%`, ok: drawdownPct < settings.max_drawdown * 0.8 },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{item.label}</span>
+                  <span className={cn("font-mono font-medium", item.ok ? "text-foreground" : "text-loss")}>{item.value}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Alerts */}
-          <div className="terminal-border rounded-lg p-3 space-y-2 cursor-pointer" onClick={() => navigate('/agents')}>
-            <h2 className="text-xs md:text-sm font-bold text-foreground flex items-center gap-2">
-              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-              Alertas
-            </h2>
-            {warnings.length === 0 ? (
-              <p className="text-xs text-muted-foreground font-mono">Sin alertas activas</p>
-            ) : warnings.slice(0, 3).map((alert) => {
-              const severity = getAgentSeverity(alert.agent_type, alert.content);
-              return (
-                <div key={alert.id} className={cn("rounded-md p-3 border",
-                  severity === 'critical' ? "bg-destructive/5 border-destructive/20" :
-                  severity === 'warning' ? "bg-warning/5 border-warning/20" : "bg-accent/50 border-border"
-                )}>
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className={cn("h-3.5 w-3.5 mt-0.5 shrink-0", severity === 'critical' ? 'text-destructive' : 'text-warning')} />
-                    <div>
-                      <p className="text-xs font-medium text-foreground">{extractTitle(alert.content)}</p>
-                      <p className="text-[10px] font-mono text-muted-foreground mt-1">
-                        {AGENT_LABELS[alert.agent_type] || alert.agent_type} • {new Date(alert.created_at).toLocaleTimeString(dateLocale)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          {/* Quick Links */}
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => navigate('/portfolio')} className="text-[10px] font-mono text-center py-2 rounded-md border border-border hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground">
+              Portfolio →
+            </button>
+            <button onClick={() => navigate('/signals')} className="text-[10px] font-mono text-center py-2 rounded-md border border-border hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground">
+              Signals →
+            </button>
+            <button onClick={() => navigate('/agents')} className="text-[10px] font-mono text-center py-2 rounded-md border border-border hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground">
+              Agents →
+            </button>
+            <button onClick={() => navigate('/settings')} className="text-[10px] font-mono text-center py-2 rounded-md border border-border hover:bg-accent/50 transition-colors text-muted-foreground hover:text-foreground">
+              Settings →
+            </button>
           </div>
         </div>
       </div>
-
     </div>
   );
 }
