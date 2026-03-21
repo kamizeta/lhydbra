@@ -100,7 +100,6 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
             action: 'close_position',
             paper: alpacaPaper,
             symbol: position.symbol.replace('/', ''),
-            qty: position.quantity,
           },
         });
 

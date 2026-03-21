@@ -150,8 +150,9 @@ serve(async (req) => {
       const { symbol, qty } = body;
       if (!symbol) return jsonRes({ error: "Missing: symbol" }, 400);
 
-      const url = qty
-        ? `${baseUrl}/v2/positions/${encodeURIComponent(symbol)}?qty=${qty}`
+      const absQty = qty ? Math.abs(Number(qty)) : null;
+      const url = absQty
+        ? `${baseUrl}/v2/positions/${encodeURIComponent(symbol)}?qty=${absQty}`
         : `${baseUrl}/v2/positions/${encodeURIComponent(symbol)}`;
 
       const res = await fetch(url, { method: "DELETE", headers });
