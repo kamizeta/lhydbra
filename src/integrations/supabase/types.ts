@@ -430,6 +430,60 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_performance: {
+        Row: {
+          avg_r_multiple: number | null
+          created_at: string
+          date: string
+          ending_capital: number
+          id: string
+          loss_count: number
+          max_drawdown_pct: number | null
+          realized_pnl: number
+          risk_used_pct: number | null
+          starting_capital: number
+          trades_closed: number
+          trades_opened: number
+          unrealized_pnl: number
+          user_id: string
+          win_count: number
+        }
+        Insert: {
+          avg_r_multiple?: number | null
+          created_at?: string
+          date: string
+          ending_capital?: number
+          id?: string
+          loss_count?: number
+          max_drawdown_pct?: number | null
+          realized_pnl?: number
+          risk_used_pct?: number | null
+          starting_capital?: number
+          trades_closed?: number
+          trades_opened?: number
+          unrealized_pnl?: number
+          user_id: string
+          win_count?: number
+        }
+        Update: {
+          avg_r_multiple?: number | null
+          created_at?: string
+          date?: string
+          ending_capital?: number
+          id?: string
+          loss_count?: number
+          max_drawdown_pct?: number | null
+          realized_pnl?: number
+          risk_used_pct?: number | null
+          starting_capital?: number
+          trades_closed?: number
+          trades_opened?: number
+          unrealized_pnl?: number
+          user_id?: string
+          win_count?: number
+        }
+        Relationships: []
+      }
       market_cache: {
         Row: {
           ask: number | null
@@ -1631,62 +1685,86 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          auto_execute: boolean
           binance_api_key: string | null
           binance_api_secret: string | null
+          consecutive_losses: number
           created_at: string
           current_capital: number
+          daily_risk_used: number
           id: string
           initial_capital: number
+          last_trade_date: string | null
+          loss_cooldown_count: number
           max_correlation: number
           max_daily_risk: number
           max_drawdown: number
           max_leverage: number
           max_positions: number
           max_single_asset: number
+          max_trades_per_day: number
           max_weekly_risk: number
           min_rr_ratio: number
+          operator_mode: boolean
           risk_per_trade: number
           stop_loss_required: boolean
+          trades_today: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          auto_execute?: boolean
           binance_api_key?: string | null
           binance_api_secret?: string | null
+          consecutive_losses?: number
           created_at?: string
           current_capital?: number
+          daily_risk_used?: number
           id?: string
           initial_capital?: number
+          last_trade_date?: string | null
+          loss_cooldown_count?: number
           max_correlation?: number
           max_daily_risk?: number
           max_drawdown?: number
           max_leverage?: number
           max_positions?: number
           max_single_asset?: number
+          max_trades_per_day?: number
           max_weekly_risk?: number
           min_rr_ratio?: number
+          operator_mode?: boolean
           risk_per_trade?: number
           stop_loss_required?: boolean
+          trades_today?: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          auto_execute?: boolean
           binance_api_key?: string | null
           binance_api_secret?: string | null
+          consecutive_losses?: number
           created_at?: string
           current_capital?: number
+          daily_risk_used?: number
           id?: string
           initial_capital?: number
+          last_trade_date?: string | null
+          loss_cooldown_count?: number
           max_correlation?: number
           max_daily_risk?: number
           max_drawdown?: number
           max_leverage?: number
           max_positions?: number
           max_single_asset?: number
+          max_trades_per_day?: number
           max_weekly_risk?: number
           min_rr_ratio?: number
+          operator_mode?: boolean
           risk_per_trade?: number
           stop_loss_required?: boolean
+          trades_today?: number
           updated_at?: string
           user_id?: string
         }
