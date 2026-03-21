@@ -400,6 +400,48 @@ export type Database = {
           },
         ]
       }
+      coaching_logs: {
+        Row: {
+          created_at: string
+          daily_grade: string | null
+          date: string
+          goal_progress_pct: number | null
+          id: string
+          metrics: Json | null
+          mistakes: string[] | null
+          phase: string
+          suggestions: string[] | null
+          summary: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_grade?: string | null
+          date?: string
+          goal_progress_pct?: number | null
+          id?: string
+          metrics?: Json | null
+          mistakes?: string[] | null
+          phase?: string
+          suggestions?: string[] | null
+          summary?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_grade?: string | null
+          date?: string
+          goal_progress_pct?: number | null
+          id?: string
+          metrics?: Json | null
+          mistakes?: string[] | null
+          phase?: string
+          suggestions?: string[] | null
+          summary?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       correlation_matrix: {
         Row: {
           asset_class_a: string
@@ -481,6 +523,51 @@ export type Database = {
           unrealized_pnl?: number
           user_id?: string
           win_count?: number
+        }
+        Relationships: []
+      }
+      goal_profiles: {
+        Row: {
+          automation_level: string
+          capital_available: number
+          created_at: string
+          daily_target: number
+          id: string
+          is_active: boolean
+          monthly_target: number
+          required_r_per_day: number
+          required_trades_per_day: number
+          risk_tolerance: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          automation_level?: string
+          capital_available?: number
+          created_at?: string
+          daily_target?: number
+          id?: string
+          is_active?: boolean
+          monthly_target?: number
+          required_r_per_day?: number
+          required_trades_per_day?: number
+          risk_tolerance?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          automation_level?: string
+          capital_available?: number
+          created_at?: string
+          daily_target?: number
+          id?: string
+          is_active?: boolean
+          monthly_target?: number
+          required_r_per_day?: number
+          required_trades_per_day?: number
+          risk_tolerance?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
