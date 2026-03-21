@@ -151,6 +151,13 @@ export default function SignalCenter() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MetricCard label="Active Signals" value={`${activeCount}`} icon={Zap} />
+        <MetricCard label="Avg Score" value={`${formatNumber(avgScore)}`} icon={BarChart3} changeType={avgScore >= 65 ? "positive" : "negative"} />
+        <MetricCard label="Avg Confidence" value={`${formatNumber(avgConfidence)}%`} icon={Target} changeType={avgConfidence >= 60 ? "positive" : "negative"} />
+        <MetricCard label="Avg Expected R" value={`${avgR.toFixed(2)}:1`} icon={Shield} changeType={avgR >= 2 ? "positive" : "negative"} />
+      </div>
+
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
         {["all", "active", "invalidated", "closed"].map(s => (
