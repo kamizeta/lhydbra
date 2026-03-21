@@ -138,6 +138,12 @@ export default function AppLayout() {
           )}
         </div>
 
+        <div className="hidden md:block border-t border-border p-2">
+          <button onClick={() => setCollapsed(!collapsed)} className="flex w-full items-center justify-center rounded-md py-2 text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors">
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        </div>
+
         <div className="border-t border-border p-3">
           <div className="flex items-center gap-2">
             <Activity className="h-3 w-3 text-profit animate-pulse-glow" />
