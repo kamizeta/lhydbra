@@ -39,7 +39,6 @@ export default function AppLayout() {
     { to: "/portfolio", icon: Briefcase, label: "Portafolio" },
     { to: "/agents", icon: Bot, label: t.nav.agents },
     { to: "/trade-ideas", icon: Lightbulb, label: t.nav.tradeIdeas },
-    { to: "/learning", icon: Brain, label: "Learning" },
     { to: "/settings", icon: Settings, label: "Settings" },
   ];
 
@@ -47,6 +46,7 @@ export default function AppLayout() {
     { to: "/signals", icon: Zap, label: "Signals" },
     { to: "/allocation", icon: PieChart, label: "Allocation" },
     { to: "/strategy-lab", icon: FlaskConical, label: "Strategy Lab" },
+    { to: "/learning", icon: Brain, label: "Learning" },
   ];
 
   return (
