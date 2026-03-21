@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, BarChart3, Bot, Lightbulb, Briefcase,
   ChevronLeft, ChevronRight, Activity, Settings, LogOut, Menu, X,
-  Zap, FlaskConical, Brain, PieChart,
+  Zap, FlaskConical, Brain, PieChart, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
@@ -18,6 +18,7 @@ import { usePositionAlerts } from "@/hooks/usePositionAlerts";
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [proOpen, setProOpen] = useState(true);
   const { t } = useI18n();
   const { user, signOut } = useAuth();
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -32,17 +33,20 @@ export default function AppLayout() {
       });
   }, [user]);
 
-  const navItems = [
+  const mainNavItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.dashboard },
     { to: "/market", icon: BarChart3, label: t.nav.market },
-    { to: "/signals", icon: Zap, label: "Signals" },
     { to: "/portfolio", icon: Briefcase, label: "Portafolio" },
-    { to: "/allocation", icon: PieChart, label: "Allocation" },
     { to: "/agents", icon: Bot, label: t.nav.agents },
     { to: "/trade-ideas", icon: Lightbulb, label: t.nav.tradeIdeas },
-    { to: "/strategy-lab", icon: FlaskConical, label: "Strategy Lab" },
     { to: "/learning", icon: Brain, label: "Learning" },
     { to: "/settings", icon: Settings, label: "Settings" },
+  ];
+
+  const proNavItems = [
+    { to: "/signals", icon: Zap, label: "Signals" },
+    { to: "/allocation", icon: PieChart, label: "Allocation" },
+    { to: "/strategy-lab", icon: FlaskConical, label: "Strategy Lab" },
   ];
 
   return (
