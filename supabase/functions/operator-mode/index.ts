@@ -18,6 +18,43 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const body = await req.json().catch(() => ({}));
+    const { scheduled = false } = body;
+
+    // ─── Scheduled run: iterate all full_operator users ───
+    if (scheduled) {
+      const adminSupabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
+      const { data: autoUsers } = await adminSupabase
+        .from("goal_profiles")
+        .select("user_id")
+        .eq("automation_level", "full_operator")
+        .eq("is_active", true);
+
+      const results = [];
+      for (const u of (autoUsers || [])) {
+        try {
+          const resp = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/operator-mode`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({ action: "run", paper: true, user_id_override: u.user_id }),
+          });
+          results.push({ user_id: u.user_id, ok: resp.ok });
+        } catch (e) {
+          results.push({ user_id: u.user_id, ok: false, error: e instanceof Error ? e.message : "Unknown" });
+        }
+      }
+
+      return jsonRes({ scheduled: true, processed: results.length, results });
+    }
+
+    // ─── Standard auth flow ───
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return jsonRes({ error: "Unauthorized" }, 401);
 
@@ -25,15 +62,23 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const userSupabase = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: userError } = await userSupabase.auth.getUser();
-    if (userError || !user) return jsonRes({ error: "Unauthorized" }, 401);
+    // Support user_id_override for scheduled per-user calls
+    const { action = "run", paper = true, user_id_override } = body;
+
+    let user: { id: string } | null = null;
+    if (user_id_override) {
+      // Called from scheduled dispatcher with service role key
+      user = { id: user_id_override };
+    } else {
+      const userSupabase = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user: authUser }, error: userError } = await userSupabase.auth.getUser();
+      if (userError || !authUser) return jsonRes({ error: "Unauthorized" }, 401);
+      user = authUser;
+    }
 
     const supabase = createClient(supabaseUrl, serviceKey);
-    const body = await req.json();
-    const { action = "run", paper = true } = body;
 
     // ─── Load user settings & goal ───
     const [settingsRes, goalRes] = await Promise.all([
