@@ -52,6 +52,11 @@ export default function Dashboard() {
   const [monthlyPnl, setMonthlyPnl] = useState(0);
   const [journalStats, setJournalStats] = useState({ total: 0, wins: 0, avgR: 0 });
   const [showGoalSetup, setShowGoalSetup] = useState(false);
+  const [activeSignals, setActiveSignals] = useState<Array<{
+    id: string; asset: string; direction: string;
+    opportunity_score: number; expected_r_multiple: number;
+    confidence_score: number;
+  }>>([]);
 
   useEffect(() => {
     if (!user) return;
