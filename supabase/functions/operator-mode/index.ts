@@ -356,21 +356,24 @@ Deno.serve(async (req) => {
               ? ` | Slippage: ${(slippage * 100).toFixed(2)}% (expected ${expectedEntry}, filled ${filledPrice})`
               : "";
 
+            const actualQty = parseFloat(orderResult.order.filled_qty || "0") || trade.quantity;
+            const actualEntry = filledPrice > 0 ? filledPrice : expectedEntry;
+
             await supabase.from("positions").insert({
               user_id: user.id,
               symbol: String(trade.asset),
               name: String(trade.asset),
               asset_type: String(trade.asset_class || "stock"),
               direction: String(trade.direction),
-              quantity: trade.quantity,
-              avg_entry: filledPrice > 0 ? filledPrice : expectedEntry,
+              quantity: actualQty,
+              avg_entry: actualEntry,
               stop_loss: adjustedStop,
               take_profit: Number(trade.take_profit),
               strategy: String(trade.strategy_family || "operator"),
               strategy_family: String(trade.strategy_family || "operator"),
               regime_at_entry: String(trade.market_regime || "undefined"),
               status: "open",
-              notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}`,
+              notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}${actualQty < trade.quantity ? ` | Partial fill: ${actualQty}/${trade.quantity}` : ""}`,
             });
           } else if (!orderResult.success && !orderResult.pending) {
             console.error("Order failed for", trade.asset, ":", orderResult.error);
