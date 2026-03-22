@@ -245,7 +245,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           const orderBody: Record<string, unknown> = {
             action: 'place_order',
             paper: alpacaPaper,
-            symbol: signal.symbol.replace('/', ''),
+            symbol: signal.asset.replace('/', ''),
             qty: quantity,
             side: alpacaSide,
             type: 'market',
