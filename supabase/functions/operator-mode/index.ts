@@ -270,8 +270,9 @@ Deno.serve(async (req) => {
     const shouldExecute = automationLevel === "full_operator" || (automationLevel === "assisted" && autoExecute);
     const execResults: Record<string, unknown>[] = [];
 
+    const executableTrades = sized.filter((t: Record<string, unknown>) => !t.skip);
     if (shouldExecute && action === "run") {
-      for (const trade of sized) {
+      for (const trade of executableTrades) {
         try {
           const orderRes = await fetch(`${supabaseUrl}/functions/v1/alpaca-trade`, {
             method: "POST",
