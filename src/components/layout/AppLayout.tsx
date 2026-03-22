@@ -37,7 +37,7 @@ export default function AppLayout() {
     { to: "/signals", icon: Zap, label: t.nav.signals },
     { to: "/trade-ideas", icon: Activity, label: t.nav.tradeIdeas },
     { to: "/portfolio", icon: Briefcase, label: t.nav.portfolio },
-    { to: "/positions", icon: TrendingUp, label: "Positions" },
+    
     { to: "/allocation", icon: PieChart, label: t.nav.allocation },
     { to: "/settings", icon: Settings, label: t.nav.settings },
   ];
