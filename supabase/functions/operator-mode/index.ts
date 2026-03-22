@@ -249,11 +249,14 @@ Deno.serve(async (req) => {
       const successCount = execResults.filter(r => r.success).length;
       const riskUsed = sized.filter((_: unknown, i: number) => execResults[i]?.success).reduce((s: number, t: Record<string, unknown>) => s + Number(t.risk_pct || 0), 0);
 
-      await supabase.from("user_settings").update({
-        trades_today: tradesToday + successCount,
-        last_trade_date: today,
-        daily_risk_used: dailyRiskUsed + riskUsed,
-      }).eq("user_id", user.id);
+      await supabase.rpc("increment_trade_counters", {
+        p_user_id: user.id,
+        p_trade_count: successCount,
+        p_risk_pct: riskUsed,
+        p_today: today,
+        p_max_trades: maxTradesPerDay,
+        p_max_risk: maxDailyRisk,
+      });
 
       await supabase.from("daily_performance").upsert({
         user_id: user.id, date: today,

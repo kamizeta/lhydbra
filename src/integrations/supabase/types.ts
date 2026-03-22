@@ -1862,7 +1862,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_trade_counters: {
+        Args: {
+          p_max_risk: number
+          p_max_trades: number
+          p_risk_pct: number
+          p_today: string
+          p_trade_count: number
+          p_user_id: string
+        }
+        Returns: {
+          new_daily_risk_used: number
+          new_trades_today: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
