@@ -1776,6 +1776,7 @@ export type Database = {
           binance_api_key: string | null
           binance_api_secret: string | null
           consecutive_losses: number
+          consecutive_wins: number
           created_at: string
           current_capital: number
           daily_risk_used: number
@@ -1804,6 +1805,7 @@ export type Database = {
           binance_api_key?: string | null
           binance_api_secret?: string | null
           consecutive_losses?: number
+          consecutive_wins?: number
           created_at?: string
           current_capital?: number
           daily_risk_used?: number
@@ -1832,6 +1834,7 @@ export type Database = {
           binance_api_key?: string | null
           binance_api_secret?: string | null
           consecutive_losses?: number
+          consecutive_wins?: number
           created_at?: string
           current_capital?: number
           daily_risk_used?: number

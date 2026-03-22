@@ -1,0 +1,1 @@
+ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS consecutive_wins integer NOT NULL DEFAULT 0;
