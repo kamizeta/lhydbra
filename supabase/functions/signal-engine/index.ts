@@ -380,13 +380,11 @@ Deno.serve(async (req) => {
       }
 
       // Compute subscores
-      const subscores = {
+      const subscores: Record<string, number> = {
         market_structure: computeMarketStructure(enriched),
         momentum: computeMomentum(enriched),
         volatility_suitability: computeVolatilitySuitability(enriched, strategyFamily),
         strategy_confluence: computeStrategyConfluence(enriched, strategyFamily),
-        macro_context: 45, // Conservative: penalize lack of real data
-        sentiment_flow: 45, // Conservative: penalize lack of real data
         risk_reward: computeRiskReward(expectedR, setup.targets, setup.entry, setup.sl),
         historical_performance: 50,
       };
