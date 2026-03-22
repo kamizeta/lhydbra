@@ -188,14 +188,14 @@ function isUSMarketOpen(): boolean {
       const stopLoss = Number(sig.stop_loss);
       const stopDist = Math.abs(entryPrice - stopLoss);
       const effectiveRisk = Math.min(riskPerTrade, remainingRisk / signals.length);
-      const riskDollars = currentCapital * (effectiveRisk / 100);
+      const riskDollars = liveCapital * (effectiveRisk / 100);
       let quantity = stopDist > 0 ? Math.floor(riskDollars / stopDist) : 0;
       if (quantity <= 0) quantity = 1;
 
       const maxSingleAsset = Number(settings.max_single_asset || 25);
       const positionValue = quantity * entryPrice;
-      const positionPct = (positionValue / currentCapital) * 100;
-      if (positionPct > maxSingleAsset) quantity = Math.floor((currentCapital * maxSingleAsset / 100) / entryPrice);
+      const positionPct = (positionValue / liveCapital) * 100;
+      if (positionPct > maxSingleAsset) quantity = Math.floor((liveCapital * maxSingleAsset / 100) / entryPrice);
 
       const targets = (sig.targets as number[]) || [];
       const takeProfit = targets.length > 0 ? targets[0] : entryPrice + stopDist * 2;
