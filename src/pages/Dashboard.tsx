@@ -138,8 +138,24 @@ export default function Dashboard() {
 
   const handleRunOperator = async () => {
     await runOperator(true);
-    if (opError) toast.error(opError);
-    else toast.success(t.operator.operatorCycleComplete);
+    if (opError) {
+      toast.error(opError);
+    } else {
+      toast.success(t.operator.operatorCycleComplete);
+      try {
+        await supabase.functions.invoke('alpaca-sync', { body: { paper: true } });
+        toast.success("Positions synced with Alpaca");
+      } catch {
+        toast.info("Run manual sync if positions don't update");
+      }
+      supabase.from('signals')
+        .select('id, asset, direction, opportunity_score, expected_r_multiple, confidence_score')
+        .eq('user_id', user!.id)
+        .eq('status', 'active')
+        .order('opportunity_score', { ascending: false })
+        .limit(3)
+        .then(({ data }) => setActiveSignals(data || []));
+    }
   };
 
   const cooldownActive = operatorStatus?.cooldown_active || false;
