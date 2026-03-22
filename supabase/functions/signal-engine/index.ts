@@ -450,12 +450,26 @@ Deno.serve(async (req) => {
         historical_performance: 50,
       };
 
-      // Enrich historical from perfData
+      const STRATEGY_PRIORS: Record<string, number> = {
+        momentum: 52,
+        trend_following: 48,
+        mean_reversion: 55,
+        breakout: 45,
+        hybrid: 50,
+      };
       const perfKey = `${strategyFamily}:${regime}`;
       const perf = perfMap[perfKey] || perfMap[`${strategyFamily}:all`] || null;
-      if (perf) {
+      if (perf && Number(perf.total_trades || 0) >= 5) {
         const wr = Number(perf.win_rate || 0);
-        subscores.historical_performance = clamp(wr, 0, 100);
+        const totalTrades = Number(perf.total_trades || 0);
+        const blendWeight = Math.min(totalTrades / 30, 1.0);
+        const prior = STRATEGY_PRIORS[strategyFamily] || 50;
+        subscores.historical_performance = clamp(
+          prior * (1 - blendWeight) + wr * blendWeight,
+          0, 100
+        );
+      } else {
+        subscores.historical_performance = STRATEGY_PRIORS[strategyFamily] || 50;
       }
 
       const weights = getWeightsForContext(regime, assetClass);
