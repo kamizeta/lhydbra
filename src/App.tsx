@@ -59,7 +59,7 @@ function ProtectedRoutes() {
         <Route path="/advanced/api-usage" element={<ApiUsagePage />} />
         <Route path="/advanced/backtest" element={<StrategyLab />} />
         <Route path="/advanced/risk" element={<RiskManagement />} />
-        <Route path="/advanced/journal" element={<Journal />} />
+        
         <Route path="/advanced/radar" element={<OpportunityRadar />} />
         <Route path="/advanced/algo" element={<AlgoEffectiveness />} />
       </Route>
