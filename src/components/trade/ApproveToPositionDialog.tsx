@@ -117,7 +117,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
       setLoaded(true);
     };
     fetchPortfolio();
-  }, [user, signal.symbol]);
+  }, [user, signal.asset]);
 
   // Run risk validation whenever inputs change
   useEffect(() => {
