@@ -3,7 +3,7 @@ import { Radar, TrendingUp, TrendingDown, Minus, RefreshCw, Loader2, Zap, Target
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { formatNumber } from "@/lib/mockData";
+import { formatNumber } from "@/lib/utils";
 import StatusBadge from "@/components/shared/StatusBadge";
 import MetricCard from "@/components/shared/MetricCard";
 

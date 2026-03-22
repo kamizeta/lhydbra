@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Brain, Play, Pause, ChevronDown, ChevronUp, Target, Clock, TrendingUp, AlertTriangle } from "lucide-react";
-import { type Strategy, formatCurrency, formatNumber } from "@/lib/mockData";
+import { type Strategy } from "@/lib/mockData";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import StatusBadge from "@/components/shared/StatusBadge";
 import MetricCard from "@/components/shared/MetricCard";
 import { cn } from "@/lib/utils";

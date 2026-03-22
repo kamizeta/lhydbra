@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatNumber } from "@/lib/mockData";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";

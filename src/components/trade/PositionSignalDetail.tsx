@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Lightbulb, Target, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/i18n";
-import { formatCurrency } from "@/lib/mockData";
+import { formatCurrency } from "@/lib/utils";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
 

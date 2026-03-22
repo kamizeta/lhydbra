@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, ArrowUpDown, TrendingUp, TrendingDown, Minus, Loader2, RefreshCw, Timer, TimerOff, X, AlertTriangle, Brain, Zap, Activity, BarChart3, Shield, Target, Lightbulb } from "lucide-react";
-import { mockAssets, Asset, AssetType, formatCurrency, formatNumber, formatVolume } from "@/lib/mockData";
+import { mockAssets, Asset, AssetType, formatVolume } from "@/lib/mockData";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useQuickQuotes } from "@/hooks/useMarketData";
 import { useMarketFeaturesDB, useRunDataIntelligence } from "@/hooks/useDataIntelligence";
 import { useOpportunityScores, useRunOpportunityScoring } from "@/hooks/useOpportunityScores";

@@ -19,7 +19,7 @@ import { useOperatorMode } from "@/hooks/useOperatorMode";
 import { useGoalProfile } from "@/hooks/useGoalProfile";
 import { usePerformanceCoach } from "@/hooks/usePerformanceCoach";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCurrency } from "@/lib/mockData";
+import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useMarketData } from "@/hooks/useMarketData";
 import { toast } from "sonner";

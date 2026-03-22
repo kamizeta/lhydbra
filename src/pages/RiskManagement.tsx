@@ -6,7 +6,7 @@ import StatusBadge from "@/components/shared/StatusBadge";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCurrency, formatNumber } from "@/lib/mockData";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 

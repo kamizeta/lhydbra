@@ -327,21 +327,8 @@ export const portfolioValue = 119250;
 export const portfolioChange = 5523.17;
 export const portfolioChangePercent = 4.86;
 
-export function formatCurrency(value: number, decimals = 2): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value);
-}
-
-export function formatNumber(value: number, decimals = 2): string {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value);
-}
+// Re-export from utils for backward compatibility
+export { formatCurrency, formatNumber } from "@/lib/utils";
 
 export function formatVolume(value: number): string {
   if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
@@ -355,5 +342,5 @@ export function formatMarketCap(value: number | undefined): string {
   if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
   if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
   if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
-  return formatCurrency(value);
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
