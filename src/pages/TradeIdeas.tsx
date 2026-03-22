@@ -260,7 +260,7 @@ export default function TradeIdeas() {
                             <Check className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={(e) => { e.stopPropagation(); updateStatus(signal.id, 'rejected'); }}
+                            onClick={(e) => { e.stopPropagation(); handleReject(signal.id); }}
                             className="rounded-md bg-loss/15 p-2 text-loss hover:bg-loss/25 transition-colors"
                           >
                             <X className="h-4 w-4" />
