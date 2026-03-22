@@ -446,6 +446,7 @@ export type Database = {
         Row: {
           asset_class_a: string
           asset_class_b: string
+          calculated_at: string | null
           computed_at: string
           correlation: number
           id: string
@@ -455,6 +456,7 @@ export type Database = {
         Insert: {
           asset_class_a?: string
           asset_class_b?: string
+          calculated_at?: string | null
           computed_at?: string
           correlation?: number
           id?: string
@@ -464,6 +466,7 @@ export type Database = {
         Update: {
           asset_class_a?: string
           asset_class_b?: string
+          calculated_at?: string | null
           computed_at?: string
           correlation?: number
           id?: string
