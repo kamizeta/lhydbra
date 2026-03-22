@@ -182,7 +182,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
     if (symbolPct > settings.max_single_asset) {
       v.push({
         rule: 'Concentración en activo',
-        current: `${formatNumber(symbolPct)}% en ${signal.symbol}`,
+        current: `${formatNumber(symbolPct)}% en ${signal.asset}`,
         limit: `${settings.max_single_asset}%`,
         severity: 'warning',
       });
