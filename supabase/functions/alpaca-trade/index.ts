@@ -137,7 +137,12 @@ serve(async (req) => {
         }
       }
 
+      const idempotencyId = signal_id
+        ? `lhy-${String(signal_id).slice(0, 8)}`
+        : `lhy-${crypto.randomUUID().slice(0, 12)}`;
+
       const orderBody: Record<string, unknown> = {
+        client_order_id: idempotencyId,
         symbol,
         qty: String(qty),
         side,
