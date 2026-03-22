@@ -387,7 +387,16 @@ Deno.serve(async (req) => {
 
       // Update counters
       const successCount = execResults.filter(r => r.success).length;
-      const riskUsed = sized.filter((_: unknown, i: number) => execResults[i]?.success).reduce((s: number, t: Record<string, unknown>) => s + Number(t.risk_pct || 0), 0);
+      const riskUsed = sized
+        .filter((_: unknown, i: number) => execResults[i]?.success)
+        .reduce((s: number, t: Record<string, unknown>, i: number) => {
+          const result = execResults[i] as Record<string, unknown>;
+          const order = result?.order as Record<string, unknown>;
+          const filledQty = parseFloat(String(order?.filled_qty || "0")) || Number(t.quantity);
+          const requestedQty = Number(t.quantity);
+          const fillRatio = requestedQty > 0 ? filledQty / requestedQty : 1;
+          return s + Number(t.risk_pct || 0) * fillRatio;
+        }, 0);
 
       await supabase.rpc("increment_trade_counters", {
         p_user_id: user.id,
