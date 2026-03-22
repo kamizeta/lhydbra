@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, BarChart3, Bot, Briefcase,
   ChevronLeft, ChevronRight, Activity, Settings, LogOut, Menu, X,
-  Zap, FlaskConical, Brain, PieChart,
+  Zap, FlaskConical, Brain, PieChart, TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
@@ -37,6 +37,7 @@ export default function AppLayout() {
     { to: "/signals", icon: Zap, label: t.nav.signals },
     { to: "/trade-ideas", icon: Activity, label: t.nav.tradeIdeas },
     { to: "/portfolio", icon: Briefcase, label: t.nav.portfolio },
+    { to: "/positions", icon: TrendingUp, label: "Positions" },
     { to: "/allocation", icon: PieChart, label: t.nav.allocation },
     { to: "/settings", icon: Settings, label: t.nav.settings },
   ];
