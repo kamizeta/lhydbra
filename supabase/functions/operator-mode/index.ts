@@ -186,6 +186,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         user_id: user.id, min_score: 70, min_r: 1.8, min_confidence: 60,
         max_signals: Math.min(remainingSlots, 3), operator_mode: true,
+        symbols: Array.isArray((settings as any).watchlist) && (settings as any).watchlist.length > 0
+          ? (settings as any).watchlist
+          : [],
       }),
     });
 
