@@ -38,18 +38,20 @@ function ProtectedRoutes() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
+        {/* Core routes */}
         <Route path="/" element={<Dashboard />} />
-        <Route path="/market" element={<MarketPage />} />
-        <Route path="/agents" element={<AgentsPanel />} />
-        <Route path="/trade-ideas" element={<TradeIdeas />} />
         <Route path="/signals" element={<SignalCenter />} />
+        <Route path="/trade-ideas" element={<TradeIdeas />} />
         <Route path="/portfolio" element={<PortfolioPage />} />
         <Route path="/allocation" element={<PortfolioAllocation />} />
-        <Route path="/strategy-lab" element={<StrategyResearchLab />} />
-        <Route path="/learning" element={<LearningDashboard />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/api-usage" element={<ApiUsagePage />} />
+        {/* Advanced routes */}
+        <Route path="/advanced/agents" element={<AgentsPanel />} />
+        <Route path="/advanced/strategy-lab" element={<StrategyResearchLab />} />
+        <Route path="/advanced/learning" element={<LearningDashboard />} />
+        <Route path="/advanced/market" element={<MarketPage />} />
+        <Route path="/advanced/api-usage" element={<ApiUsagePage />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
