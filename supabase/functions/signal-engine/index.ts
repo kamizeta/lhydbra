@@ -232,6 +232,36 @@ function determineBestStrategy(features: Record<string, unknown>): string {
   return map[regime] || 'hybrid';
 }
 
+// ─── Real Macro & Sentiment Data ───
+
+async function fetchFearGreedScore(): Promise<number> {
+  try {
+    const r = await fetch("https://api.alternative.me/fng/?limit=1", {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!r.ok) return 50;
+    const d = await r.json();
+    return parseInt(d?.data?.[0]?.value ?? "50");
+  } catch { return 50; }
+}
+
+async function fetchVIXScore(apiKey: string): Promise<number> {
+  try {
+    const r = await fetch(
+      `https://api.twelvedata.com/price?symbol=VIX&apikey=${apiKey}`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    if (!r.ok) return 50;
+    const d = await r.json();
+    const vix = parseFloat(d?.price ?? "20");
+    if (vix < 12) return 85;
+    if (vix < 17) return 70;
+    if (vix < 25) return 50;
+    if (vix < 35) return 30;
+    return 15;
+  } catch { return 50; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
