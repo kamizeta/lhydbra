@@ -98,6 +98,17 @@ export default function Dashboard() {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('signals')
+      .select('id, asset, direction, opportunity_score, expected_r_multiple, confidence_score')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('opportunity_score', { ascending: false })
+      .limit(3)
+      .then(({ data }) => setActiveSignals(data || []));
+  }, [user]);
+
   const priceMap = useMemo(() => {
     const map = new Map<string, number>();
     if (!marketAssets) return map;
