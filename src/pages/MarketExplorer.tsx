@@ -58,6 +58,7 @@ function VolatilityBadge({ regime }: { regime: string }) {
 }
 
 export default function MarketExplorer() {
+  const { user } = useAuth();
   const { t } = useI18n();
   const autoRefresh = useAutoRefresh();
   const [countdown, setCountdown] = useState(60);
