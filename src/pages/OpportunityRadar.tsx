@@ -211,9 +211,9 @@ export default function OpportunityRadar() {
           {selected ? (
             <>
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-foreground font-mono">{selected.symbol}</h2>
-                <span className={cn("text-2xl font-mono font-bold", getTier(selected.total_score).color)}>
-                  {selected.total_score.toFixed(0)}
+                <h2 className="text-lg font-bold text-foreground font-mono">{selected.asset}</h2>
+                <span className={cn("text-2xl font-mono font-bold", getTier(selected.opportunity_score).color)}>
+                  {selected.opportunity_score.toFixed(0)}
                 </span>
               </div>
 
