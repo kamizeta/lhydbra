@@ -137,9 +137,33 @@ serve(async (req) => {
         if (buyingPower < 10) {
           return jsonRes({ error: "Insufficient buying power" }, 400);
         }
+
+      // Validate asset is tradable on Alpaca
+      try {
+        const assetRes = await fetchWithRetry(
+          `${baseUrl}/v2/assets/${encodeURIComponent(symbol)}`,
+          { headers }
+        );
+        if (assetRes.ok) {
+          const asset = await assetRes.json();
+          if (asset.tradable === false) {
+            return jsonRes({
+              error: `${symbol} is not tradable on Alpaca (status: ${asset.status || "unknown"})`,
+            }, 400);
+          }
+          if (asset.status === "inactive") {
+            return jsonRes({
+              error: `${symbol} is inactive on Alpaca`,
+            }, 400);
+          }
+          if (side === "sell" && asset.easy_to_borrow === false) {
+            console.warn(`${symbol} is not easy-to-borrow, short may be rejected by Alpaca`);
+          }
+        }
+      } catch {
+        console.warn(`Asset tradability check failed for ${symbol}, proceeding with order`);
       }
 
-      const idempotencyId = signal_id
         ? `lhy-${String(signal_id).slice(0, 8)}`
         : `lhy-${crypto.randomUUID().slice(0, 12)}`;
 
