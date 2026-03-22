@@ -48,6 +48,8 @@ export default function AppLayout() {
     { to: "/advanced/learning", icon: Brain, label: t.nav.learning },
     { to: "/advanced/market", icon: BarChart3, label: t.nav.market },
     { to: "/advanced/backtest", icon: FlaskConical, label: "Backtest" },
+    { to: "/advanced/journal", icon: BookOpen, label: "Journal" },
+    { to: "/advanced/risk", icon: Shield, label: "Risk" },
   ];
 
   const renderNavItem = (item: typeof coreNavItems[0], dimmed = false) => (
