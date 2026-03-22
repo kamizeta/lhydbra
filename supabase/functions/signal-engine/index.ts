@@ -289,6 +289,19 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // ─── Expire stale signals (older than 24h) ───
+    const expiryThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    await supabase
+      .from("signals")
+      .update({
+        status: "invalidated",
+        invalidation_reason: "Signal expired: market conditions may have changed (>24h old)",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user_id)
+      .eq("status", "active")
+      .lt("created_at", expiryThreshold);
+
     const targetSymbols = symbols && symbols.length > 0 ? symbols : [];
 
     // Fetch open positions to avoid duplicating signals
