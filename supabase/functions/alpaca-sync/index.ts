@@ -114,6 +114,42 @@ serve(async (req) => {
             detail: `qty: ${localQty}→${qty}, entry: ${localEntry.toFixed(2)}→${avgEntry.toFixed(2)}`,
           });
         }
+
+        // ─── Breakeven stop management ───
+        if (local.stop_loss) {
+          const currentSL = Number(local.stop_loss);
+          const entry = Number(local.avg_entry);
+          const stopDist = Math.abs(entry - currentSL);
+          const direction = local.direction === "long" ? "long" : "short";
+
+          const currentR = stopDist > 0
+            ? direction === "long"
+              ? (currentPrice - entry) / stopDist
+              : (entry - currentPrice) / stopDist
+            : 0;
+
+          const alreadyAtBreakeven = direction === "long"
+            ? currentSL >= entry - 0.001
+            : currentSL <= entry + 0.001;
+
+          if (currentR >= 1.0 && !alreadyAtBreakeven) {
+            try {
+              await supabase.from("positions").update({
+                stop_loss: entry,
+                updated_at: new Date().toISOString(),
+                notes: `${local.notes || ""} | BE stop set at ${entry.toFixed(4)} (reached ${currentR.toFixed(1)}R)`,
+              }).eq("id", local.id);
+
+              changes.push({
+                action: "updated",
+                symbol: sym,
+                detail: `Breakeven stop set @ ${entry.toFixed(4)} (was ${currentSL.toFixed(4)}, reached ${currentR.toFixed(1)}R)`,
+              });
+            } catch (beErr) {
+              console.error("Breakeven stop update error:", beErr);
+            }
+          }
+        }
       } else {
         // New position from Alpaca → create locally
         await supabase.from("positions").insert({

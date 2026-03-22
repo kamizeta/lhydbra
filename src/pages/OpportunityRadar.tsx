@@ -8,20 +8,14 @@ import StatusBadge from "@/components/shared/StatusBadge";
 import MetricCard from "@/components/shared/MetricCard";
 
 interface OpScore {
-  symbol: string;
-  asset_type: string;
-  total_score: number;
+  asset: string;
+  asset_class: string;
+  opportunity_score: number;
   direction: string | null;
   strategy_family: string | null;
-  momentum_score: number | null;
-  structure_score: number | null;
-  volatility_score: number | null;
-  strategy_score: number | null;
-  rr_score: number | null;
-  macro_score: number | null;
-  sentiment_score: number | null;
-  historical_score: number | null;
-  computed_at: string;
+  score_breakdown: Record<string, number>;
+  confidence_score: number;
+  created_at: string;
 }
 
 interface MarketFeature {
@@ -65,15 +59,16 @@ export default function OpportunityRadar() {
   const [filter, setFilter] = useState<"all" | "long" | "short">("all");
 
   useEffect(() => {
+    if (!user) return;
     Promise.all([
-      supabase.from("opportunity_scores").select("*").eq("timeframe", "1d").order("total_score", { ascending: false }),
+      supabase.from("signals").select("*").eq("user_id", user.id).eq("status", "active").order("opportunity_score", { ascending: false }),
       supabase.from("market_features").select("symbol, market_regime, trend_direction, trend_strength, rsi_14, momentum_score, volatility_regime").eq("timeframe", "1d"),
     ]).then(([scoresRes, featRes]) => {
-      if (scoresRes.data) setScores(scoresRes.data as OpScore[]);
+      if (scoresRes.data) setScores(scoresRes.data as unknown as OpScore[]);
       if (featRes.data) setFeatures(featRes.data as MarketFeature[]);
       setLoading(false);
     });
-  }, []);
+  }, [user]);
 
   const featureMap = useMemo(() => {
     const m = new Map<string, MarketFeature>();
@@ -86,10 +81,13 @@ export default function OpportunityRadar() {
     return scores.filter(s => s.direction === filter);
   }, [scores, filter]);
 
-  const selected = selectedSymbol ? scores.find(s => s.symbol === selectedSymbol) : null;
+  // Helper to get sub-score from breakdown
+  const getSubScore = (s: OpScore, key: string) => (s.score_breakdown || {})[key] || 0;
+
+  const selected = selectedSymbol ? scores.find(s => s.asset === selectedSymbol) : null;
   const selectedFeature = selectedSymbol ? featureMap.get(selectedSymbol) : null;
 
-  const avgScore = scores.length > 0 ? scores.reduce((s, o) => s + o.total_score, 0) / scores.length : 0;
+  const avgScore = scores.length > 0 ? scores.reduce((s, o) => s + o.opportunity_score, 0) / scores.length : 0;
   const topOpp = scores.length > 0 ? scores[0] : null;
   const longCount = scores.filter(s => s.direction === "long").length;
   const shortCount = scores.filter(s => s.direction === "short").length;
@@ -114,7 +112,7 @@ export default function OpportunityRadar() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MetricCard label="Avg Score" value={formatNumber(avgScore)} icon={Target} changeType={avgScore >= 55 ? "positive" : "negative"} />
-        <MetricCard label="Top Opportunity" value={topOpp ? `${topOpp.symbol} (${topOpp.total_score.toFixed(0)})` : "—"} icon={Zap} />
+        <MetricCard label="Top Opportunity" value={topOpp ? `${topOpp.asset} (${topOpp.opportunity_score.toFixed(0)})` : "—"} icon={Zap} />
         <MetricCard label="Direction Bias" value={`${longCount}L / ${shortCount}S`} change={longCount > shortCount ? "Bullish bias" : shortCount > longCount ? "Bearish bias" : "Neutral"} icon={TrendingUp} />
         <MetricCard label="Assets Scanned" value={`${scores.length}`} icon={Radar} />
       </div>
@@ -150,17 +148,17 @@ export default function OpportunityRadar() {
               </thead>
               <tbody>
                 {filtered.map(s => {
-                  const tier = getTier(s.total_score);
-                  const feat = featureMap.get(s.symbol);
-                  const isSelected = selectedSymbol === s.symbol;
+                  const tier = getTier(s.opportunity_score);
+                  const feat = featureMap.get(s.asset);
+                  const isSelected = selectedSymbol === s.asset;
                   return (
-                    <tr key={s.symbol}
-                      onClick={() => setSelectedSymbol(isSelected ? null : s.symbol)}
+                    <tr key={s.asset}
+                      onClick={() => setSelectedSymbol(isSelected ? null : s.asset)}
                       className={cn(
                         "border-b border-border/50 cursor-pointer transition-colors",
                         isSelected ? "bg-primary/10" : "hover:bg-accent/30"
                       )}>
-                      <td className="p-3 font-mono font-bold text-foreground">{s.symbol}</td>
+                      <td className="p-3 font-mono font-bold text-foreground">{s.asset}</td>
                       <td className="text-center p-3">
                         {s.direction === "long" ? (
                           <span className="text-profit flex items-center justify-center gap-1"><ArrowUpRight className="h-3.5 w-3.5" /> LONG</span>
@@ -171,7 +169,7 @@ export default function OpportunityRadar() {
                         )}
                       </td>
                       <td className="text-center p-3">
-                        <span className={cn("text-lg font-mono font-bold", tier.color)}>{s.total_score.toFixed(0)}</span>
+                        <span className={cn("text-lg font-mono font-bold", tier.color)}>{s.opportunity_score.toFixed(0)}</span>
                       </td>
                       <td className="text-center p-3">
                         <span className={cn("text-[10px] font-mono font-bold px-2 py-0.5 rounded border", tier.bg, tier.color, tier.border)}>
@@ -187,7 +185,7 @@ export default function OpportunityRadar() {
                       <td className="p-3">
                         <div className="flex gap-0.5 items-end h-5">
                           {SUB_SCORE_LABELS.map(({ key }) => {
-                            const val = (s as any)[key] || 0;
+                            const val = getSubScore(s, key.replace('_score', ''));
                             const h = Math.max(2, (val / 100) * 20);
                             return (
                               <div key={key} className={cn("w-2 rounded-sm transition-all",
@@ -213,9 +211,9 @@ export default function OpportunityRadar() {
           {selected ? (
             <>
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-foreground font-mono">{selected.symbol}</h2>
-                <span className={cn("text-2xl font-mono font-bold", getTier(selected.total_score).color)}>
-                  {selected.total_score.toFixed(0)}
+                <h2 className="text-lg font-bold text-foreground font-mono">{selected.asset}</h2>
+                <span className={cn("text-2xl font-mono font-bold", getTier(selected.opportunity_score).color)}>
+                  {selected.opportunity_score.toFixed(0)}
                 </span>
               </div>
 
@@ -225,9 +223,9 @@ export default function OpportunityRadar() {
                 </StatusBadge>
                 <StatusBadge variant="info">{selected.strategy_family || "—"}</StatusBadge>
                 <span className={cn("text-[10px] font-mono px-2 py-0.5 rounded border",
-                  getTier(selected.total_score).bg, getTier(selected.total_score).color, getTier(selected.total_score).border
+                  getTier(selected.opportunity_score).bg, getTier(selected.opportunity_score).color, getTier(selected.opportunity_score).border
                 )}>
-                  {getTier(selected.total_score).label}
+                  {getTier(selected.opportunity_score).label}
                 </span>
               </div>
 
@@ -235,7 +233,7 @@ export default function OpportunityRadar() {
               <div className="space-y-2">
                 <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Score Breakdown</h3>
                 {SUB_SCORE_LABELS.map(({ key, label }) => {
-                  const val = (selected as any)[key] || 0;
+                  const val = getSubScore(selected, key.replace('_score', ''));
                   return (
                     <div key={key} className="space-y-1">
                       <div className="flex justify-between text-xs">
@@ -282,7 +280,7 @@ export default function OpportunityRadar() {
               )}
 
               <div className="text-[10px] text-muted-foreground font-mono pt-2">
-                Computed: {new Date(selected.computed_at).toLocaleString()}
+                Computed: {new Date(selected.created_at).toLocaleString()}
               </div>
             </>
           ) : (

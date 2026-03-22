@@ -356,21 +356,24 @@ Deno.serve(async (req) => {
               ? ` | Slippage: ${(slippage * 100).toFixed(2)}% (expected ${expectedEntry}, filled ${filledPrice})`
               : "";
 
+            const actualQty = parseFloat(orderResult.order.filled_qty || "0") || trade.quantity;
+            const actualEntry = filledPrice > 0 ? filledPrice : expectedEntry;
+
             await supabase.from("positions").insert({
               user_id: user.id,
               symbol: String(trade.asset),
               name: String(trade.asset),
               asset_type: String(trade.asset_class || "stock"),
               direction: String(trade.direction),
-              quantity: trade.quantity,
-              avg_entry: filledPrice > 0 ? filledPrice : expectedEntry,
+              quantity: actualQty,
+              avg_entry: actualEntry,
               stop_loss: adjustedStop,
               take_profit: Number(trade.take_profit),
               strategy: String(trade.strategy_family || "operator"),
               strategy_family: String(trade.strategy_family || "operator"),
               regime_at_entry: String(trade.market_regime || "undefined"),
               status: "open",
-              notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}`,
+              notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}${actualQty < trade.quantity ? ` | Partial fill: ${actualQty}/${trade.quantity}` : ""}`,
             });
           } else if (!orderResult.success && !orderResult.pending) {
             console.error("Order failed for", trade.asset, ":", orderResult.error);
@@ -384,7 +387,16 @@ Deno.serve(async (req) => {
 
       // Update counters
       const successCount = execResults.filter(r => r.success).length;
-      const riskUsed = sized.filter((_: unknown, i: number) => execResults[i]?.success).reduce((s: number, t: Record<string, unknown>) => s + Number(t.risk_pct || 0), 0);
+      const riskUsed = sized
+        .filter((_: unknown, i: number) => execResults[i]?.success)
+        .reduce((s: number, t: Record<string, unknown>, i: number) => {
+          const result = execResults[i] as Record<string, unknown>;
+          const order = result?.order as Record<string, unknown>;
+          const filledQty = parseFloat(String(order?.filled_qty || "0")) || Number(t.quantity);
+          const requestedQty = Number(t.quantity);
+          const fillRatio = requestedQty > 0 ? filledQty / requestedQty : 1;
+          return s + Number(t.risk_pct || 0) * fillRatio;
+        }, 0);
 
       await supabase.rpc("increment_trade_counters", {
         p_user_id: user.id,
@@ -401,6 +413,43 @@ Deno.serve(async (req) => {
         trades_opened: tradesToday + successCount,
         risk_used_pct: dailyRiskUsed + riskUsed,
       }, { onConflict: "user_id,date" });
+
+      // ─── Save daily execution report ───
+      try {
+        const signalsConsidered = signals.length + (signalResult.rejected || 0);
+        const signalsGenerated = signals.length;
+        const tradesExecuted = execResults.filter(r => r.success).length;
+        const tradesFailed = execResults.filter(r => !r.success && !r.pending).length;
+        const tradesPending = execResults.filter(r => r.pending).length;
+
+        await supabase.from("daily_performance").upsert({
+          user_id: user.id,
+          date: today,
+          starting_capital: liveCapital,
+          trades_opened: tradesToday + tradesExecuted,
+          risk_used_pct: dailyRiskUsed + riskUsed,
+          signals_considered: signalsConsidered,
+          signals_generated: signalsGenerated,
+          trades_executed: tradesExecuted,
+          trades_failed: tradesFailed,
+          trades_pending: tradesPending,
+          automation_level: automationLevel,
+          operator_ran_at: new Date().toISOString(),
+          execution_details: JSON.stringify(
+            executableTrades.map((t: Record<string, unknown>, i: number) => ({
+              symbol: t.asset,
+              direction: t.direction,
+              score: Number(t.opportunity_score).toFixed(0),
+              r: Number(t.expected_r_multiple).toFixed(1),
+              qty: t.quantity,
+              result: execResults[i]?.success ? 'executed' : execResults[i]?.pending ? 'pending' : 'failed',
+              error: execResults[i]?.error || null,
+            }))
+          ),
+        }, { onConflict: "user_id,date" });
+      } catch (reportErr) {
+        console.error("Daily report save error:", reportErr);
+      }
     }
 
     return jsonRes({

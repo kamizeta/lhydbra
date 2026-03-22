@@ -477,20 +477,28 @@ export type Database = {
       }
       daily_performance: {
         Row: {
+          automation_level: string | null
           avg_r_multiple: number | null
           created_at: string
           date: string
           ending_capital: number
+          execution_details: Json | null
           id: string
           losing_trades: number | null
           loss_count: number
           max_drawdown_pct: number | null
+          operator_ran_at: string | null
           realized_pnl: number
           risk_used_pct: number | null
+          signals_considered: number | null
+          signals_generated: number | null
           starting_capital: number
           total_pnl: number | null
           trades_closed: number
+          trades_executed: number | null
+          trades_failed: number | null
           trades_opened: number
+          trades_pending: number | null
           unrealized_pnl: number
           updated_at: string | null
           user_id: string
@@ -499,20 +507,28 @@ export type Database = {
           winning_trades: number | null
         }
         Insert: {
+          automation_level?: string | null
           avg_r_multiple?: number | null
           created_at?: string
           date: string
           ending_capital?: number
+          execution_details?: Json | null
           id?: string
           losing_trades?: number | null
           loss_count?: number
           max_drawdown_pct?: number | null
+          operator_ran_at?: string | null
           realized_pnl?: number
           risk_used_pct?: number | null
+          signals_considered?: number | null
+          signals_generated?: number | null
           starting_capital?: number
           total_pnl?: number | null
           trades_closed?: number
+          trades_executed?: number | null
+          trades_failed?: number | null
           trades_opened?: number
+          trades_pending?: number | null
           unrealized_pnl?: number
           updated_at?: string | null
           user_id: string
@@ -521,20 +537,28 @@ export type Database = {
           winning_trades?: number | null
         }
         Update: {
+          automation_level?: string | null
           avg_r_multiple?: number | null
           created_at?: string
           date?: string
           ending_capital?: number
+          execution_details?: Json | null
           id?: string
           losing_trades?: number | null
           loss_count?: number
           max_drawdown_pct?: number | null
+          operator_ran_at?: string | null
           realized_pnl?: number
           risk_used_pct?: number | null
+          signals_considered?: number | null
+          signals_generated?: number | null
           starting_capital?: number
           total_pnl?: number | null
           trades_closed?: number
+          trades_executed?: number | null
+          trades_failed?: number | null
           trades_opened?: number
+          trades_pending?: number | null
           unrealized_pnl?: number
           updated_at?: string | null
           user_id?: string
