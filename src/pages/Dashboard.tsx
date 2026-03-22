@@ -57,6 +57,7 @@ export default function Dashboard() {
     opportunity_score: number; expected_r_multiple: number;
     confidence_score: number;
   }>>([]);
+  const [dataFreshness, setDataFreshness] = useState<{ fresh: boolean; symbol_count: number } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -107,6 +108,19 @@ export default function Dashboard() {
       .order('opportunity_score', { ascending: false })
       .limit(3)
       .then(({ data }) => setActiveSignals(data || []));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const cutoff = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
+    supabase
+      .from('market_features')
+      .select('symbol', { count: 'exact', head: true })
+      .eq('timeframe', '1d')
+      .gte('computed_at', cutoff)
+      .then(({ count }) => {
+        setDataFreshness({ fresh: (count || 0) > 0, symbol_count: count || 0 });
+      });
   }, [user]);
 
   const priceMap = useMemo(() => {
@@ -202,6 +216,14 @@ export default function Dashboard() {
           <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
             · Risk: {operatorStatus?.daily_risk_used?.toFixed(1) ?? '0.0'}%/{operatorStatus?.max_daily_risk ?? 3}%
           </span>
+          {dataFreshness !== null && (
+            <span className={cn(
+              "text-[9px] font-mono uppercase tracking-wider hidden sm:inline",
+              dataFreshness.fresh ? "text-green-400/60" : "text-red-400"
+            )}>
+              {dataFreshness.fresh ? `● ${dataFreshness.symbol_count}s` : "⚠ STALE"}
+            </span>
+          )}
         </div>
         <button
           onClick={handleRunOperator}
