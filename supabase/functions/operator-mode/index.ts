@@ -6,7 +6,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-Deno.serve(async (req) => {
+function isUSMarketOpen(): boolean {
+  const now = new Date();
+  const day = now.getUTCDay();
+  if (day === 0 || day === 6) return false;
+  const utcMins = now.getUTCHours() * 60 + now.getUTCMinutes();
+  return utcMins >= 870 && utcMins < 1260; // 14:30–21:00 UTC = NYSE hours
+}
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
