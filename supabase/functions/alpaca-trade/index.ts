@@ -164,6 +164,7 @@ serve(async (req) => {
         console.warn(`Asset tradability check failed for ${symbol}, proceeding with order`);
       }
 
+      const idempotencyId = signal_id
         ? `lhy-${String(signal_id).slice(0, 8)}`
         : `lhy-${crypto.randomUUID().slice(0, 12)}`;
 
