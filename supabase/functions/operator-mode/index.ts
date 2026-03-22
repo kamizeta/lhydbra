@@ -247,15 +247,21 @@ Deno.serve(async (req) => {
       const effectiveRisk = Math.min(riskPerTrade, remainingRisk / signals.length);
       const riskDollars = liveCapital * (effectiveRisk / 100);
       let quantity = stopDist > 0 ? Math.floor(riskDollars / stopDist) : 0;
-      if (quantity <= 0) quantity = 1;
+      if (quantity <= 0) {
+        return { ...sig, quantity: 0, skip: true, skip_reason: `Inviable sizing: stop_dist=${stopDist.toFixed(4)}, risk_dollars=${riskDollars.toFixed(2)}` };
+      }
 
       const maxSingleAsset = Number(settings.max_single_asset || 25);
       const positionValue = quantity * entryPrice;
       const positionPct = (positionValue / liveCapital) * 100;
       if (positionPct > maxSingleAsset) quantity = Math.floor((liveCapital * maxSingleAsset / 100) / entryPrice);
 
+      if (quantity <= 0) {
+        return { ...sig, quantity: 0, skip: true, skip_reason: `Concentration cap zeroed quantity` };
+      }
+
       const targets = (sig.targets as number[]) || [];
-      const takeProfit = targets.length > 0 ? targets[0] : entryPrice + stopDist * 2;
+      const takeProfit = targets.length > 1 ? targets[1] : targets.length > 0 ? targets[0] : entryPrice + stopDist * 2;
 
       return { ...sig, quantity, risk_pct: effectiveRisk, risk_dollars: riskDollars, position_value: quantity * entryPrice, take_profit: takeProfit };
     });
