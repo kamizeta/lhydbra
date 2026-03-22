@@ -344,6 +344,7 @@ export default function TradeIdeas() {
           signal={{
             ...approveSignal,
             asset_type: approveSignal.asset_class,
+            strategy: approveSignal.strategy_family || 'signal-engine',
           }}
           onClose={() => setApproveSignal(null)}
           onConfirm={handlePositionCreated}
