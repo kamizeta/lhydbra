@@ -14,6 +14,7 @@ function isUSMarketOpen(): boolean {
   return utcMins >= 870 && utcMins < 1260; // 14:30–21:00 UTC = NYSE hours
 }
 
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
