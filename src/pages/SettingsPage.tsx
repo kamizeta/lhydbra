@@ -35,6 +35,7 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const { t } = useI18n();
   const { settings: savedSettings, loading } = useUserSettings();
+  const { goal, save: saveGoal } = useGoalProfile();
   const { preferences: notifPrefs, savePreferences: saveNotifPrefs } = useNotifications();
   const [settings, setSettings] = useState<UserSettings>(savedSettings);
   const [saving, setSaving] = useState(false);
