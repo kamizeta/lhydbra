@@ -2,23 +2,17 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { Language, Translations } from './types';
 import { es } from './es';
 import { en } from './en';
-import { pt } from './pt';
-import { fr } from './fr';
 
-const translations: Record<Language, Translations> = { es, en, pt, fr };
+const translations: Record<Language, Translations> = { en, es };
 
 export const languageNames: Record<Language, string> = {
-  es: 'Español',
   en: 'English',
-  pt: 'Português',
-  fr: 'Français',
+  es: 'Español',
 };
 
 export const languageFlags: Record<Language, string> = {
-  es: '🇪🇸',
   en: '🇺🇸',
-  pt: '🇧🇷',
-  fr: '🇫🇷',
+  es: '🇪🇸',
 };
 
 function detectLanguage(): Language {
@@ -27,8 +21,6 @@ function detectLanguage(): Language {
 
   const browserLang = navigator.language.split('-')[0];
   if (browserLang === 'es') return 'es';
-  if (browserLang === 'pt') return 'pt';
-  if (browserLang === 'fr') return 'fr';
   return 'en';
 }
 

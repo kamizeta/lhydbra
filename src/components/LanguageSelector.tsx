@@ -3,7 +3,7 @@ import { Globe } from 'lucide-react';
 import { useI18n, languageNames, languageFlags, type Language } from '@/i18n';
 import { cn } from '@/lib/utils';
 
-const languages: Language[] = ['es', 'en', 'pt', 'fr'];
+const languages: Language[] = ['en', 'es'];
 
 export default function LanguageSelector({ collapsed, variant = 'sidebar' }: { collapsed?: boolean; variant?: 'sidebar' | 'header' }) {
   const { language, setLanguage } = useI18n();
