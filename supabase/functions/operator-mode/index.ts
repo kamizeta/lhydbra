@@ -88,6 +88,30 @@ Deno.serve(async (req) => {
         .select("symbol, direction, quantity, avg_entry, stop_loss, pnl, strategy")
         .eq("user_id", user.id).eq("status", "open");
 
+      // Fetch current prices to calculate unrealized PnL
+      const openSymbols = (openPositions || []).map((p: Record<string, unknown>) => String(p.symbol));
+      let intradayUnrealizedPct = 0;
+      if (openSymbols.length > 0) {
+        const { data: priceRows } = await supabase
+          .from("market_cache")
+          .select("symbol, price")
+          .in("symbol", openSymbols);
+        const priceMap = new Map((priceRows || []).map((r: Record<string, unknown>) =>
+          [String(r.symbol), parseFloat(String(r.price || "0"))]
+        ));
+        let unrealizedPnl = 0;
+        for (const pos of (openPositions || [])) {
+          const cp = priceMap.get(String(pos.symbol)) || Number(pos.avg_entry);
+          const diff = pos.direction === "long"
+            ? cp - Number(pos.avg_entry)
+            : Number(pos.avg_entry) - cp;
+          unrealizedPnl += diff * Number(pos.quantity);
+        }
+        intradayUnrealizedPct = currentCapital > 0
+          ? (unrealizedPnl / currentCapital) * 100
+          : 0;
+      }
+
       const { data: todayJournal } = await supabase
         .from("trade_journal").select("pnl, r_multiple")
         .eq("user_id", user.id).gte("entered_at", `${today}T00:00:00Z`);
@@ -112,6 +136,8 @@ Deno.serve(async (req) => {
         automation_level: automationLevel,
         effective_risk_per_trade: riskPerTrade,
         drawdown_pct: drawdownPct,
+        intraday_unrealized_pct: +intradayUnrealizedPct.toFixed(2),
+        circuit_breaker_active: intradayUnrealizedPct < -maxDailyRisk,
         preflight_warnings: preflight,
         goal: goal ? {
           monthly_target: Number(goal.monthly_target),
