@@ -244,6 +244,34 @@ serve(async (req) => {
       }
     }
 
+    // ─── Update daily performance summary ───
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: todaysClosed } = await supabase
+        .from("positions")
+        .select("pnl, strategy_family, direction")
+        .eq("user_id", userId)
+        .eq("status", "closed")
+        .gte("closed_at", `${today}T00:00:00Z`);
+
+      if (todaysClosed && todaysClosed.length > 0) {
+        const totalPnl = todaysClosed.reduce((s, p) => s + Number(p.pnl || 0), 0);
+        const wins = todaysClosed.filter(p => Number(p.pnl || 0) > 0).length;
+        const losses = todaysClosed.filter(p => Number(p.pnl || 0) <= 0).length;
+
+        await supabase.from("daily_performance").upsert({
+          user_id: userId,
+          date: today,
+          realized_pnl: totalPnl,
+          trades_closed: todaysClosed.length,
+          win_count: wins,
+          loss_count: losses,
+        }, { onConflict: "user_id,date" });
+      }
+    } catch (perfErr) {
+      console.error("Daily performance update error:", perfErr);
+    }
+
     // 6. Fetch account info
     const acctRes = await fetch(`${baseUrl}/v2/account`, { headers });
     const account = acctRes.ok ? await acctRes.json() : null;
