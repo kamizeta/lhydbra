@@ -227,18 +227,44 @@ Deno.serve(async (req) => {
           const orderResult = await orderRes.json();
           execResults.push({ symbol: trade.asset, success: orderResult.success || false, order: orderResult.order || null, error: orderResult.error || null });
 
-          if (orderResult.success) {
+          if (orderResult.success && orderResult.order) {
+            const expectedEntry = Number(trade.entry_price);
+            const filledPrice = parseFloat(orderResult.order.filled_avg_price || "0") || expectedEntry;
+            const slippage = Math.abs(filledPrice - expectedEntry) / expectedEntry;
+
+            const rawStop = Number(trade.stop_loss);
+            let adjustedStop = rawStop;
+            if (slippage > 0.003 && filledPrice > 0) {
+              const stopDist = Math.abs(expectedEntry - rawStop);
+              adjustedStop = String(trade.direction) === "long"
+                ? filledPrice - stopDist
+                : filledPrice + stopDist;
+            }
+
+            const slippageNote = slippage > 0.003
+              ? ` | Slippage: ${(slippage * 100).toFixed(2)}% (expected ${expectedEntry}, filled ${filledPrice})`
+              : "";
+
             await supabase.from("positions").insert({
-              user_id: user.id, symbol: String(trade.asset), name: String(trade.asset),
-              asset_type: String(trade.asset_class || "stock"), direction: String(trade.direction),
-              quantity: trade.quantity, avg_entry: Number(trade.entry_price),
-              stop_loss: Number(trade.stop_loss), take_profit: Number(trade.take_profit),
+              user_id: user.id,
+              symbol: String(trade.asset),
+              name: String(trade.asset),
+              asset_type: String(trade.asset_class || "stock"),
+              direction: String(trade.direction),
+              quantity: trade.quantity,
+              avg_entry: filledPrice > 0 ? filledPrice : expectedEntry,
+              stop_loss: adjustedStop,
+              take_profit: Number(trade.take_profit),
               strategy: String(trade.strategy_family || "operator"),
               strategy_family: String(trade.strategy_family || "operator"),
               regime_at_entry: String(trade.market_regime || "undefined"),
               status: "open",
-              notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}`,
+              notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}`,
             });
+          } else if (!orderResult.success && !orderResult.pending) {
+            console.error("Order failed for", trade.asset, ":", orderResult.error);
+          } else if (orderResult.pending) {
+            console.warn("Fill unconfirmed for", trade.asset, "- will reconcile via alpaca-sync");
           }
         } catch (execErr) {
           execResults.push({ symbol: trade.asset, success: false, error: execErr instanceof Error ? execErr.message : "Execution failed" });
