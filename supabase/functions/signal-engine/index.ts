@@ -278,6 +278,12 @@ Deno.serve(async (req) => {
     } = await req.json();
     if (!user_id) throw new Error("user_id required");
 
+    const twelveKey = Deno.env.get("TWELVE_DATA_API_KEY") ?? "";
+    const [fearGreedScore, vixScore] = await Promise.all([
+      fetchFearGreedScore(),
+      fetchVIXScore(twelveKey),
+    ]);
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
