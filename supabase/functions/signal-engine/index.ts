@@ -365,9 +365,26 @@ Deno.serve(async (req) => {
     // Fetch market features
     let featuresQuery = supabase.from("market_features").select("*").eq("timeframe", "1d");
     if (targetSymbols.length > 0) featuresQuery = featuresQuery.in("symbol", targetSymbols);
-    const { data: featuresData } = await featuresQuery;
-    if (!featuresData || featuresData.length === 0) {
+    const { data: allFeaturesData } = await featuresQuery;
+    if (!allFeaturesData || allFeaturesData.length === 0) {
       return new Response(JSON.stringify({ signals: [], count: 0, message: "No market features available" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Filter out stale features (older than 26 hours — allows for overnight batch)
+    const featuresCutoff = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
+    const featuresData = allFeaturesData.filter(f =>
+      f.computed_at && f.computed_at > featuresCutoff
+    );
+    const staleCount = allFeaturesData.length - featuresData.length;
+    if (staleCount > 0) {
+      console.warn(`[signal-engine] Filtered ${staleCount} stale features (>26h old). ${featuresData.length} fresh remaining.`);
+    }
+    if (featuresData.length === 0) {
+      return new Response(JSON.stringify({
+        signals: [], count: 0,
+        message: `No fresh market features available (${staleCount} symbols have stale data >26h). Run compute-indicators first.`,
+        stale_count: staleCount,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Fetch prices
