@@ -278,8 +278,8 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
 
       const { error } = await supabase.from('positions').insert({
         user_id: user.id,
-        symbol: signal.symbol,
-        name: signal.name,
+        symbol: signal.asset,
+        name: signal.asset,
         asset_type: signal.asset_type,
         direction: signal.direction,
         quantity,
