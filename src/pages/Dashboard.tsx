@@ -216,6 +216,14 @@ export default function Dashboard() {
           <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
             · Risk: {operatorStatus?.daily_risk_used?.toFixed(1) ?? '0.0'}%/{operatorStatus?.max_daily_risk ?? 3}%
           </span>
+          {dataFreshness !== null && (
+            <span className={cn(
+              "text-[9px] font-mono uppercase tracking-wider hidden sm:inline",
+              dataFreshness.fresh ? "text-green-400/60" : "text-red-400"
+            )}>
+              {dataFreshness.fresh ? `● ${dataFreshness.symbol_count}s` : "⚠ STALE"}
+            </span>
+          )}
         </div>
         <button
           onClick={handleRunOperator}
