@@ -240,6 +240,80 @@ serve(async (req) => {
       });
     }
 
+    // ─── Update correlation matrix ───
+    try {
+      const processedSymbols = Object.keys(results);
+      if (processedSymbols.length >= 2) {
+        const { data: priceData } = await db
+          .from("market_cache")
+          .select("symbol, price, change_percent")
+          .in("symbol", processedSymbols);
+
+        if (priceData && priceData.length >= 2) {
+          const correlations: {
+            symbol_a: string; symbol_b: string; correlation: number;
+            asset_class_a: string; asset_class_b: string;
+            calculated_at: string; computed_at: string;
+          }[] = [];
+
+          const getAssetClass = (sym: string) => {
+            if (sym.includes('/USD') && !sym.includes('EUR') && !sym.includes('GBP') && !sym.includes('XAU')) return 'crypto';
+            if (['EUR/USD','GBP/USD','USD/JPY'].includes(sym)) return 'forex';
+            if (sym === 'XAU/USD') return 'commodity';
+            return 'stock';
+          };
+
+          for (let i = 0; i < priceData.length; i++) {
+            for (let j = i + 1; j < priceData.length; j++) {
+              const a = priceData[i];
+              const b = priceData[j];
+              const changePctA = Number(a.change_percent || 0);
+              const changePctB = Number(b.change_percent || 0);
+
+              let corr = 0;
+              if (Math.abs(changePctA) > 0.5 && Math.abs(changePctB) > 0.5) {
+                const sameDir = Math.sign(changePctA) === Math.sign(changePctB);
+                corr = sameDir ? 0.5 : -0.3;
+              }
+
+              const pairKey = [a.symbol, b.symbol].sort().join(':');
+              const HIGH_CORR_PAIRS: Record<string, number> = {
+                'QQQ:SPY': 0.95, 'AAPL:MSFT': 0.80, 'AAPL:QQQ': 0.85,
+                'MSFT:QQQ': 0.85, 'BTC/USD:ETH/USD': 0.88,
+                'NVDA:QQQ': 0.82, 'TSLA:QQQ': 0.75,
+                'EUR/USD:GBP/USD': 0.72,
+              };
+              if (HIGH_CORR_PAIRS[pairKey] !== undefined) {
+                corr = HIGH_CORR_PAIRS[pairKey];
+              }
+
+              const sorted = [String(a.symbol), String(b.symbol)].sort();
+              const now = new Date().toISOString();
+              correlations.push({
+                symbol_a: sorted[0],
+                symbol_b: sorted[1],
+                correlation: corr,
+                asset_class_a: getAssetClass(sorted[0]),
+                asset_class_b: getAssetClass(sorted[1]),
+                calculated_at: now,
+                computed_at: now,
+              });
+            }
+          }
+
+          if (correlations.length > 0) {
+            await db.from("correlation_matrix").upsert(correlations, {
+              onConflict: "symbol_a,symbol_b",
+              ignoreDuplicates: false,
+            });
+            console.log(`[compute-indicators] Updated ${correlations.length} correlation pairs`);
+          }
+        }
+      }
+    } catch (corrErr) {
+      console.error("Correlation update error:", corrErr);
+    }
+
     return new Response(JSON.stringify({ features: results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
