@@ -314,7 +314,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
             <Shield className="h-4 w-4 text-primary" />
-            Aprobar Trade: {signal.symbol}
+            Aprobar Trade: {signal.asset}
           </h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
