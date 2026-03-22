@@ -479,16 +479,21 @@ export type Database = {
           date: string
           ending_capital: number
           id: string
+          losing_trades: number | null
           loss_count: number
           max_drawdown_pct: number | null
           realized_pnl: number
           risk_used_pct: number | null
           starting_capital: number
+          total_pnl: number | null
           trades_closed: number
           trades_opened: number
           unrealized_pnl: number
+          updated_at: string | null
           user_id: string
           win_count: number
+          win_rate: number | null
+          winning_trades: number | null
         }
         Insert: {
           avg_r_multiple?: number | null
@@ -496,16 +501,21 @@ export type Database = {
           date: string
           ending_capital?: number
           id?: string
+          losing_trades?: number | null
           loss_count?: number
           max_drawdown_pct?: number | null
           realized_pnl?: number
           risk_used_pct?: number | null
           starting_capital?: number
+          total_pnl?: number | null
           trades_closed?: number
           trades_opened?: number
           unrealized_pnl?: number
+          updated_at?: string | null
           user_id: string
           win_count?: number
+          win_rate?: number | null
+          winning_trades?: number | null
         }
         Update: {
           avg_r_multiple?: number | null
@@ -513,16 +523,21 @@ export type Database = {
           date?: string
           ending_capital?: number
           id?: string
+          losing_trades?: number | null
           loss_count?: number
           max_drawdown_pct?: number | null
           realized_pnl?: number
           risk_used_pct?: number | null
           starting_capital?: number
+          total_pnl?: number | null
           trades_closed?: number
           trades_opened?: number
           unrealized_pnl?: number
+          updated_at?: string | null
           user_id?: string
           win_count?: number
+          win_rate?: number | null
+          winning_trades?: number | null
         }
         Relationships: []
       }
