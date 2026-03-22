@@ -57,6 +57,7 @@ export default function Dashboard() {
     opportunity_score: number; expected_r_multiple: number;
     confidence_score: number;
   }>>([]);
+  const [dataFreshness, setDataFreshness] = useState<{ fresh: boolean; symbol_count: number } | null>(null);
 
   useEffect(() => {
     if (!user) return;
