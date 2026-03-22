@@ -77,6 +77,36 @@ Deno.serve(async (req) => {
     if (dailyRiskUsed >= maxDailyRisk) preflight.push(`🔴 RISK EXHAUSTED: ${dailyRiskUsed.toFixed(1)}%/${maxDailyRisk}%`);
     if (drawdownPct > maxDrawdown) preflight.push(`🔴 MAX DRAWDOWN: ${drawdownPct.toFixed(1)}% (limit: ${maxDrawdown}%)`);
 
+    // Intraday circuit breaker: check unrealized loss on open positions
+    if (action !== "status") {
+      const { data: cbPositions } = await supabase
+        .from("positions")
+        .select("symbol, direction, quantity, avg_entry")
+        .eq("user_id", user.id).eq("status", "open");
+      const cbSymbols = (cbPositions || []).map((p: Record<string, unknown>) => String(p.symbol));
+      if (cbSymbols.length > 0) {
+        const { data: cbPrices } = await supabase
+          .from("market_cache")
+          .select("symbol, price")
+          .in("symbol", cbSymbols);
+        const cbPriceMap = new Map((cbPrices || []).map((r: Record<string, unknown>) =>
+          [String(r.symbol), parseFloat(String(r.price || "0"))]
+        ));
+        let cbUnrealized = 0;
+        for (const pos of (cbPositions || [])) {
+          const cp = cbPriceMap.get(String(pos.symbol)) || Number(pos.avg_entry);
+          const diff = pos.direction === "long"
+            ? cp - Number(pos.avg_entry)
+            : Number(pos.avg_entry) - cp;
+          cbUnrealized += diff * Number(pos.quantity);
+        }
+        const cbPct = currentCapital > 0 ? (cbUnrealized / currentCapital) * 100 : 0;
+        if (cbPct < -maxDailyRisk) {
+          preflight.push(`🔴 CIRCUIT BREAKER: Unrealized loss ${cbPct.toFixed(1)}% exceeds daily limit -${maxDailyRisk}%`);
+        }
+      }
+    }
+
     if (preflight.length > 0 && action !== "status") {
       return jsonRes({ status: "blocked", reasons: preflight, trades_today: tradesToday, consecutive_losses: consecutiveLosses, daily_risk_used: dailyRiskUsed });
     }
@@ -87,6 +117,30 @@ Deno.serve(async (req) => {
         .from("positions")
         .select("symbol, direction, quantity, avg_entry, stop_loss, pnl, strategy")
         .eq("user_id", user.id).eq("status", "open");
+
+      // Fetch current prices to calculate unrealized PnL
+      const openSymbols = (openPositions || []).map((p: Record<string, unknown>) => String(p.symbol));
+      let intradayUnrealizedPct = 0;
+      if (openSymbols.length > 0) {
+        const { data: priceRows } = await supabase
+          .from("market_cache")
+          .select("symbol, price")
+          .in("symbol", openSymbols);
+        const priceMap = new Map((priceRows || []).map((r: Record<string, unknown>) =>
+          [String(r.symbol), parseFloat(String(r.price || "0"))]
+        ));
+        let unrealizedPnl = 0;
+        for (const pos of (openPositions || [])) {
+          const cp = priceMap.get(String(pos.symbol)) || Number(pos.avg_entry);
+          const diff = pos.direction === "long"
+            ? cp - Number(pos.avg_entry)
+            : Number(pos.avg_entry) - cp;
+          unrealizedPnl += diff * Number(pos.quantity);
+        }
+        intradayUnrealizedPct = currentCapital > 0
+          ? (unrealizedPnl / currentCapital) * 100
+          : 0;
+      }
 
       const { data: todayJournal } = await supabase
         .from("trade_journal").select("pnl, r_multiple")
@@ -112,6 +166,8 @@ Deno.serve(async (req) => {
         automation_level: automationLevel,
         effective_risk_per_trade: riskPerTrade,
         drawdown_pct: drawdownPct,
+        intraday_unrealized_pct: +intradayUnrealizedPct.toFixed(2),
+        circuit_breaker_active: intradayUnrealizedPct < -maxDailyRisk,
         preflight_warnings: preflight,
         goal: goal ? {
           monthly_target: Number(goal.monthly_target),
