@@ -413,6 +413,43 @@ Deno.serve(async (req) => {
         trades_opened: tradesToday + successCount,
         risk_used_pct: dailyRiskUsed + riskUsed,
       }, { onConflict: "user_id,date" });
+
+      // ─── Save daily execution report ───
+      try {
+        const signalsConsidered = signals.length + (signalResult.rejected || 0);
+        const signalsGenerated = signals.length;
+        const tradesExecuted = execResults.filter(r => r.success).length;
+        const tradesFailed = execResults.filter(r => !r.success && !r.pending).length;
+        const tradesPending = execResults.filter(r => r.pending).length;
+
+        await supabase.from("daily_performance").upsert({
+          user_id: user.id,
+          date: today,
+          starting_capital: liveCapital,
+          trades_opened: tradesToday + tradesExecuted,
+          risk_used_pct: dailyRiskUsed + riskUsed,
+          signals_considered: signalsConsidered,
+          signals_generated: signalsGenerated,
+          trades_executed: tradesExecuted,
+          trades_failed: tradesFailed,
+          trades_pending: tradesPending,
+          automation_level: automationLevel,
+          operator_ran_at: new Date().toISOString(),
+          execution_details: JSON.stringify(
+            executableTrades.map((t: Record<string, unknown>, i: number) => ({
+              symbol: t.asset,
+              direction: t.direction,
+              score: Number(t.opportunity_score).toFixed(0),
+              r: Number(t.expected_r_multiple).toFixed(1),
+              qty: t.quantity,
+              result: execResults[i]?.success ? 'executed' : execResults[i]?.pending ? 'pending' : 'failed',
+              error: execResults[i]?.error || null,
+            }))
+          ),
+        }, { onConflict: "user_id,date" });
+      } catch (reportErr) {
+        console.error("Daily report save error:", reportErr);
+      }
     }
 
     return jsonRes({

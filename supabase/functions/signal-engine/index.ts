@@ -454,6 +454,13 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Sector cap check
+      const symbolSector = SYMBOL_SECTORS[symbol] || 'other';
+      if ((sectorCount[symbolSector] || 0) >= MAX_SECTOR_POSITIONS) {
+        rejections.push({ asset: symbol, reason: `Sector cap: ${symbolSector} already has ${sectorCount[symbolSector]} positions` });
+        continue;
+      }
+
       const strategyFamily = determineBestStrategy(enriched);
       const setups = generateSetups(enriched, direction);
       if (setups.length === 0) continue;

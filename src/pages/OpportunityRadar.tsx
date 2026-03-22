@@ -280,7 +280,7 @@ export default function OpportunityRadar() {
               )}
 
               <div className="text-[10px] text-muted-foreground font-mono pt-2">
-                Computed: {new Date(selected.computed_at).toLocaleString()}
+                Computed: {new Date(selected.created_at).toLocaleString()}
               </div>
             </>
           ) : (
