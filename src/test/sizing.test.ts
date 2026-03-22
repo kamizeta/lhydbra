@@ -8,8 +8,8 @@ const base = {
 };
 
 describe('calcPositionSize', () => {
-  test('1% risk on $10k, $2 stop = 50 shares', () => {
-    expect(calcPositionSize(base)).toBe(50);
+  test('1% risk on $10k, $2 stop, capped by 25% concentration = 25 shares', () => {
+    expect(calcPositionSize(base)).toBe(25);
   });
   test('concentration cap at 25%', () => {
     expect(calcPositionSize({ ...base, riskPct: 50 })).toBe(25);
