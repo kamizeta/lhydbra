@@ -285,7 +285,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         quantity,
         avg_entry: entryPrice,
         stop_loss: signal.stop_loss,
-        take_profit: signal.take_profit,
+        take_profit: derivedTakeProfit,
         strategy: signal.strategy,
         strategy_family: signal.strategy_family || null,
         regime_at_entry: signal.market_regime || null,
