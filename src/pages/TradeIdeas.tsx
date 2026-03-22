@@ -46,7 +46,8 @@ export default function TradeIdeas() {
       .from('signals')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .in('status', ['active'])
+      .order('opportunity_score', { ascending: false });
 
     if (!error && data) {
       setSignals(data as unknown as TradeSignal[]);
