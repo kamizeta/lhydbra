@@ -146,10 +146,10 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
     }
 
     // 3. Minimum R:R ratio
-    if (signal.risk_reward < settings.min_rr_ratio) {
+    if (derivedRiskReward < settings.min_rr_ratio) {
       v.push({
         rule: 'Ratio R:R mínimo',
-        current: `${formatNumber(signal.risk_reward)}:1`,
+        current: `${formatNumber(derivedRiskReward)}:1`,
         limit: `${settings.min_rr_ratio}:1`,
         severity: 'block',
       });
