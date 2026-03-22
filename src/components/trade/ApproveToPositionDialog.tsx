@@ -298,7 +298,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         setSaving(false);
         return;
       }
-      toast.success(`Posición abierta: ${signal.symbol} × ${quantity} @ ${formatCurrency(entryPrice)}`);
+      toast.success(`Posición abierta: ${signal.asset} × ${quantity} @ ${formatCurrency(entryPrice)}`);
     }
 
     onConfirm(signal.id);
