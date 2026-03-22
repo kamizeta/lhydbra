@@ -19,6 +19,7 @@ import SignalCenter from "@/pages/SignalCenter";
 import StrategyResearchLab from "@/pages/StrategyResearchLab";
 import LearningDashboard from "@/pages/LearningDashboard";
 import PortfolioAllocation from "@/pages/PortfolioAllocation";
+import PositionsPage from "@/pages/PositionsPage";
 
 const queryClient = new QueryClient();
 
