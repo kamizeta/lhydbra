@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Lightbulb, Check, X, ArrowRight, Target, Shield, TrendingUp, Trash2, Loader2 } from "lucide-react";
-import { formatCurrency, formatNumber } from "@/lib/mockData";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";

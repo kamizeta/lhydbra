@@ -3,7 +3,7 @@ import { FlaskConical, TrendingUp, Award, BarChart3, Target, Loader2 } from "luc
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatNumber } from "@/lib/mockData";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 

@@ -3,8 +3,7 @@ import { X, DollarSign, Wifi, WifiOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/mockData";
-import { cn } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 
 interface Position {
   id: string;

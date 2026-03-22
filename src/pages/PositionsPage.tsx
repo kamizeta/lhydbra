@@ -7,7 +7,7 @@ import { useMarketData } from '@/hooks/useMarketData';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import StatusBadge from '@/components/shared/StatusBadge';
-import { formatCurrency } from '@/lib/mockData';
+import { formatCurrency } from '@/lib/utils';
 import ClosePositionDialog from '@/components/trade/ClosePositionDialog';
 import PositionSignalDetail from '@/components/trade/PositionSignalDetail';
 import PortfolioEngine from '@/components/trade/PortfolioEngine';

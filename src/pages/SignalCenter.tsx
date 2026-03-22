@@ -3,7 +3,7 @@ import { Zap, Target, BarChart3, Shield, Loader2, CheckCircle, XCircle, Clock, P
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { formatNumber } from "@/lib/mockData";
+import { formatNumber } from "@/lib/utils";
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import SignalDetailPanel from "@/components/signals/SignalDetailPanel";

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { BookOpen, TrendingUp, Award, BarChart3, Edit3, Save, X, Tag } from "lucide-react";
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
-import { formatCurrency, formatNumber } from "@/lib/mockData";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
 import { useAuth } from "@/hooks/useAuth";
