@@ -46,7 +46,8 @@ export default function TradeIdeas() {
       .from('signals')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .in('status', ['active'])
+      .order('opportunity_score', { ascending: false });
 
     if (!error && data) {
       setSignals(data as unknown as TradeSignal[]);
@@ -79,15 +80,17 @@ export default function TradeIdeas() {
     setApproveSignal(signal);
   };
 
-  const updateStatus = async (id: string, status: string) => {
-    const { error } = await supabase
+  const handleReject = async (signalId: string) => {
+    await supabase
       .from('signals')
-      .update({ status } as Record<string, unknown>)
-      .eq('id', id);
-
-    if (!error) {
-      setSignals(prev => prev.map(s => s.id === id ? { ...s, status } : s));
-    }
+      .update({
+        status: 'rejected',
+        invalidation_reason: 'Manually rejected by user',
+        updated_at: new Date().toISOString(),
+      } as Record<string, unknown>)
+      .eq('id', signalId)
+      .eq('user_id', user?.id);
+    loadSignals();
   };
 
   const deleteSignal = async (id: string) => {
@@ -118,8 +121,16 @@ export default function TradeIdeas() {
   };
 
   const handlePositionCreated = async (signalId: string) => {
-    await updateStatus(signalId, 'approved');
     setApproveSignal(null);
+    await supabase
+      .from('signals')
+      .update({
+        status: 'approved',
+        updated_at: new Date().toISOString(),
+      } as Record<string, unknown>)
+      .eq('id', signalId)
+      .eq('user_id', user?.id);
+    loadSignals();
   };
 
   const getTakeProfit = (sig: TradeSignal) =>
@@ -249,7 +260,7 @@ export default function TradeIdeas() {
                             <Check className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={(e) => { e.stopPropagation(); updateStatus(signal.id, 'rejected'); }}
+                            onClick={(e) => { e.stopPropagation(); handleReject(signal.id); }}
                             className="rounded-md bg-loss/15 p-2 text-loss hover:bg-loss/25 transition-colors"
                           >
                             <X className="h-4 w-4" />
