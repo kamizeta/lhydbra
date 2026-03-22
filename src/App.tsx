@@ -44,6 +44,7 @@ function ProtectedRoutes() {
         <Route path="/signals" element={<SignalCenter />} />
         <Route path="/trade-ideas" element={<TradeIdeas />} />
         <Route path="/portfolio" element={<PortfolioPage />} />
+        <Route path="/positions" element={<PositionsPage />} />
         <Route path="/allocation" element={<PortfolioAllocation />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
