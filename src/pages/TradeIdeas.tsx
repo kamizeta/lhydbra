@@ -343,15 +343,8 @@ export default function TradeIdeas() {
         <ApproveToPositionDialog
           signal={{
             ...approveSignal,
-            symbol: approveSignal.asset,
-            name: `${approveSignal.asset} ${approveSignal.direction.toUpperCase()}`,
             asset_type: approveSignal.asset_class,
             strategy: approveSignal.strategy_family || 'signal-engine',
-            take_profit: getTakeProfit(approveSignal),
-            risk_reward: getRiskReward(approveSignal),
-            position_size: null,
-            opportunity_score: approveSignal.opportunity_score,
-            market_regime: approveSignal.market_regime,
           }}
           onClose={() => setApproveSignal(null)}
           onConfirm={handlePositionCreated}

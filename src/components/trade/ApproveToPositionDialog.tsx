@@ -10,17 +10,17 @@ import StatusBadge from "@/components/shared/StatusBadge";
 
 interface TradeSignal {
   id: string;
-  symbol: string;
-  name: string;
+  asset: string;
+  asset_class: string;
   asset_type: string;
   direction: string;
-  strategy: string;
+  strategy: string | null;
   strategy_family?: string | null;
   entry_price: number;
   stop_loss: number;
-  take_profit: number;
-  risk_reward: number;
-  position_size: number | null;
+  targets: number[];
+  expected_r_multiple: number;
+  take_profit?: number;
   opportunity_score?: number | null;
   market_regime?: string | null;
 }
@@ -54,6 +54,10 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
   const [existingRiskDollars, setExistingRiskDollars] = useState(0);
   const [existingSymbolExposure, setExistingSymbolExposure] = useState(0);
   const [loaded, setLoaded] = useState(false);
+
+  // Derive take_profit and risk_reward from signals table schema
+  const derivedTakeProfit = signal.take_profit ?? (signal.targets?.[0] ?? signal.entry_price * 1.05);
+  const derivedRiskReward = signal.expected_r_multiple;
 
   // Calculate ideal position size (capped by risk, concentration & leverage limits)
   const riskPerUnit = Math.abs(entryPrice - signal.stop_loss);
@@ -101,7 +105,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           if (p.stop_loss) {
             totalRisk += Math.abs(Number(p.avg_entry) - Number(p.stop_loss)) * Number(p.quantity);
           }
-          if (p.symbol === signal.symbol) {
+          if (p.symbol === signal.asset) {
             symbolExposure += value;
           }
         });
@@ -113,7 +117,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
       setLoaded(true);
     };
     fetchPortfolio();
-  }, [user, signal.symbol]);
+  }, [user, signal.asset]);
 
   // Run risk validation whenever inputs change
   useEffect(() => {
@@ -142,10 +146,10 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
     }
 
     // 3. Minimum R:R ratio
-    if (signal.risk_reward < settings.min_rr_ratio) {
+    if (derivedRiskReward < settings.min_rr_ratio) {
       v.push({
         rule: 'Ratio R:R mínimo',
-        current: `${formatNumber(signal.risk_reward)}:1`,
+        current: `${formatNumber(derivedRiskReward)}:1`,
         limit: `${settings.min_rr_ratio}:1`,
         severity: 'block',
       });
@@ -178,7 +182,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
     if (symbolPct > settings.max_single_asset) {
       v.push({
         rule: 'Concentración en activo',
-        current: `${formatNumber(symbolPct)}% en ${signal.symbol}`,
+        current: `${formatNumber(symbolPct)}% en ${signal.asset}`,
         limit: `${settings.max_single_asset}%`,
         severity: 'warning',
       });
@@ -241,7 +245,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           const orderBody: Record<string, unknown> = {
             action: 'place_order',
             paper: alpacaPaper,
-            symbol: signal.symbol.replace('/', ''),
+            symbol: signal.asset.replace('/', ''),
             qty: quantity,
             side: alpacaSide,
             type: 'market',
@@ -249,9 +253,9 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           };
 
           // Use bracket order if SL and TP are set
-          if (signal.stop_loss > 0 && signal.take_profit > 0) {
+          if (signal.stop_loss > 0 && derivedTakeProfit > 0) {
             orderBody.order_class = 'bracket';
-            orderBody.take_profit = signal.take_profit;
+            orderBody.take_profit = derivedTakeProfit;
             orderBody.stop_loss = signal.stop_loss;
           }
 
@@ -274,14 +278,14 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
 
       const { error } = await supabase.from('positions').insert({
         user_id: user.id,
-        symbol: signal.symbol,
-        name: signal.name,
+        symbol: signal.asset,
+        name: signal.asset,
         asset_type: signal.asset_type,
         direction: signal.direction,
         quantity,
         avg_entry: entryPrice,
         stop_loss: signal.stop_loss,
-        take_profit: signal.take_profit,
+        take_profit: derivedTakeProfit,
         strategy: signal.strategy,
         strategy_family: signal.strategy_family || null,
         regime_at_entry: signal.market_regime || null,
@@ -294,7 +298,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         setSaving(false);
         return;
       }
-      toast.success(`Posición abierta: ${signal.symbol} × ${quantity} @ ${formatCurrency(entryPrice)}`);
+      toast.success(`Posición abierta: ${signal.asset} × ${quantity} @ ${formatCurrency(entryPrice)}`);
     }
 
     onConfirm(signal.id);
@@ -310,7 +314,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
             <Shield className="h-4 w-4 text-primary" />
-            Aprobar Trade: {signal.symbol}
+            Aprobar Trade: {signal.asset}
           </h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
@@ -333,11 +337,11 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Take Profit</span>
-            <span className="text-profit">{formatCurrency(signal.take_profit)}</span>
+            <span className="text-profit">{formatCurrency(derivedTakeProfit)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">R:R</span>
-            <span className={cn(signal.risk_reward >= settings.min_rr_ratio ? "text-profit" : "text-loss")}>{formatNumber(signal.risk_reward)}:1</span>
+            <span className={cn(derivedRiskReward >= settings.min_rr_ratio ? "text-profit" : "text-loss")}>{formatNumber(derivedRiskReward)}:1</span>
           </div>
           {signal.opportunity_score != null && (
             <div className="flex justify-between">
