@@ -61,7 +61,6 @@ const App = () => (
     <I18nProvider>
       <AuthProvider>
         <TooltipProvider>
-          <Toaster />
           <Sonner />
           <BrowserRouter>
             <ProtectedRoutes />
