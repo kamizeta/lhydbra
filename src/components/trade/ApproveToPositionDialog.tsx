@@ -341,7 +341,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">R:R</span>
-            <span className={cn(signal.risk_reward >= settings.min_rr_ratio ? "text-profit" : "text-loss")}>{formatNumber(signal.risk_reward)}:1</span>
+            <span className={cn(derivedRiskReward >= settings.min_rr_ratio ? "text-profit" : "text-loss")}>{formatNumber(derivedRiskReward)}:1</span>
           </div>
           {signal.opportunity_score != null && (
             <div className="flex justify-between">
