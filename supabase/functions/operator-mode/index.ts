@@ -215,6 +215,7 @@ function isUSMarketOpen(): boolean {
             headers: { "Content-Type": "application/json", "Authorization": authHeader },
             body: JSON.stringify({
               action: "place_order", paper,
+              signal_id: String(trade.id || ""),
               symbol: String(trade.asset).replace("/", ""),
               qty: trade.quantity,
               side: trade.direction === "long" ? "buy" : "sell",
