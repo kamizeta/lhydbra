@@ -161,6 +161,81 @@ serve(async (req) => {
           pnl,
         }).eq("id", local.id);
 
+        // ── Post-trade feedback loop ──
+        try {
+          const isWin = pnl > 0;
+
+          // Update consecutive wins/losses streak
+          const { data: currentSettings } = await supabase
+            .from("user_settings")
+            .select("consecutive_losses, consecutive_wins")
+            .eq("user_id", userId)
+            .maybeSingle();
+
+          const prevLosses = Number((currentSettings as any)?.consecutive_losses || 0);
+          const prevWins = Number((currentSettings as any)?.consecutive_wins || 0);
+
+          await supabase.from("user_settings").update({
+            consecutive_losses: isWin ? 0 : prevLosses + 1,
+            consecutive_wins: isWin ? prevWins + 1 : 0,
+            updated_at: new Date().toISOString(),
+          }).eq("user_id", userId);
+
+          // Upsert strategy_performance
+          const strategy = (local as any).strategy_family || (local as any).strategy || "unknown";
+          const regime = (local as any).regime_at_entry || "all";
+          const entryP = Number(local.avg_entry);
+          const stopP = Number((local as any).stop_loss || 0);
+          const rMultiple = entryP > 0 && stopP > 0 && Math.abs(entryP - stopP) > 0
+            ? pnl / (Math.abs(entryP - stopP) * qty)
+            : null;
+
+          const { data: existing } = await supabase
+            .from("strategy_performance")
+            .select("*")
+            .eq("user_id", userId)
+            .eq("strategy_family", strategy)
+            .eq("market_regime", regime)
+            .maybeSingle();
+
+          if (existing) {
+            const newTotal = Number(existing.total_trades) + 1;
+            const newWins = Number(existing.winning_trades) + (isWin ? 1 : 0);
+            const newLosses = Number(existing.losing_trades) + (isWin ? 0 : 1);
+            const newPnl = Number(existing.total_pnl || 0) + pnl;
+            const newWinRate = newTotal > 0 ? (newWins / newTotal) * 100 : 0;
+            const newAvgR = rMultiple !== null
+              ? ((Number(existing.avg_r_multiple || 0) * Number(existing.total_trades)) + rMultiple) / newTotal
+              : Number(existing.avg_r_multiple || 0);
+
+            await supabase.from("strategy_performance").update({
+              total_trades: newTotal,
+              winning_trades: newWins,
+              losing_trades: newLosses,
+              total_pnl: Number(newPnl.toFixed(2)),
+              win_rate: Number(newWinRate.toFixed(2)),
+              avg_r_multiple: Number(newAvgR.toFixed(4)),
+              updated_at: new Date().toISOString(),
+            }).eq("id", existing.id);
+          } else {
+            await supabase.from("strategy_performance").insert({
+              user_id: userId,
+              strategy_family: strategy,
+              market_regime: regime,
+              total_trades: 1,
+              winning_trades: isWin ? 1 : 0,
+              losing_trades: isWin ? 0 : 1,
+              total_pnl: Number(pnl.toFixed(2)),
+              win_rate: isWin ? 100 : 0,
+              avg_r_multiple: rMultiple ? Number(rMultiple.toFixed(4)) : 0,
+            });
+          }
+
+          console.log(`[FeedbackLoop] ${local.symbol}: ${isWin ? "WIN" : "LOSS"}, streak: ${isWin ? prevWins + 1 : 0}W / ${isWin ? 0 : prevLosses + 1}L`);
+        } catch (feedbackErr) {
+          console.warn("[FeedbackLoop] Non-blocking error:", feedbackErr);
+        }
+
         changes.push({
           action: "closed",
           symbol: local.symbol,
