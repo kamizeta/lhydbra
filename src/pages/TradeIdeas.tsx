@@ -121,8 +121,16 @@ export default function TradeIdeas() {
   };
 
   const handlePositionCreated = async (signalId: string) => {
-    await updateStatus(signalId, 'approved');
     setApproveSignal(null);
+    await supabase
+      .from('signals')
+      .update({
+        status: 'approved',
+        updated_at: new Date().toISOString(),
+      } as Record<string, unknown>)
+      .eq('id', signalId)
+      .eq('user_id', user?.id);
+    loadSignals();
   };
 
   const getTakeProfit = (sig: TradeSignal) =>
