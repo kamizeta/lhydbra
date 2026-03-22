@@ -271,17 +271,22 @@ export default function MarketExplorer() {
           onClick={async () => {
             setGeneratingIdeas(true);
             try {
-              const { data, error } = await supabase.functions.invoke('regime-trade-ideas', {
-                body: { min_score: 45 },
-              });
+              const { data, error } = await supabase
+                .from('signals')
+                .select('*')
+                .eq('user_id', user?.id)
+                .eq('status', 'active')
+                .order('opportunity_score', { ascending: false })
+                .limit(20);
               if (error) throw error;
-              if (data?.count > 0) {
-                toast({ title: `⚡ ${data.count} ideas generadas`, description: `${data.skipped_existing} existentes omitidas, ${data.skipped_neutral} en régimen neutral omitidas. Ve a Trade Ideas.` });
+              const count = data?.length || 0;
+              if (count > 0) {
+                toast({ title: `⚡ ${count} active signals`, description: `Found ${count} active signals. View them in Trade Ideas.` });
               } else {
-                toast({ title: '📊 Sin nuevas ideas', description: `No hay oportunidades con score ≥ 45 en regímenes accionables. ${data?.skipped_existing || 0} ya existentes, ${data?.skipped_neutral || 0} en régimen neutral.` });
+                toast({ title: '📊 No active signals', description: 'No active signals found. Run the signal engine first.' });
               }
             } catch (e: any) {
-              toast({ title: 'Error', description: e.message || 'Error generando ideas', variant: 'destructive' });
+              toast({ title: 'Error', description: e.message || 'Error loading signals', variant: 'destructive' });
             } finally {
               setGeneratingIdeas(false);
             }
@@ -297,7 +302,7 @@ export default function MarketExplorer() {
           )}
         >
           {generatingIdeas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lightbulb className="h-3.5 w-3.5" />}
-          {generatingIdeas ? 'Generando...' : 'Auto-Ideas'}
+          {generatingIdeas ? 'Loading...' : 'Auto-Ideas'}
         </button>
       </div>
 
