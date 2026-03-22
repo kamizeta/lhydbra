@@ -235,6 +235,37 @@ serve(async (req) => {
         return jsonRes({ error: `Alpaca close error [${res.status}]: ${data.message || JSON.stringify(data)}` }, res.status);
       }
 
+      // Immediately update local position record
+      try {
+        const fillPrice = parseFloat(data.filled_avg_price || "0");
+        if (fillPrice > 0) {
+          const { data: localPos } = await supabase
+            .from("positions")
+            .select("id, direction, quantity, avg_entry")
+            .eq("user_id", user.id)
+            .eq("symbol", symbol)
+            .eq("status", "open")
+            .maybeSingle();
+
+          if (localPos) {
+            const diff = localPos.direction === "long"
+              ? fillPrice - Number(localPos.avg_entry)
+              : Number(localPos.avg_entry) - fillPrice;
+            const pnl = diff * Number(localPos.quantity);
+
+            await supabase.from("positions").update({
+              status: "closed",
+              close_price: fillPrice,
+              pnl,
+              closed_at: data.filled_at || new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }).eq("id", localPos.id);
+          }
+        }
+      } catch (syncErr) {
+        console.error("Local position sync failed (Alpaca close succeeded):", syncErr);
+      }
+
       return jsonRes({ success: true, order: data });
     }
 
