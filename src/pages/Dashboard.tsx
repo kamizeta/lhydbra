@@ -110,6 +110,19 @@ export default function Dashboard() {
       .then(({ data }) => setActiveSignals(data || []));
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    const cutoff = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
+    supabase
+      .from('market_features')
+      .select('symbol', { count: 'exact', head: true })
+      .eq('timeframe', '1d')
+      .gte('computed_at', cutoff)
+      .then(({ count }) => {
+        setDataFreshness({ fresh: (count || 0) > 0, symbol_count: count || 0 });
+      });
+  }, [user]);
+
   const priceMap = useMemo(() => {
     const map = new Map<string, number>();
     if (!marketAssets) return map;
