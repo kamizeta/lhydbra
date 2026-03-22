@@ -55,6 +55,10 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
   const [existingSymbolExposure, setExistingSymbolExposure] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
+  // Derive take_profit and risk_reward from signals table schema
+  const derivedTakeProfit = signal.take_profit ?? (signal.targets?.[0] ?? signal.entry_price * 1.05);
+  const derivedRiskReward = signal.expected_r_multiple;
+
   // Calculate ideal position size (capped by risk, concentration & leverage limits)
   const riskPerUnit = Math.abs(entryPrice - signal.stop_loss);
   const dollarRisk = settings.current_capital * (settings.risk_per_trade / 100);
