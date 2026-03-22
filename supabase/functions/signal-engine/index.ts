@@ -210,17 +210,23 @@ function generateSetups(features: Record<string, unknown>, direction: string): {
   return setups;
 }
 
-function determineDirection(features: Record<string, unknown>): string {
+function determineDirection(features: Record<string, unknown>): string | null {
   const trend = String(features.trend_direction || 'sideways');
   const rsi = Number(features.rsi_14 || 50);
   const macdHist = Number(features.macd_histogram || 0);
-  
+  const trendStrength = Number(features.trend_strength || 0);
   let longScore = 0, shortScore = 0;
-  if (trend === 'up') longScore += 2; else if (trend === 'down') shortScore += 2;
-  if (rsi > 50) longScore += 1; else if (rsi < 50) shortScore += 1;
-  if (macdHist > 0) longScore += 1; else if (macdHist < 0) shortScore += 1;
-  
-  return longScore >= shortScore ? 'long' : 'short';
+  if (trend === 'up') longScore += 2;
+  else if (trend === 'down') shortScore += 2;
+  else return null; // sideways = no conviction
+  if (rsi > 55) longScore += 1;
+  else if (rsi < 45) shortScore += 1;
+  if (macdHist > 0) longScore += 1;
+  else if (macdHist < 0) shortScore += 1;
+  if (trendStrength < 0.2) return null; // too weak to trade
+  const margin = Math.abs(longScore - shortScore);
+  if (margin < 2) return null; // conflicting signals
+  return longScore > shortScore ? 'long' : 'short';
 }
 
 function determineBestStrategy(features: Record<string, unknown>): string {
@@ -404,6 +410,10 @@ Deno.serve(async (req) => {
 
       const enriched = { ...feat, current_price: currentPrice };
       const direction = determineDirection(enriched);
+      if (!direction) {
+        rejections.push({ asset: symbol, reason: 'Insufficient directional conviction (sideways or conflicting signals)' });
+        continue;
+      }
 
       // Skip if already has position
       if (openPositionMap.has(symbol) && openPositionMap.get(symbol) === direction) {
