@@ -4,6 +4,7 @@ import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2, User, Key, T
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSettings, type UserSettings } from '@/hooks/useUserSettings';
+import { useGoalProfile } from '@/hooks/useGoalProfile';
 import { useNotifications, type NotificationPreferences } from '@/hooks/useNotifications';
 import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
