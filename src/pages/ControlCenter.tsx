@@ -59,7 +59,7 @@ export default function ControlCenter() {
       supabase.from("positions").select("symbol, direction, quantity, avg_entry, stop_loss, strategy, asset_type").eq("user_id", user.id).eq("status", "open"),
       supabase.from("signals").select("asset, direction, confidence_score, status, strategy_family, opportunity_score").eq("user_id", user.id).eq("status", "active").order("created_at", { ascending: false }).limit(5),
       supabase.from("trade_journal").select("pnl, r_multiple").eq("user_id", user.id),
-      supabase.from("opportunity_scores").select("symbol, total_score, direction, strategy_family").eq("timeframe", "1d").order("total_score", { ascending: false }).limit(5),
+      supabase.from("signals").select("asset, opportunity_score, direction, strategy_family").eq("user_id", user.id).eq("status", "active").order("opportunity_score", { ascending: false }).limit(5),
     ]).then(([posRes, sigRes, journalRes, oppRes]) => {
       if (posRes.data) setPositions(posRes.data as Position[]);
       if (sigRes.data) setSignals(sigRes.data as unknown as Signal[]);
@@ -74,7 +74,7 @@ export default function ControlCenter() {
           avgR: rTrades.length > 0 ? rTrades.reduce((s, t) => s + (t.r_multiple || 0), 0) / rTrades.length : 0,
         });
       }
-      if (oppRes.data) setTopOpps(oppRes.data as TopOpp[]);
+      if (oppRes.data) setTopOpps(oppRes.data as unknown as TopOpp[]);
       setLoading(false);
     });
   }, [user]);
