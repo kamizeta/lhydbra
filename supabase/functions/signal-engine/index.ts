@@ -268,6 +268,19 @@ async function fetchVIXScore(apiKey: string): Promise<number> {
   } catch { return 50; }
 }
 
+const SYMBOL_SECTORS: Record<string, string> = {
+  'AAPL': 'tech', 'MSFT': 'tech', 'NVDA': 'tech', 'GOOGL': 'tech', 'META': 'tech',
+  'AMZN': 'tech', 'TSLA': 'tech', 'AMD': 'tech',
+  'QQQ': 'tech_etf', 'SOXX': 'tech_etf', 'SMH': 'tech_etf',
+  'SPY': 'broad_etf', 'VOO': 'broad_etf', 'IWM': 'broad_etf',
+  'JPM': 'finance', 'BAC': 'finance', 'GS': 'finance', 'XLF': 'finance',
+  'XLE': 'energy', 'CVX': 'energy', 'XOM': 'energy',
+  'GLD': 'commodity', 'XAU/USD': 'commodity',
+  'BTC/USD': 'crypto', 'ETH/USD': 'crypto',
+  'EUR/USD': 'forex', 'GBP/USD': 'forex', 'USD/JPY': 'forex',
+};
+const MAX_SECTOR_POSITIONS = 2;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
