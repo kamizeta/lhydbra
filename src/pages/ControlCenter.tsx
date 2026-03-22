@@ -36,8 +36,8 @@ interface JournalStats {
 }
 
 interface TopOpp {
-  symbol: string;
-  total_score: number;
+  asset: string;
+  opportunity_score: number;
   direction: string | null;
   strategy_family: string | null;
 }
