@@ -46,13 +46,28 @@ function rsi(closes: number[], period = 14): number | null {
 }
 
 function macd(closes: number[]): { macd: number; signal: number; histogram: number } | null {
-  const ema12 = ema(closes, 12);
-  const ema26 = ema(closes, 26);
-  if (ema12 === null || ema26 === null) return null;
-  const macdLine = ema12 - ema26;
-  // Simplified signal (would need historical MACD values for true EMA9 of MACD)
-  const signal = macdLine * 0.8; // approximation
-  return { macd: macdLine, signal, histogram: macdLine - signal };
+  if (closes.length < 35) return null;
+  const macdValues: number[] = [];
+  for (let i = 0; i <= closes.length - 26; i++) {
+    const slice = closes.slice(i, closes.length);
+    const e12 = ema(slice, 12);
+    const e26 = ema(slice, 26);
+    if (e12 !== null && e26 !== null) {
+      macdValues.push(e12 - e26);
+    }
+  }
+  if (macdValues.length < 9) return null;
+  const k = 2 / (9 + 1);
+  let signalLine = macdValues.slice(0, 9).reduce((a, b) => a + b, 0) / 9;
+  for (let i = 9; i < macdValues.length; i++) {
+    signalLine = macdValues[i] * k + signalLine * (1 - k);
+  }
+  const currentMacd = macdValues[macdValues.length - 1];
+  return {
+    macd: currentMacd,
+    signal: signalLine,
+    histogram: currentMacd - signalLine,
+  };
 }
 
 function atr(highs: number[], lows: number[], closes: number[], period = 14): number | null {
