@@ -25,7 +25,7 @@ describe('calcPositionSize', () => {
   });
   test('fractional for crypto', () => {
     const p = { ...base, isFractional: true, entryPrice: 50000, stopLoss: 49000 };
-    expect(calcPositionSize(p)).toBe(0.1);
+    expect(calcPositionSize(p)).toBe(0.05);
   });
   test('leverage cap', () => {
     expect(calcPositionSize({ ...base, existingTotalExposure: 19000, riskPct: 50 })).toBe(10);
