@@ -223,9 +223,9 @@ export default function OpportunityRadar() {
                 </StatusBadge>
                 <StatusBadge variant="info">{selected.strategy_family || "—"}</StatusBadge>
                 <span className={cn("text-[10px] font-mono px-2 py-0.5 rounded border",
-                  getTier(selected.total_score).bg, getTier(selected.total_score).color, getTier(selected.total_score).border
+                  getTier(selected.opportunity_score).bg, getTier(selected.opportunity_score).color, getTier(selected.opportunity_score).border
                 )}>
-                  {getTier(selected.total_score).label}
+                  {getTier(selected.opportunity_score).label}
                 </span>
               </div>
 
