@@ -233,7 +233,7 @@ export default function OpportunityRadar() {
               <div className="space-y-2">
                 <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Score Breakdown</h3>
                 {SUB_SCORE_LABELS.map(({ key, label }) => {
-                  const val = (selected as any)[key] || 0;
+                  const val = getSubScore(selected, key.replace('_score', ''));
                   return (
                     <div key={key} className="space-y-1">
                       <div className="flex justify-between text-xs">
