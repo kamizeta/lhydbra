@@ -55,6 +55,10 @@ export default function SettingsPage() {
   // Scoring weights state
   const [weights, setWeights] = useState<ScoringWeights>(defaultWeights);
   const [weightsLoading, setWeightsLoading] = useState(true);
+  const [watchlistInput, setWatchlistInput] = useState('');
+  const [localWatchlist, setLocalWatchlist] = useState<string[]>(
+    (savedSettings as any).watchlist || ['AAPL','MSFT','NVDA','TSLA','SPY','QQQ','BTC/USD','ETH/USD','EUR/USD','GBP/USD','XAU/USD']
+  );
 
   useEffect(() => { setSettings(savedSettings); }, [savedSettings]);
   useEffect(() => { setLocalNotifPrefs(notifPrefs); }, [notifPrefs]);
