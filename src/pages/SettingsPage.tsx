@@ -60,7 +60,12 @@ export default function SettingsPage() {
     (savedSettings as any).watchlist || ['AAPL','MSFT','NVDA','TSLA','SPY','QQQ','BTC/USD','ETH/USD','EUR/USD','GBP/USD','XAU/USD']
   );
 
-  useEffect(() => { setSettings(savedSettings); }, [savedSettings]);
+  useEffect(() => {
+    setSettings(savedSettings);
+    if ((savedSettings as any).watchlist) {
+      setLocalWatchlist((savedSettings as any).watchlist);
+    }
+  }, [savedSettings]);
   useEffect(() => { setLocalNotifPrefs(notifPrefs); }, [notifPrefs]);
 
   // Load profile
