@@ -84,10 +84,10 @@ export default function OpportunityRadar() {
   // Helper to get sub-score from breakdown
   const getSubScore = (s: OpScore, key: string) => (s.score_breakdown || {})[key] || 0;
 
-  const selected = selectedSymbol ? scores.find(s => s.symbol === selectedSymbol) : null;
+  const selected = selectedSymbol ? scores.find(s => s.asset === selectedSymbol) : null;
   const selectedFeature = selectedSymbol ? featureMap.get(selectedSymbol) : null;
 
-  const avgScore = scores.length > 0 ? scores.reduce((s, o) => s + o.total_score, 0) / scores.length : 0;
+  const avgScore = scores.length > 0 ? scores.reduce((s, o) => s + o.opportunity_score, 0) / scores.length : 0;
   const topOpp = scores.length > 0 ? scores[0] : null;
   const longCount = scores.filter(s => s.direction === "long").length;
   const shortCount = scores.filter(s => s.direction === "short").length;
