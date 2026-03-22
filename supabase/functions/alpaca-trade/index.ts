@@ -180,15 +180,25 @@ serve(async (req) => {
 
       // Poll for fill confirmation
       let finalOrder = data;
-      if (data.status === 'accepted' || data.status === 'new' || data.status === 'pending_new') {
+      let fillConfirmed = !['accepted', 'new', 'pending_new'].includes(String(data.status));
+
+      if (!fillConfirmed) {
         const polled = await pollOrderStatus(baseUrl, data.id, headers);
-        if (polled && polled.status !== 'polling_timeout') {
-          finalOrder = polled;
+        if (polled.status === 'polling_timeout') {
+          return jsonRes({
+            success: false,
+            pending: true,
+            order_id: data.id,
+            client_order_id: idempotencyId,
+            message: "Order sent to Alpaca but fill not confirmed within timeout. Run alpaca-sync to reconcile.",
+          });
         }
+        finalOrder = polled;
+        fillConfirmed = String(finalOrder.status) === 'filled';
       }
 
       return jsonRes({
-        success: true,
+        success: fillConfirmed,
         order: {
           id: finalOrder.id,
           client_order_id: finalOrder.client_order_id,
