@@ -112,7 +112,7 @@ export default function OpportunityRadar() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <MetricCard label="Avg Score" value={formatNumber(avgScore)} icon={Target} changeType={avgScore >= 55 ? "positive" : "negative"} />
-        <MetricCard label="Top Opportunity" value={topOpp ? `${topOpp.symbol} (${topOpp.total_score.toFixed(0)})` : "—"} icon={Zap} />
+        <MetricCard label="Top Opportunity" value={topOpp ? `${topOpp.asset} (${topOpp.opportunity_score.toFixed(0)})` : "—"} icon={Zap} />
         <MetricCard label="Direction Bias" value={`${longCount}L / ${shortCount}S`} change={longCount > shortCount ? "Bullish bias" : shortCount > longCount ? "Bearish bias" : "Neutral"} icon={TrendingUp} />
         <MetricCard label="Assets Scanned" value={`${scores.length}`} icon={Radar} />
       </div>
