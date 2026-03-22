@@ -415,9 +415,13 @@ Deno.serve(async (req) => {
       }
 
       let baseScore = 0;
+      let totalWeight = 0;
       for (const [k, w] of Object.entries(weights)) {
-        baseScore += w * (subscores[k as keyof typeof subscores] || 50);
+        if (subscores[k] === undefined) continue;
+        baseScore += w * subscores[k];
+        totalWeight += w;
       }
+      if (totalWeight > 0) baseScore = (baseScore / totalWeight) * 100;
 
       const stratMod = computeStrategyModifier(strategyFamily, regime, perf);
       const regimeMod = computeRegimeModifier(regime, Number(feat.regime_confidence || 50));
