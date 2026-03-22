@@ -1799,6 +1799,7 @@ export type Database = {
           trades_today: number
           updated_at: string
           user_id: string
+          watchlist: string[]
         }
         Insert: {
           auto_execute?: boolean
@@ -1828,6 +1829,7 @@ export type Database = {
           trades_today?: number
           updated_at?: string
           user_id: string
+          watchlist?: string[]
         }
         Update: {
           auto_execute?: boolean
@@ -1857,6 +1859,7 @@ export type Database = {
           trades_today?: number
           updated_at?: string
           user_id?: string
+          watchlist?: string[]
         }
         Relationships: []
       }
