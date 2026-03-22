@@ -380,13 +380,11 @@ Deno.serve(async (req) => {
       }
 
       // Compute subscores
-      const subscores = {
+      const subscores: Record<string, number> = {
         market_structure: computeMarketStructure(enriched),
         momentum: computeMomentum(enriched),
         volatility_suitability: computeVolatilitySuitability(enriched, strategyFamily),
         strategy_confluence: computeStrategyConfluence(enriched, strategyFamily),
-        macro_context: 45, // Conservative: penalize lack of real data
-        sentiment_flow: 45, // Conservative: penalize lack of real data
         risk_reward: computeRiskReward(expectedR, setup.targets, setup.entry, setup.sl),
         historical_performance: 50,
       };
@@ -417,9 +415,13 @@ Deno.serve(async (req) => {
       }
 
       let baseScore = 0;
+      let totalWeight = 0;
       for (const [k, w] of Object.entries(weights)) {
-        baseScore += w * (subscores[k as keyof typeof subscores] || 50);
+        if (subscores[k] === undefined) continue;
+        baseScore += w * subscores[k];
+        totalWeight += w;
       }
+      if (totalWeight > 0) baseScore = (baseScore / totalWeight) * 100;
 
       const stratMod = computeStrategyModifier(strategyFamily, regime, perf);
       const regimeMod = computeRegimeModifier(regime, Number(feat.regime_confidence || 50));
