@@ -410,6 +410,10 @@ Deno.serve(async (req) => {
 
       const enriched = { ...feat, current_price: currentPrice };
       const direction = determineDirection(enriched);
+      if (!direction) {
+        rejections.push({ asset: symbol, reason: 'Insufficient directional conviction (sideways or conflicting signals)' });
+        continue;
+      }
 
       // Skip if already has position
       if (openPositionMap.has(symbol) && openPositionMap.get(symbol) === direction) {
