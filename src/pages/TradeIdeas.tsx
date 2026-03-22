@@ -15,21 +15,19 @@ import {
 
 interface TradeSignal {
   id: string;
-  symbol: string;
-  name: string;
-  asset_type: string;
+  asset: string;
+  asset_class: string;
   direction: string;
-  strategy: string;
+  strategy_family: string | null;
   entry_price: number;
   stop_loss: number;
-  take_profit: number;
-  risk_reward: number;
-  position_size: number | null;
-  risk_percent: number | null;
-  confidence: number;
+  targets: number[];
+  expected_r_multiple: number;
+  opportunity_score: number;
+  confidence_score: number;
   status: string;
   reasoning: string | null;
-  agent_analysis: string | null;
+  market_regime: string | null;
   created_at: string;
 }
 
@@ -45,13 +43,13 @@ export default function TradeIdeas() {
   const loadSignals = async () => {
     if (!user) return;
     const { data, error } = await supabase
-      .from('trade_signals')
+      .from('signals')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setSignals(data as TradeSignal[]);
+      setSignals(data as unknown as TradeSignal[]);
     }
     setLoading(false);
   };
@@ -63,11 +61,11 @@ export default function TradeIdeas() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel('trade_signals_changes')
+      .channel('signals_trade_ideas')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'trade_signals',
+        table: 'signals',
         filter: `user_id=eq.${user.id}`,
       }, () => {
         loadSignals();
@@ -83,8 +81,8 @@ export default function TradeIdeas() {
 
   const updateStatus = async (id: string, status: string) => {
     const { error } = await supabase
-      .from('trade_signals')
-      .update({ status })
+      .from('signals')
+      .update({ status } as Record<string, unknown>)
       .eq('id', id);
 
     if (!error) {
@@ -94,27 +92,27 @@ export default function TradeIdeas() {
 
   const deleteSignal = async (id: string) => {
     const { error } = await supabase
-      .from('trade_signals')
+      .from('signals')
       .delete()
       .eq('id', id);
 
     if (!error) {
       setSignals(prev => prev.filter(s => s.id !== id));
       if (selectedSignal?.id === id) setSelectedSignal(null);
-      toast.success('Trade signal deleted');
+      toast.success('Signal deleted');
     }
   };
 
   const deleteAllSignals = async () => {
     if (!user) return;
     const { error } = await supabase
-      .from('trade_signals')
+      .from('signals')
       .delete()
       .eq('user_id', user.id);
     if (!error) {
       setSignals([]);
       setSelectedSignal(null);
-      toast.success('Todas las ideas de trade eliminadas');
+      toast.success('Todas las señales eliminadas');
     }
     setConfirmDeleteAll(false);
   };
@@ -123,6 +121,11 @@ export default function TradeIdeas() {
     await updateStatus(signalId, 'approved');
     setApproveSignal(null);
   };
+
+  const getTakeProfit = (sig: TradeSignal) =>
+    sig.targets && sig.targets.length > 0 ? sig.targets[0] : sig.entry_price;
+
+  const getRiskReward = (sig: TradeSignal) => sig.expected_r_multiple || 0;
 
   if (loading) {
     return (
@@ -169,9 +172,9 @@ export default function TradeIdeas() {
       {signals.length === 0 ? (
         <div className="terminal-border rounded-lg p-12 flex flex-col items-center justify-center text-center">
           <Lightbulb className="h-10 w-10 text-muted-foreground/30 mb-3" />
-          <h3 className="text-sm font-medium text-muted-foreground">No hay ideas de trade</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">No hay señales</h3>
           <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-            Ejecuta los agentes de AI para generar ideas de trade automáticamente.
+            Ejecuta el Signal Engine para generar señales automáticamente.
           </p>
         </div>
       ) : (
@@ -181,6 +184,7 @@ export default function TradeIdeas() {
             {signals.map(signal => {
               const isApproved = signal.status === 'approved';
               const isRejected = signal.status === 'rejected';
+              const isInvalidated = signal.status === 'invalidated';
               return (
               <div
                 key={signal.id}
@@ -188,12 +192,12 @@ export default function TradeIdeas() {
                   "terminal-border rounded-lg p-4 cursor-pointer transition-all relative overflow-hidden",
                   selectedSignal?.id === signal.id && "ring-1 ring-primary glow-primary",
                   isApproved && "border-profit/40",
-                  isRejected && "border-loss/40",
+                  (isRejected || isInvalidated) && "border-loss/40",
                 )}
                 onClick={() => setSelectedSignal(signal)}
               >
                 {/* Status indicator bar */}
-                {(isApproved || isRejected) && (
+                {(isApproved || isRejected || isInvalidated) && (
                   <div className={cn(
                     "absolute left-0 top-0 bottom-0 w-1",
                     isApproved ? "bg-profit" : "bg-loss"
@@ -207,34 +211,35 @@ export default function TradeIdeas() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-foreground">{signal.symbol}</span>
+                        <span className="font-mono font-bold text-foreground">{signal.asset}</span>
                         <StatusBadge variant={signal.direction === 'long' ? 'profit' : 'loss'}>
                           {signal.direction.toUpperCase()}
                         </StatusBadge>
                         <StatusBadge variant={
-                          signal.status === 'pending' ? 'warning' :
+                          signal.status === 'active' ? 'warning' :
                           signal.status === 'approved' ? 'profit' :
-                          signal.status === 'rejected' ? 'loss' : 'neutral'
+                          signal.status === 'rejected' || signal.status === 'invalidated' ? 'loss' :
+                          signal.status === 'closed' ? 'info' : 'neutral'
                         } dot>
                           {signal.status.toUpperCase()}
                         </StatusBadge>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">{signal.name} • {signal.strategy}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{signal.strategy_family || '—'} • {signal.market_regime || '—'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 text-right">
                     <div className="hidden md:block">
-                      <div className="text-xs text-muted-foreground">R/R</div>
-                      <div className="font-mono font-bold text-foreground">{formatNumber(signal.risk_reward)}</div>
+                      <div className="text-xs text-muted-foreground">R:R</div>
+                      <div className="font-mono font-bold text-foreground">{formatNumber(getRiskReward(signal))}</div>
                     </div>
                     <div className="hidden md:block">
                       <div className="text-xs text-muted-foreground">{t.common.confidence}</div>
-                      <div className={cn("font-mono font-bold", signal.confidence > 75 ? "text-profit" : signal.confidence > 60 ? "text-warning" : "text-muted-foreground")}>
-                        {signal.confidence}%
+                      <div className={cn("font-mono font-bold", signal.confidence_score > 75 ? "text-profit" : signal.confidence_score > 60 ? "text-warning" : "text-muted-foreground")}>
+                        {signal.confidence_score}%
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      {signal.status === 'pending' && (
+                      {signal.status === 'active' && (
                         <>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleApprove(signal); }}
@@ -265,9 +270,7 @@ export default function TradeIdeas() {
                   <div className="flex gap-4 text-xs font-mono flex-wrap">
                     <span className="text-muted-foreground">{t.common.entry}: <span className="text-foreground">{formatCurrency(signal.entry_price)}</span></span>
                     <span className="text-muted-foreground">SL: <span className="text-loss">{formatCurrency(signal.stop_loss)}</span></span>
-                    <span className="text-muted-foreground">TP: <span className="text-profit">{formatCurrency(signal.take_profit)}</span></span>
-                    {signal.position_size && <span className="text-muted-foreground">{t.common.size}: <span className="text-foreground">{signal.position_size}</span></span>}
-                    {signal.risk_percent && <span className="text-muted-foreground">{t.common.risk}: <span className="text-warning">{signal.risk_percent}%</span></span>}
+                    <span className="text-muted-foreground">TP: <span className="text-profit">{formatCurrency(getTakeProfit(signal))}</span></span>
                   </div>
                   <span className="text-[10px] font-mono text-muted-foreground shrink-0 ml-2">
                     {new Date(signal.created_at).toLocaleDateString()} {new Date(signal.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -288,7 +291,7 @@ export default function TradeIdeas() {
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-lg font-bold text-foreground">{selectedSignal.symbol}</span>
+                    <span className="font-mono text-lg font-bold text-foreground">{selectedSignal.asset}</span>
                     <StatusBadge variant={selectedSignal.direction === 'long' ? 'profit' : 'loss'}>
                       {selectedSignal.direction.toUpperCase()}
                     </StatusBadge>
@@ -298,12 +301,10 @@ export default function TradeIdeas() {
                     {[
                       [t.common.entry, formatCurrency(selectedSignal.entry_price), ''],
                       [t.common.stopLoss, formatCurrency(selectedSignal.stop_loss), 'text-loss'],
-                      [t.common.takeProfit, formatCurrency(selectedSignal.take_profit), 'text-profit'],
-                      [t.tradeIdeas.rrRatio, formatNumber(selectedSignal.risk_reward), ''],
-                      ...(selectedSignal.position_size ? [[t.common.size, `${selectedSignal.position_size}`, '']] : []),
-                      ...(selectedSignal.risk_percent ? [[t.common.risk, `${selectedSignal.risk_percent}%`, 'text-warning']] : []),
-                      [t.common.confidence, `${selectedSignal.confidence}%`, selectedSignal.confidence > 70 ? 'text-profit' : ''],
-                      [t.common.strategy, selectedSignal.strategy, 'text-primary'],
+                      [t.common.takeProfit, formatCurrency(getTakeProfit(selectedSignal)), 'text-profit'],
+                      [t.tradeIdeas.rrRatio, formatNumber(getRiskReward(selectedSignal)), ''],
+                      [t.common.confidence, `${selectedSignal.confidence_score}%`, selectedSignal.confidence_score > 70 ? 'text-profit' : ''],
+                      [t.common.strategy, selectedSignal.strategy_family || '—', 'text-primary'],
                     ].map(([label, value, color]) => (
                       <div key={label as string} className="flex justify-between text-xs">
                         <span className="text-muted-foreground">{label}</span>
@@ -318,15 +319,6 @@ export default function TradeIdeas() {
                         <Target className="h-3 w-3" /> {t.tradeIdeas.reasoning}
                       </h3>
                       <p className="text-xs text-muted-foreground leading-relaxed">{selectedSignal.reasoning}</p>
-                    </div>
-                  )}
-
-                  {selectedSignal.agent_analysis && (
-                    <div>
-                      <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
-                        <Shield className="h-3 w-3" /> {t.tradeIdeas.agentAnalysis}
-                      </h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">{selectedSignal.agent_analysis}</p>
                     </div>
                   )}
 
@@ -349,7 +341,18 @@ export default function TradeIdeas() {
       {/* Approve → Open Position Dialog */}
       {approveSignal && (
         <ApproveToPositionDialog
-          signal={approveSignal}
+          signal={{
+            ...approveSignal,
+            symbol: approveSignal.asset,
+            name: `${approveSignal.asset} ${approveSignal.direction.toUpperCase()}`,
+            asset_type: approveSignal.asset_class,
+            strategy: approveSignal.strategy_family || 'signal-engine',
+            take_profit: getTakeProfit(approveSignal),
+            risk_reward: getRiskReward(approveSignal),
+            position_size: null,
+            opportunity_score: approveSignal.opportunity_score,
+            market_regime: approveSignal.market_regime,
+          }}
           onClose={() => setApproveSignal(null)}
           onConfirm={handlePositionCreated}
         />
@@ -357,9 +360,9 @@ export default function TradeIdeas() {
       <AlertDialog open={confirmDeleteAll} onOpenChange={setConfirmDeleteAll}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar todas las ideas?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar todas las señales?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará todas las ideas de trade. No se puede deshacer.
+              Esta acción eliminará todas las señales. No se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

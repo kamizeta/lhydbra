@@ -11,19 +11,18 @@ const corsHeaders = {
 
 interface Signal {
   id: string;
-  symbol: string;
-  asset_type: string;
+  asset: string;
+  asset_class: string;
   direction: string;
   entry_price: number;
   stop_loss: number;
-  take_profit: number;
-  opportunity_score: number | null;
-  confidence: number;
-  expected_r_multiple?: number;
-  risk_reward: number;
+  targets: number[];
+  expected_r_multiple: number;
+  opportunity_score: number;
+  confidence_score: number;
   strategy_family: string | null;
   market_regime: string | null;
-  strategy: string;
+  status: string;
 }
 
 interface Position {
@@ -71,7 +70,6 @@ function computeStrategyStrength(family: string | null, perfMap: Map<string, Str
   if (!family) return 50;
   const p = perfMap.get(family);
   if (!p || p.total_trades < 3) return 50;
-  // Normalize win_rate (0-100) and avg_r (typically 0-3) into 0-100
   const wrScore = Math.min(100, (p.win_rate || 0));
   const rScore = Math.min(100, ((p.avg_r_multiple || 0) / 2) * 100);
   return wrScore * 0.6 + rScore * 0.4;
@@ -85,24 +83,19 @@ function computePortfolioFit(
   totalCapital: number,
   maxAssetPct: number,
 ): number {
-  // Start at 100 (perfect fit), deduct for overlap
   let fit = 100;
 
-  // Penalize if same asset type already concentrated
-  const typeExposure = (exposureByType.get(signal.asset_type) || 0) / totalCapital * 100;
+  const typeExposure = (exposureByType.get(signal.asset_class) || 0) / totalCapital * 100;
   if (typeExposure > maxAssetPct * 0.5) fit -= 20;
   if (typeExposure > maxAssetPct * 0.75) fit -= 20;
 
-  // Penalize if same strategy is heavy
   const stratExposure = (exposureByStrategy.get(signal.strategy_family || "unknown") || 0) / totalCapital * 100;
   if (stratExposure > 30) fit -= 15;
   if (stratExposure > 50) fit -= 15;
 
-  // Bonus if no position in this asset
-  const hasPosition = positions.some(p => p.symbol === signal.symbol);
+  const hasPosition = positions.some(p => p.symbol === signal.asset);
   if (!hasPosition) fit += 10;
 
-  // Bonus for different direction than portfolio majority
   const longCount = positions.filter(p => p.direction === "long").length;
   const shortCount = positions.filter(p => p.direction === "short").length;
   if (signal.direction === "short" && longCount > shortCount * 2) fit += 10;
@@ -123,7 +116,6 @@ function getCorrelation(symbol: string, portfolio: string[], corrMap: Map<string
       count++;
     }
   }
-  // If no correlation data, use asset-class heuristic
   return count > 0 ? totalCorr / count : 0.3;
 }
 
@@ -153,9 +145,9 @@ serve(async (req) => {
       min_opportunity = 60,
       min_confidence = 50,
       min_r_multiple = 1.5,
-      max_risk_per_trade_pct,      // override
-      max_total_risk_pct,           // override
-      max_asset_class_pct,          // override
+      max_risk_per_trade_pct,
+      max_total_risk_pct,
+      max_asset_class_pct,
       max_strategy_pct = 40,
       max_cluster_pct = 25,
     } = body;
@@ -163,8 +155,8 @@ serve(async (req) => {
     // ── FETCH ALL DATA IN PARALLEL ─────────────────────
 
     const [signalsRes, positionsRes, settingsRes, perfRes, corrRes] = await Promise.all([
-      supabase.from("trade_signals").select("*")
-        .eq("user_id", userId).eq("status", "pending")
+      supabase.from("signals").select("*")
+        .eq("user_id", userId).eq("status", "active")
         .order("opportunity_score", { ascending: false }),
       supabase.from("positions").select("symbol, asset_type, direction, quantity, avg_entry, stop_loss, strategy_family")
         .eq("user_id", userId).eq("status", "open"),
@@ -188,7 +180,6 @@ serve(async (req) => {
     const perfData = (perfRes.data || []) as StratPerf[];
     const corrData = (corrRes.data || []) as Correlation[];
 
-    // Apply overrides
     const riskPerTrade = max_risk_per_trade_pct ?? settings.risk_per_trade;
     const maxTotalRisk = max_total_risk_pct ?? settings.max_daily_risk;
     const maxAssetClass = max_asset_class_pct ?? settings.max_single_asset;
@@ -196,14 +187,12 @@ serve(async (req) => {
     const totalCapital = settings.current_capital;
     const maxRiskBudget = totalCapital * (maxTotalRisk / 100);
 
-    // Build lookup maps
     const perfMap = new Map<string, StratPerf>();
     perfData.forEach(p => perfMap.set(p.strategy_family, p));
 
     const corrMap = new Map<string, number>();
     corrData.forEach(c => corrMap.set(`${c.symbol_a}|${c.symbol_b}`, c.correlation));
 
-    // Current exposure maps
     const exposureByType = new Map<string, number>();
     const exposureByStrategy = new Map<string, number>();
     let currentTotalRisk = 0;
@@ -229,24 +218,23 @@ serve(async (req) => {
 
     for (const sig of signals) {
       const oppScore = sig.opportunity_score || 0;
-      const confScore = sig.confidence || 0;
-      const rr = sig.risk_reward || 0;
+      const confScore = sig.confidence_score || 0;
+      const rr = sig.expected_r_multiple || 0;
 
       if (oppScore < min_opportunity) {
-        rejected.push({ signal_id: sig.id, symbol: sig.symbol, reason: `Opportunity score ${oppScore} < ${min_opportunity}` });
+        rejected.push({ signal_id: sig.id, symbol: sig.asset, reason: `Opportunity score ${oppScore} < ${min_opportunity}` });
         continue;
       }
       if (confScore < min_confidence) {
-        rejected.push({ signal_id: sig.id, symbol: sig.symbol, reason: `Confidence ${confScore} < ${min_confidence}` });
+        rejected.push({ signal_id: sig.id, symbol: sig.asset, reason: `Confidence ${confScore} < ${min_confidence}` });
         continue;
       }
       if (rr < min_r_multiple) {
-        rejected.push({ signal_id: sig.id, symbol: sig.symbol, reason: `R:R ${rr.toFixed(2)} < ${min_r_multiple}` });
+        rejected.push({ signal_id: sig.id, symbol: sig.asset, reason: `R:R ${rr.toFixed(2)} < ${min_r_multiple}` });
         continue;
       }
-      // Reject if already have same-direction position
-      if (positions.some(p => p.symbol === sig.symbol && p.direction === sig.direction)) {
-        rejected.push({ signal_id: sig.id, symbol: sig.symbol, reason: `Already has open ${sig.direction} position` });
+      if (positions.some(p => p.symbol === sig.asset && p.direction === sig.direction)) {
+        rejected.push({ signal_id: sig.id, symbol: sig.asset, reason: `Already has open ${sig.direction} position` });
         continue;
       }
       filtered.push(sig);
@@ -256,7 +244,7 @@ serve(async (req) => {
 
     const ranked = filtered.map(sig => {
       const oppNorm = (sig.opportunity_score || 0);
-      const confNorm = sig.confidence;
+      const confNorm = sig.confidence_score;
       const stratStrength = computeStrategyStrength(sig.strategy_family, perfMap);
       const portFit = computePortfolioFit(sig, positions, exposureByType, exposureByStrategy, totalCapital, maxAssetClass);
 
@@ -266,8 +254,7 @@ serve(async (req) => {
         0.15 * stratStrength +
         0.15 * portFit;
 
-      // Step 3: Correlation adjustment
-      const corrPenalty = getCorrelation(sig.symbol, portfolioSymbols, corrMap);
+      const corrPenalty = getCorrelation(sig.asset, portfolioSymbols, corrMap);
       const adjustedPriority = allocationPriority * (1 - corrPenalty);
 
       return {
@@ -280,7 +267,6 @@ serve(async (req) => {
       };
     });
 
-    // Sort by adjusted priority descending
     ranked.sort((a, b) => b.adjustedPriority - a.adjustedPriority);
 
     // ── STEPS 4-6: SIZING + ALLOCATION + CONSTRAINTS ──
@@ -321,13 +307,11 @@ serve(async (req) => {
         continue;
       }
 
-      // Check position count limit
       if (positions.length + allocations.filter(a => a.status === "allocated").length >= settings.max_positions) {
         allocations.push(makeAllocation(item, rank, 0, 0, 0, 0, 0, "rejected", `Max positions (${settings.max_positions}) reached`, totalCapital));
         continue;
       }
 
-      // Step 4: Risk-based position sizing
       const maxRiskDollars = Math.min(
         totalCapital * (riskPerTrade / 100),
         Math.max(0, remainingRiskBudget)
@@ -341,19 +325,17 @@ serve(async (req) => {
       let positionSize = maxRiskDollars / stopDistance;
       let capitalNeeded = positionSize * sig.entry_price;
 
-      // Step 8: Score multiplier scaling
       const multiplier = scoreMultiplier(sig.opportunity_score || 0);
       positionSize *= multiplier;
       capitalNeeded = positionSize * sig.entry_price;
 
-      // Step 5-6: Check constraints
-      const newTypeExposure = (exposureByType.get(sig.asset_type) || 0) + capitalNeeded;
+      // Asset class constraint
+      const newTypeExposure = (exposureByType.get(sig.asset_class) || 0) + capitalNeeded;
       const typeExposurePct = (newTypeExposure / totalCapital) * 100;
       if (typeExposurePct > maxAssetClass) {
-        // Try to reduce
-        const maxForType = totalCapital * (maxAssetClass / 100) - (exposureByType.get(sig.asset_type) || 0);
+        const maxForType = totalCapital * (maxAssetClass / 100) - (exposureByType.get(sig.asset_class) || 0);
         if (maxForType <= 0) {
-          allocations.push(makeAllocation(item, rank, 0, 0, 0, multiplier, 0, "rejected", `Asset class ${sig.asset_type} at max (${maxAssetClass}%)`, totalCapital));
+          allocations.push(makeAllocation(item, rank, 0, 0, 0, multiplier, 0, "rejected", `Asset class ${sig.asset_class} at max (${maxAssetClass}%)`, totalCapital));
           continue;
         }
         capitalNeeded = maxForType;
@@ -375,9 +357,8 @@ serve(async (req) => {
       }
 
       // Correlation cluster check
-      const clusterCorr = getCorrelation(sig.symbol, portfolioSymbols, corrMap);
+      const clusterCorr = getCorrelation(sig.asset, portfolioSymbols, corrMap);
       if (clusterCorr > (settings.max_correlation / 100)) {
-        // Reduce position by penalty factor
         const reductionFactor = 1 - (clusterCorr - (settings.max_correlation / 100));
         if (reductionFactor <= 0.2) {
           allocations.push(makeAllocation(item, rank, 0, 0, 0, multiplier, 0, "rejected", `High correlation (${(clusterCorr * 100).toFixed(0)}%) with portfolio`, totalCapital));
@@ -404,9 +385,9 @@ serve(async (req) => {
       // Commit allocation
       remainingRiskBudget -= riskUsed;
       remainingCapital -= capitalNeeded;
-      exposureByType.set(sig.asset_type, (exposureByType.get(sig.asset_type) || 0) + capitalNeeded);
+      exposureByType.set(sig.asset_class, (exposureByType.get(sig.asset_class) || 0) + capitalNeeded);
       exposureByStrategy.set(fam, (exposureByStrategy.get(fam) || 0) + capitalNeeded);
-      portfolioSymbols.push(sig.symbol);
+      portfolioSymbols.push(sig.asset);
 
       allocations.push(makeAllocation(
         item, rank, capitalNeeded, positionSize, riskUsed,
@@ -455,7 +436,6 @@ serve(async (req) => {
       });
       portfolioScore = totalAllocatedCapital > 0 ? weightedSum / totalAllocatedCapital : 0;
 
-      // Diversification bonus
       const uniqueTypes = new Set(allocated.map(a => a.asset_type));
       const uniqueStrategies = new Set(allocated.filter(a => a.strategy_family).map(a => a.strategy_family));
       const diversificationBonus = Math.min(10, (uniqueTypes.size - 1) * 3 + (uniqueStrategies.size - 1) * 2);
@@ -464,7 +444,6 @@ serve(async (req) => {
 
     // ── PERSIST TO DB ──────────────────────────────────
 
-    // Create allocation plan
     const { data: plan, error: planErr } = await supabase.from("allocation_plans").insert({
       user_id: userId,
       total_capital: totalCapital,
@@ -501,7 +480,6 @@ serve(async (req) => {
       return json({ error: "Failed to save allocation plan" }, 500);
     }
 
-    // Insert allocation items
     if (allocations.length > 0) {
       const items = allocations.map(a => ({
         plan_id: plan.id,
@@ -578,13 +556,13 @@ function makeAllocation(
   const sig = item.signal;
   return {
     signal_id: sig.id,
-    symbol: sig.symbol,
-    asset_type: sig.asset_type,
+    symbol: sig.asset,
+    asset_type: sig.asset_class,
     direction: sig.direction,
     strategy_family: sig.strategy_family,
     opportunity_score: sig.opportunity_score || 0,
-    confidence_score: sig.confidence,
-    expected_r_multiple: sig.risk_reward || 0,
+    confidence_score: sig.confidence_score,
+    expected_r_multiple: sig.expected_r_multiple || 0,
     allocation_priority: item.allocationPriority,
     correlation_penalty: item.correlationPenalty,
     adjusted_priority: item.adjustedPriority,
@@ -599,7 +577,7 @@ function makeAllocation(
     rejection_reason: rejectionReason,
     explanation: {
       opportunity_score: sig.opportunity_score || 0,
-      confidence: sig.confidence,
+      confidence: sig.confidence_score,
       strategy_strength: Number(item.strategyStrength.toFixed(2)),
       portfolio_fit: Number(item.portfolioFit.toFixed(2)),
       allocation_priority: Number(item.allocationPriority.toFixed(2)),

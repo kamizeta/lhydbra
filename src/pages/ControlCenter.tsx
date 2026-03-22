@@ -20,11 +20,11 @@ interface Position {
 }
 
 interface Signal {
-  symbol: string;
+  asset: string;
   direction: string;
-  confidence: number;
+  confidence_score: number;
   status: string;
-  strategy: string;
+  strategy_family: string | null;
   opportunity_score: number | null;
 }
 
@@ -57,12 +57,12 @@ export default function ControlCenter() {
     if (!user) return;
     Promise.all([
       supabase.from("positions").select("symbol, direction, quantity, avg_entry, stop_loss, strategy, asset_type").eq("user_id", user.id).eq("status", "open"),
-      supabase.from("trade_signals").select("symbol, direction, confidence, status, strategy, opportunity_score").eq("user_id", user.id).eq("status", "pending").order("created_at", { ascending: false }).limit(5),
+      supabase.from("signals").select("asset, direction, confidence_score, status, strategy_family, opportunity_score").eq("user_id", user.id).eq("status", "active").order("created_at", { ascending: false }).limit(5),
       supabase.from("trade_journal").select("pnl, r_multiple").eq("user_id", user.id),
       supabase.from("opportunity_scores").select("symbol, total_score, direction, strategy_family").eq("timeframe", "1d").order("total_score", { ascending: false }).limit(5),
     ]).then(([posRes, sigRes, journalRes, oppRes]) => {
       if (posRes.data) setPositions(posRes.data as Position[]);
-      if (sigRes.data) setSignals(sigRes.data as Signal[]);
+      if (sigRes.data) setSignals(sigRes.data as unknown as Signal[]);
       if (journalRes.data) {
         const trades = journalRes.data as { pnl: number | null; r_multiple: number | null }[];
         const wins = trades.filter(t => (t.pnl || 0) > 0);
@@ -202,19 +202,19 @@ export default function ControlCenter() {
           )}
         </div>
 
-        {/* Pending Signals */}
+        {/* Active Signals */}
         <div className="terminal-border rounded-lg p-4">
           <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-            <Bot className="h-4 w-4 text-primary" /> Pending Signals
+            <Bot className="h-4 w-4 text-primary" /> Active Signals
           </h2>
           {signals.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-4">No pending signals. Run AI Agents.</p>
+            <p className="text-xs text-muted-foreground text-center py-4">No active signals. Run Signal Engine.</p>
           ) : (
             <div className="space-y-2">
               {signals.map((s, i) => (
                 <div key={i} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-foreground">{s.symbol}</span>
+                    <span className="text-xs font-mono font-bold text-foreground">{s.asset}</span>
                     <StatusBadge variant={s.direction === "long" ? "profit" : "loss"}>
                       {s.direction.toUpperCase()}
                     </StatusBadge>
@@ -225,7 +225,7 @@ export default function ControlCenter() {
                         s.opportunity_score >= 65 ? "bg-profit/10 text-profit" : "bg-primary/10 text-primary"
                       )}>{s.opportunity_score.toFixed(0)}</span>
                     )}
-                    <span className="text-[10px] font-mono text-muted-foreground">{s.confidence}%</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">{s.confidence_score}%</span>
                   </div>
                 </div>
               ))}
@@ -245,7 +245,7 @@ export default function ControlCenter() {
             { label: "Indicators", status: topOpps.length > 0, detail: topOpps.length > 0 ? "Computed" : "Pending" },
             { label: "Scores", status: topOpps.length > 0, detail: `${topOpps.length} scored` },
             { label: "Positions", status: true, detail: `${positions.length} open` },
-            { label: "Signals", status: true, detail: `${signals.length} pending` },
+            { label: "Signals", status: true, detail: `${signals.length} active` },
             { label: "Journal", status: true, detail: `${journalStats.totalTrades} entries` },
           ].map((sys, i) => (
             <div key={i} className="flex items-center gap-2 bg-accent/30 rounded-md px-3 py-2">
