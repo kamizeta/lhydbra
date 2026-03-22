@@ -105,7 +105,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           if (p.stop_loss) {
             totalRisk += Math.abs(Number(p.avg_entry) - Number(p.stop_loss)) * Number(p.quantity);
           }
-          if (p.symbol === signal.symbol) {
+          if (p.symbol === signal.asset) {
             symbolExposure += value;
           }
         });
