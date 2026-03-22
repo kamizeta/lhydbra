@@ -247,15 +247,21 @@ Deno.serve(async (req) => {
       const effectiveRisk = Math.min(riskPerTrade, remainingRisk / signals.length);
       const riskDollars = liveCapital * (effectiveRisk / 100);
       let quantity = stopDist > 0 ? Math.floor(riskDollars / stopDist) : 0;
-      if (quantity <= 0) quantity = 1;
+      if (quantity <= 0) {
+        return { ...sig, quantity: 0, skip: true, skip_reason: `Inviable sizing: stop_dist=${stopDist.toFixed(4)}, risk_dollars=${riskDollars.toFixed(2)}` };
+      }
 
       const maxSingleAsset = Number(settings.max_single_asset || 25);
       const positionValue = quantity * entryPrice;
       const positionPct = (positionValue / liveCapital) * 100;
       if (positionPct > maxSingleAsset) quantity = Math.floor((liveCapital * maxSingleAsset / 100) / entryPrice);
 
+      if (quantity <= 0) {
+        return { ...sig, quantity: 0, skip: true, skip_reason: `Concentration cap zeroed quantity` };
+      }
+
       const targets = (sig.targets as number[]) || [];
-      const takeProfit = targets.length > 0 ? targets[0] : entryPrice + stopDist * 2;
+      const takeProfit = targets.length > 1 ? targets[1] : targets.length > 0 ? targets[0] : entryPrice + stopDist * 2;
 
       return { ...sig, quantity, risk_pct: effectiveRisk, risk_dollars: riskDollars, position_value: quantity * entryPrice, take_profit: takeProfit };
     });
@@ -264,8 +270,9 @@ Deno.serve(async (req) => {
     const shouldExecute = automationLevel === "full_operator" || (automationLevel === "assisted" && autoExecute);
     const execResults: Record<string, unknown>[] = [];
 
+    const executableTrades = sized.filter((t: Record<string, unknown>) => !t.skip);
     if (shouldExecute && action === "run") {
-      for (const trade of sized) {
+      for (const trade of executableTrades) {
         try {
           const orderRes = await fetch(`${supabaseUrl}/functions/v1/alpaca-trade`, {
             method: "POST",
@@ -354,7 +361,8 @@ Deno.serve(async (req) => {
       signals_generated: signals.length,
       signals_rejected: signalResult.rejected || 0,
       effective_risk_per_trade: riskPerTrade,
-      trades: sized.map((t: Record<string, unknown>) => ({
+      skipped: sized.filter((t: Record<string, unknown>) => t.skip).map((t: Record<string, unknown>) => ({ symbol: t.asset, reason: t.skip_reason })),
+      trades: executableTrades.map((t: Record<string, unknown>) => ({
         symbol: t.asset, direction: t.direction,
         score: Number(t.opportunity_score).toFixed(0),
         confidence: Number(t.confidence_score).toFixed(0),
