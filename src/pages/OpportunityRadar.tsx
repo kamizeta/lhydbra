@@ -81,6 +81,9 @@ export default function OpportunityRadar() {
     return scores.filter(s => s.direction === filter);
   }, [scores, filter]);
 
+  // Helper to get sub-score from breakdown
+  const getSubScore = (s: OpScore, key: string) => (s.score_breakdown || {})[key] || 0;
+
   const selected = selectedSymbol ? scores.find(s => s.symbol === selectedSymbol) : null;
   const selectedFeature = selectedSymbol ? featureMap.get(selectedSymbol) : null;
 
