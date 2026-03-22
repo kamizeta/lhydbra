@@ -142,7 +142,7 @@ serve(async (req) => {
       // Validate asset is tradable on Alpaca
       try {
         const assetRes = await fetchWithRetry(
-          `${baseUrl}/v2/assets/${encodeURIComponent(symbol)}`,
+          `${baseUrl}/v2/assets/${encodeURIComponent(symbol.replace('/', ''))}`,
           { headers }
         );
         if (assetRes.ok) {
