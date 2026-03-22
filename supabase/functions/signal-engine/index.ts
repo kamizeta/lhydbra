@@ -330,8 +330,11 @@ Deno.serve(async (req) => {
       .eq("user_id", user_id)
       .eq("status", "open");
     const openPositionMap = new Map<string, string>();
+    const sectorCount: Record<string, number> = {};
     for (const pos of (openPositions || [])) {
       openPositionMap.set(pos.symbol, pos.direction);
+      const sector = SYMBOL_SECTORS[pos.symbol] || 'other';
+      sectorCount[sector] = (sectorCount[sector] || 0) + 1;
     }
 
     // OPERATOR MODE: Check daily trade cap and cooldown
