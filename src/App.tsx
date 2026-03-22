@@ -21,6 +21,10 @@ import StrategyLab from "@/pages/StrategyLab";
 import LearningDashboard from "@/pages/LearningDashboard";
 import PortfolioAllocation from "@/pages/PortfolioAllocation";
 import PositionsPage from "@/pages/PositionsPage";
+import RiskManagement from "@/pages/RiskManagement";
+import Journal from "@/pages/Journal";
+import OpportunityRadar from "@/pages/OpportunityRadar";
+import AlgoEffectiveness from "@/pages/AlgoEffectiveness";
 
 const queryClient = new QueryClient();
 
