@@ -10,17 +10,17 @@ import StatusBadge from "@/components/shared/StatusBadge";
 
 interface TradeSignal {
   id: string;
-  symbol: string;
-  name: string;
+  asset: string;
+  asset_class: string;
   asset_type: string;
   direction: string;
-  strategy: string;
+  strategy: string | null;
   strategy_family?: string | null;
   entry_price: number;
   stop_loss: number;
-  take_profit: number;
-  risk_reward: number;
-  position_size: number | null;
+  targets: number[];
+  expected_r_multiple: number;
+  take_profit?: number;
   opportunity_score?: number | null;
   market_regime?: string | null;
 }
