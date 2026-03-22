@@ -421,6 +421,8 @@ Deno.serve(async (req) => {
         momentum: computeMomentum(enriched),
         volatility_suitability: computeVolatilitySuitability(enriched, strategyFamily),
         strategy_confluence: computeStrategyConfluence(enriched, strategyFamily),
+        macro_context: vixScore,
+        sentiment_flow: fearGreedScore,
         risk_reward: computeRiskReward(expectedR, setup.targets, setup.entry, setup.sl),
         historical_performance: 50,
       };
