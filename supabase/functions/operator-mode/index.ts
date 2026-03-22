@@ -361,7 +361,8 @@ Deno.serve(async (req) => {
       signals_generated: signals.length,
       signals_rejected: signalResult.rejected || 0,
       effective_risk_per_trade: riskPerTrade,
-      trades: sized.map((t: Record<string, unknown>) => ({
+      skipped: sized.filter((t: Record<string, unknown>) => t.skip).map((t: Record<string, unknown>) => ({ symbol: t.asset, reason: t.skip_reason })),
+      trades: executableTrades.map((t: Record<string, unknown>) => ({
         symbol: t.asset, direction: t.direction,
         score: Number(t.opportunity_score).toFixed(0),
         confidence: Number(t.confidence_score).toFixed(0),
