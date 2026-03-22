@@ -80,15 +80,17 @@ export default function TradeIdeas() {
     setApproveSignal(signal);
   };
 
-  const updateStatus = async (id: string, status: string) => {
-    const { error } = await supabase
+  const handleReject = async (signalId: string) => {
+    await supabase
       .from('signals')
-      .update({ status } as Record<string, unknown>)
-      .eq('id', id);
-
-    if (!error) {
-      setSignals(prev => prev.map(s => s.id === id ? { ...s, status } : s));
-    }
+      .update({
+        status: 'rejected',
+        invalidation_reason: 'Manually rejected by user',
+        updated_at: new Date().toISOString(),
+      } as Record<string, unknown>)
+      .eq('id', signalId)
+      .eq('user_id', user?.id);
+    loadSignals();
   };
 
   const deleteSignal = async (id: string) => {
