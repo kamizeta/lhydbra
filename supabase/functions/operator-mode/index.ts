@@ -6,7 +6,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-Deno.serve(async (req) => {
+function isUSMarketOpen(): boolean {
+  const now = new Date();
+  const day = now.getUTCDay();
+  if (day === 0 || day === 6) return false;
+  const utcMins = now.getUTCHours() * 60 + now.getUTCMinutes();
+  return utcMins >= 870 && utcMins < 1260; // 14:30–21:00 UTC = NYSE hours
+}
+
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -139,20 +146,56 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Block equity orders outside market hours
+    const hasEquitySignals = signals.some((s: Record<string, unknown>) =>
+      ['stock', 'etf'].includes(String(s.asset_class || 'stock'))
+    );
+    if (hasEquitySignals && !isUSMarketOpen()) {
+      return jsonRes({
+        status: "blocked",
+        reasons: ["🔴 MARKET CLOSED: US equity execution blocked outside NYSE hours (14:30–21:00 UTC Mon–Fri)"],
+        market_open: false,
+        signals_generated: signals.length,
+      });
+    }
+
+    // Use real Alpaca equity for sizing instead of manually-entered capital
+    let liveCapital = currentCapital;
+    try {
+      const alpacaBase = paper ? "https://paper-api.alpaca.markets" : "https://api.alpaca.markets";
+      const alpacaHdrs = {
+        "APCA-API-KEY-ID": Deno.env.get("ALPACA_API_KEY_ID")!,
+        "APCA-API-SECRET-KEY": Deno.env.get("ALPACA_API_SECRET_KEY")!,
+      };
+      const acctRes = await fetch(`${alpacaBase}/v2/account`, { headers: alpacaHdrs });
+      if (acctRes.ok) {
+        const acct = await acctRes.json();
+        const alpacaEquity = parseFloat(acct.portfolio_value || acct.equity || "0");
+        if (alpacaEquity > 0) {
+          liveCapital = alpacaEquity;
+          if (Math.abs(liveCapital - currentCapital) / currentCapital > 0.01) {
+            await supabase.from("user_settings")
+              .update({ current_capital: liveCapital, updated_at: new Date().toISOString() })
+              .eq("user_id", user.id);
+          }
+        }
+      }
+    } catch { /* fallback to currentCapital */ }
+
     // ─── Size positions with adaptive risk ───
     const sized = signals.map((sig: Record<string, unknown>) => {
       const entryPrice = Number(sig.entry_price);
       const stopLoss = Number(sig.stop_loss);
       const stopDist = Math.abs(entryPrice - stopLoss);
       const effectiveRisk = Math.min(riskPerTrade, remainingRisk / signals.length);
-      const riskDollars = currentCapital * (effectiveRisk / 100);
+      const riskDollars = liveCapital * (effectiveRisk / 100);
       let quantity = stopDist > 0 ? Math.floor(riskDollars / stopDist) : 0;
       if (quantity <= 0) quantity = 1;
 
       const maxSingleAsset = Number(settings.max_single_asset || 25);
       const positionValue = quantity * entryPrice;
-      const positionPct = (positionValue / currentCapital) * 100;
-      if (positionPct > maxSingleAsset) quantity = Math.floor((currentCapital * maxSingleAsset / 100) / entryPrice);
+      const positionPct = (positionValue / liveCapital) * 100;
+      if (positionPct > maxSingleAsset) quantity = Math.floor((liveCapital * maxSingleAsset / 100) / entryPrice);
 
       const targets = (sig.targets as number[]) || [];
       const takeProfit = targets.length > 0 ? targets[0] : entryPrice + stopDist * 2;
@@ -172,6 +215,7 @@ Deno.serve(async (req) => {
             headers: { "Content-Type": "application/json", "Authorization": authHeader },
             body: JSON.stringify({
               action: "place_order", paper,
+              signal_id: String(trade.id || ""),
               symbol: String(trade.asset).replace("/", ""),
               qty: trade.quantity,
               side: trade.direction === "long" ? "buy" : "sell",
