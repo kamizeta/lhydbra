@@ -8,20 +8,14 @@ import StatusBadge from "@/components/shared/StatusBadge";
 import MetricCard from "@/components/shared/MetricCard";
 
 interface OpScore {
-  symbol: string;
-  asset_type: string;
-  total_score: number;
+  asset: string;
+  asset_class: string;
+  opportunity_score: number;
   direction: string | null;
   strategy_family: string | null;
-  momentum_score: number | null;
-  structure_score: number | null;
-  volatility_score: number | null;
-  strategy_score: number | null;
-  rr_score: number | null;
-  macro_score: number | null;
-  sentiment_score: number | null;
-  historical_score: number | null;
-  computed_at: string;
+  score_breakdown: Record<string, number>;
+  confidence_score: number;
+  created_at: string;
 }
 
 interface MarketFeature {
