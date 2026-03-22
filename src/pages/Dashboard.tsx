@@ -193,6 +193,9 @@ export default function Dashboard() {
           )}>
             {cooldownActive ? "COOLDOWN" : dailyCapReached ? "CAP REACHED" : "ACTIVE"}
           </span>
+          <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider hidden sm:inline">
+            {goal?.automation_level === 'full_operator' ? '● AUTO' : '○ GUIDED'}
+          </span>
           <span className="text-xs text-muted-foreground font-mono">
             {operatorStatus?.trades_today ?? 0}/{operatorStatus?.max_trades_per_day ?? 3} trades
           </span>

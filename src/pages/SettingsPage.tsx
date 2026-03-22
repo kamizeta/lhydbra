@@ -267,6 +267,58 @@ export default function SettingsPage() {
       {/* Risk Tab */}
       {activeTab === 'risk' && (
         <div className="space-y-6">
+          {/* Operator Mode Card */}
+          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-mono font-medium text-foreground">
+                  Operator Mode
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Controls whether the system executes trades automatically
+                </p>
+              </div>
+              <span className={cn(
+                "px-2 py-1 rounded text-[10px] font-mono font-bold uppercase",
+                goal?.automation_level === 'full_operator'
+                  ? "bg-green-500/10 text-green-400 border border-green-500/30"
+                  : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30"
+              )}>
+                {goal?.automation_level === 'full_operator' ? 'FULL AUTO' : 'GUIDED'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => saveGoal({ automation_level: 'guided' })}
+                className={cn(
+                  "p-3 rounded border text-xs font-mono text-left transition-colors",
+                  goal?.automation_level === 'guided'
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border text-muted-foreground hover:border-primary/40"
+                )}
+              >
+                <div className="font-medium">Guided</div>
+                <div className="text-[10px] mt-1 opacity-70">
+                  Generates signals, you approve
+                </div>
+              </button>
+              <button
+                onClick={() => saveGoal({ automation_level: 'full_operator' })}
+                className={cn(
+                  "p-3 rounded border text-xs font-mono text-left transition-colors",
+                  goal?.automation_level === 'full_operator'
+                    ? "border-green-500/50 bg-green-500/10 text-foreground"
+                    : "border-border text-muted-foreground hover:border-green-500/30"
+                )}
+              >
+                <div className="font-medium">Full Operator</div>
+                <div className="text-[10px] mt-1 opacity-70">
+                  Executes automatically within risk limits
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div className="flex justify-end">
             <button
               onClick={saveSettings}
