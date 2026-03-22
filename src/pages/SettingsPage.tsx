@@ -323,6 +323,80 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Watchlist Editor */}
+          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-mono font-medium text-foreground">
+                  Watchlist
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Symbols monitored by the signal engine
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!user) return;
+                  await supabase.from('user_settings')
+                    .update({ watchlist: localWatchlist, updated_at: new Date().toISOString() } as any)
+                    .eq('user_id', user.id);
+                  toast.success('Watchlist saved');
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Save className="h-3 w-3" />
+                Save
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {localWatchlist.map(sym => (
+                <span
+                  key={sym}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-accent/50 border border-border rounded text-[11px] font-mono text-foreground"
+                >
+                  {sym}
+                  <button
+                    onClick={() => setLocalWatchlist(prev => prev.filter(s => s !== sym))}
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={watchlistInput}
+                onChange={(e) => setWatchlistInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const sym = watchlistInput.trim().toUpperCase();
+                    if (sym && !localWatchlist.includes(sym)) {
+                      setLocalWatchlist(prev => [...prev, sym]);
+                    }
+                    setWatchlistInput('');
+                  }
+                }}
+                placeholder="Add symbol (e.g. AMZN)"
+                className="flex-1 px-3 py-1.5 bg-background border border-border rounded-md text-xs text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+              <button
+                onClick={() => {
+                  const sym = watchlistInput.trim().toUpperCase();
+                  if (sym && !localWatchlist.includes(sym)) {
+                    setLocalWatchlist(prev => [...prev, sym]);
+                  }
+                  setWatchlistInput('');
+                }}
+                className="px-3 py-1.5 border border-border rounded-md text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
           <div className="flex justify-end">
             <button
               onClick={saveSettings}
