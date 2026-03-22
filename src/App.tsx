@@ -55,6 +55,7 @@ function ProtectedRoutes() {
         <Route path="/advanced/learning" element={<LearningDashboard />} />
         <Route path="/advanced/market" element={<MarketPage />} />
         <Route path="/advanced/api-usage" element={<ApiUsagePage />} />
+        <Route path="/advanced/backtest" element={<StrategyLab />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
