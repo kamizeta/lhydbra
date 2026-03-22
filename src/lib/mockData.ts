@@ -25,6 +25,25 @@ export interface Asset {
   source?: string;
 }
 
+export interface Strategy {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  timeHorizon: string;
+  winRate: number;
+  profitFactor: number;
+  totalTrades: number;
+  active: boolean;
+  capitalAllocated: number;
+  pnl: number;
+  maxDrawdown: number;
+  entryRules: string[];
+  exitRules: string[];
+  idealConditions: string[];
+}
+
 
 // Mock assets (fallback when live data unavailable)
 export const mockAssets: Asset[] = [
