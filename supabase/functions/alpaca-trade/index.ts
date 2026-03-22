@@ -137,6 +137,7 @@ serve(async (req) => {
         if (buyingPower < 10) {
           return jsonRes({ error: "Insufficient buying power" }, 400);
         }
+      }
 
       // Validate asset is tradable on Alpaca
       try {
