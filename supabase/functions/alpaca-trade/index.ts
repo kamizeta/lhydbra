@@ -123,6 +123,8 @@ serve(async (req) => {
       const { symbol, qty, side, type = "market", time_in_force = "day",
         limit_price, stop_price, order_class, take_profit, stop_loss,
         signal_id } = body;
+
+      if (!symbol || !qty || !side) {
         return jsonRes({ error: "Missing required: symbol, qty, side" }, 400);
       }
 
