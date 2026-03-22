@@ -17,6 +17,7 @@ import NotFound from "@/pages/NotFound";
 import ApiUsagePage from "@/pages/ApiUsagePage";
 import SignalCenter from "@/pages/SignalCenter";
 import StrategyResearchLab from "@/pages/StrategyResearchLab";
+import StrategyLab from "@/pages/StrategyLab";
 import LearningDashboard from "@/pages/LearningDashboard";
 import PortfolioAllocation from "@/pages/PortfolioAllocation";
 import PositionsPage from "@/pages/PositionsPage";
@@ -54,6 +55,7 @@ function ProtectedRoutes() {
         <Route path="/advanced/learning" element={<LearningDashboard />} />
         <Route path="/advanced/market" element={<MarketPage />} />
         <Route path="/advanced/api-usage" element={<ApiUsagePage />} />
+        <Route path="/advanced/backtest" element={<StrategyLab />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
