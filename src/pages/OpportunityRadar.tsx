@@ -59,15 +59,16 @@ export default function OpportunityRadar() {
   const [filter, setFilter] = useState<"all" | "long" | "short">("all");
 
   useEffect(() => {
+    if (!user) return;
     Promise.all([
-      supabase.from("opportunity_scores").select("*").eq("timeframe", "1d").order("total_score", { ascending: false }),
+      supabase.from("signals").select("*").eq("user_id", user.id).eq("status", "active").order("opportunity_score", { ascending: false }),
       supabase.from("market_features").select("symbol, market_regime, trend_direction, trend_strength, rsi_14, momentum_score, volatility_regime").eq("timeframe", "1d"),
     ]).then(([scoresRes, featRes]) => {
-      if (scoresRes.data) setScores(scoresRes.data as OpScore[]);
+      if (scoresRes.data) setScores(scoresRes.data as unknown as OpScore[]);
       if (featRes.data) setFeatures(featRes.data as MarketFeature[]);
       setLoading(false);
     });
-  }, []);
+  }, [user]);
 
   const featureMap = useMemo(() => {
     const m = new Map<string, MarketFeature>();
