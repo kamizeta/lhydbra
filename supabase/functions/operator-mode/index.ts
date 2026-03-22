@@ -146,6 +146,42 @@ function isUSMarketOpen(): boolean {
       });
     }
 
+    // Block equity orders outside market hours
+    const hasEquitySignals = signals.some((s: Record<string, unknown>) =>
+      ['stock', 'etf'].includes(String(s.asset_class || 'stock'))
+    );
+    if (hasEquitySignals && !isUSMarketOpen()) {
+      return jsonRes({
+        status: "blocked",
+        reasons: ["🔴 MARKET CLOSED: US equity execution blocked outside NYSE hours (14:30–21:00 UTC Mon–Fri)"],
+        market_open: false,
+        signals_generated: signals.length,
+      });
+    }
+
+    // Use real Alpaca equity for sizing instead of manually-entered capital
+    let liveCapital = currentCapital;
+    try {
+      const alpacaBase = paper ? "https://paper-api.alpaca.markets" : "https://api.alpaca.markets";
+      const alpacaHdrs = {
+        "APCA-API-KEY-ID": Deno.env.get("ALPACA_API_KEY_ID")!,
+        "APCA-API-SECRET-KEY": Deno.env.get("ALPACA_API_SECRET_KEY")!,
+      };
+      const acctRes = await fetch(`${alpacaBase}/v2/account`, { headers: alpacaHdrs });
+      if (acctRes.ok) {
+        const acct = await acctRes.json();
+        const alpacaEquity = parseFloat(acct.portfolio_value || acct.equity || "0");
+        if (alpacaEquity > 0) {
+          liveCapital = alpacaEquity;
+          if (Math.abs(liveCapital - currentCapital) / currentCapital > 0.01) {
+            await supabase.from("user_settings")
+              .update({ current_capital: liveCapital, updated_at: new Date().toISOString() })
+              .eq("user_id", user.id);
+          }
+        }
+      }
+    } catch { /* fallback to currentCapital */ }
+
     // ─── Size positions with adaptive risk ───
     const sized = signals.map((sig: Record<string, unknown>) => {
       const entryPrice = Number(sig.entry_price);
