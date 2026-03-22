@@ -337,7 +337,7 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Take Profit</span>
-            <span className="text-profit">{formatCurrency(signal.take_profit)}</span>
+            <span className="text-profit">{formatCurrency(derivedTakeProfit)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">R:R</span>
