@@ -32,18 +32,44 @@ export default function AppLayout() {
       });
   }, [user]);
 
-  const navItems = [
+  const coreNavItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.operator },
-    { to: "/market", icon: BarChart3, label: t.nav.market },
-    { to: "/trade-ideas", icon: Activity, label: t.nav.tradeIdeas },
     { to: "/signals", icon: Zap, label: t.nav.signals },
+    { to: "/trade-ideas", icon: Activity, label: t.nav.tradeIdeas },
     { to: "/portfolio", icon: Briefcase, label: t.nav.portfolio },
     { to: "/allocation", icon: PieChart, label: t.nav.allocation },
-    { to: "/agents", icon: Bot, label: t.nav.agents },
-    { to: "/strategy-lab", icon: FlaskConical, label: t.nav.strategyLab },
-    { to: "/learning", icon: Brain, label: t.nav.learning },
     { to: "/settings", icon: Settings, label: t.nav.settings },
   ];
+
+  const advancedNavItems = [
+    { to: "/advanced/agents", icon: Bot, label: t.nav.agents },
+    { to: "/advanced/strategy-lab", icon: FlaskConical, label: t.nav.strategyLab },
+    { to: "/advanced/learning", icon: Brain, label: t.nav.learning },
+    { to: "/advanced/market", icon: BarChart3, label: t.nav.market },
+  ];
+
+  const renderNavItem = (item: typeof coreNavItems[0], dimmed = false) => (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={item.to === "/"}
+      onClick={() => setMobileOpen(false)}
+      className={({ isActive }) =>
+        cn(
+          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+          isActive
+            ? "bg-primary/10 text-primary glow-primary"
+            : cn(
+                "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                dimmed && "opacity-60"
+              )
+        )
+      }
+    >
+      <item.icon className="h-4 w-4 shrink-0" />
+      {(!collapsed || mobileOpen) && <span className="text-xs">{item.label}</span>}
+    </NavLink>
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -71,23 +97,17 @@ export default function AppLayout() {
         </div>
 
         <nav className="flex-1 space-y-0.5 p-2 overflow-y-auto">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  isActive ? "bg-primary/10 text-primary glow-primary" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                )
-              }
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {(!collapsed || mobileOpen) && <span className="text-xs">{item.label}</span>}
-            </NavLink>
-          ))}
+          {coreNavItems.map((item) => renderNavItem(item))}
+
+          {/* Divider */}
+          <div className={cn("my-2", collapsed && !mobileOpen ? "mx-2" : "mx-3")}>
+            <div className="h-px bg-border" />
+            {(!collapsed || mobileOpen) && (
+              <span className="block text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider mt-2 mb-1 px-1">Advanced</span>
+            )}
+          </div>
+
+          {advancedNavItems.map((item) => renderNavItem(item, true))}
         </nav>
 
         <div className="hidden md:block border-t border-border p-2">
