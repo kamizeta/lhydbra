@@ -186,10 +186,10 @@ export default function ControlCenter() {
                 <div key={i} className="flex items-center justify-between py-1.5 border-b border-border/50 last:border-0">
                   <div className="flex items-center gap-2">
                     <span className={cn("text-lg font-mono font-bold",
-                      o.total_score >= 65 ? "text-profit" : o.total_score >= 45 ? "text-primary" : "text-terminal-gold"
-                    )}>{o.total_score.toFixed(0)}</span>
+                      o.opportunity_score >= 65 ? "text-profit" : o.opportunity_score >= 45 ? "text-primary" : "text-terminal-gold"
+                    )}>{o.opportunity_score.toFixed(0)}</span>
                     <div>
-                      <span className="text-xs font-mono font-bold text-foreground">{o.symbol}</span>
+                      <span className="text-xs font-mono font-bold text-foreground">{o.asset}</span>
                       <div className="text-[10px] text-muted-foreground font-mono">{o.strategy_family || "—"}</div>
                     </div>
                   </div>
