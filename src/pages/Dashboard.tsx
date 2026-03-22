@@ -250,7 +250,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
           <span className="text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Open Positions</span>
           {positions.length > 5 && (
-            <button onClick={() => navigate('/positions')} className="text-xs text-primary hover:underline font-mono">
+            <button onClick={() => navigate('/portfolio')} className="text-xs text-primary hover:underline font-mono">
               +{positions.length - 5} more →
             </button>
           )}

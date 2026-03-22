@@ -20,9 +20,7 @@ import StrategyResearchLab from "@/pages/StrategyResearchLab";
 import StrategyLab from "@/pages/StrategyLab";
 import LearningDashboard from "@/pages/LearningDashboard";
 import PortfolioAllocation from "@/pages/PortfolioAllocation";
-import PositionsPage from "@/pages/PositionsPage";
 import RiskManagement from "@/pages/RiskManagement";
-import Journal from "@/pages/Journal";
 import OpportunityRadar from "@/pages/OpportunityRadar";
 import AlgoEffectiveness from "@/pages/AlgoEffectiveness";
 
@@ -49,7 +47,7 @@ function ProtectedRoutes() {
         <Route path="/signals" element={<SignalCenter />} />
         <Route path="/trade-ideas" element={<TradeIdeas />} />
         <Route path="/portfolio" element={<PortfolioPage />} />
-        <Route path="/positions" element={<PositionsPage />} />
+        
         <Route path="/allocation" element={<PortfolioAllocation />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
@@ -61,7 +59,7 @@ function ProtectedRoutes() {
         <Route path="/advanced/api-usage" element={<ApiUsagePage />} />
         <Route path="/advanced/backtest" element={<StrategyLab />} />
         <Route path="/advanced/risk" element={<RiskManagement />} />
-        <Route path="/advanced/journal" element={<Journal />} />
+        
         <Route path="/advanced/radar" element={<OpportunityRadar />} />
         <Route path="/advanced/algo" element={<AlgoEffectiveness />} />
       </Route>

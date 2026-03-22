@@ -37,7 +37,7 @@ export default function AppLayout() {
     { to: "/signals", icon: Zap, label: t.nav.signals },
     { to: "/trade-ideas", icon: Activity, label: t.nav.tradeIdeas },
     { to: "/portfolio", icon: Briefcase, label: t.nav.portfolio },
-    { to: "/positions", icon: TrendingUp, label: "Positions" },
+    
     { to: "/allocation", icon: PieChart, label: t.nav.allocation },
     { to: "/settings", icon: Settings, label: t.nav.settings },
   ];
@@ -48,7 +48,7 @@ export default function AppLayout() {
     { to: "/advanced/learning", icon: Brain, label: t.nav.learning },
     { to: "/advanced/market", icon: BarChart3, label: t.nav.market },
     { to: "/advanced/backtest", icon: FlaskConical, label: "Backtest" },
-    { to: "/advanced/journal", icon: BookOpen, label: "Journal" },
+    
     { to: "/advanced/risk", icon: Shield, label: "Risk" },
   ];
 
