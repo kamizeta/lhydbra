@@ -148,17 +148,17 @@ export default function OpportunityRadar() {
               </thead>
               <tbody>
                 {filtered.map(s => {
-                  const tier = getTier(s.total_score);
-                  const feat = featureMap.get(s.symbol);
-                  const isSelected = selectedSymbol === s.symbol;
+                  const tier = getTier(s.opportunity_score);
+                  const feat = featureMap.get(s.asset);
+                  const isSelected = selectedSymbol === s.asset;
                   return (
-                    <tr key={s.symbol}
-                      onClick={() => setSelectedSymbol(isSelected ? null : s.symbol)}
+                    <tr key={s.asset}
+                      onClick={() => setSelectedSymbol(isSelected ? null : s.asset)}
                       className={cn(
                         "border-b border-border/50 cursor-pointer transition-colors",
                         isSelected ? "bg-primary/10" : "hover:bg-accent/30"
                       )}>
-                      <td className="p-3 font-mono font-bold text-foreground">{s.symbol}</td>
+                      <td className="p-3 font-mono font-bold text-foreground">{s.asset}</td>
                       <td className="text-center p-3">
                         {s.direction === "long" ? (
                           <span className="text-profit flex items-center justify-center gap-1"><ArrowUpRight className="h-3.5 w-3.5" /> LONG</span>
@@ -169,7 +169,7 @@ export default function OpportunityRadar() {
                         )}
                       </td>
                       <td className="text-center p-3">
-                        <span className={cn("text-lg font-mono font-bold", tier.color)}>{s.total_score.toFixed(0)}</span>
+                        <span className={cn("text-lg font-mono font-bold", tier.color)}>{s.opportunity_score.toFixed(0)}</span>
                       </td>
                       <td className="text-center p-3">
                         <span className={cn("text-[10px] font-mono font-bold px-2 py-0.5 rounded border", tier.bg, tier.color, tier.border)}>
@@ -185,7 +185,7 @@ export default function OpportunityRadar() {
                       <td className="p-3">
                         <div className="flex gap-0.5 items-end h-5">
                           {SUB_SCORE_LABELS.map(({ key }) => {
-                            const val = (s as any)[key] || 0;
+                            const val = getSubScore(s, key.replace('_score', ''));
                             const h = Math.max(2, (val / 100) * 20);
                             return (
                               <div key={key} className={cn("w-2 rounded-sm transition-all",
