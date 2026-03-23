@@ -687,6 +687,8 @@ Deno.serve(async (req) => {
         reasoning: explanation.summary,
         explanation,
         status: 'active',
+        macro_regime: activeMacro,
+        macro_filter_passed: true,
       };
 
       candidates.push({ signal, finalScore, confidenceScore });
