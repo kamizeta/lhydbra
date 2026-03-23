@@ -323,6 +323,15 @@ const SYMBOL_SECTORS: Record<string, string> = {
 };
 const MAX_SECTOR_POSITIONS = 2;
 
+const EXTENDED_UNIVERSE: Record<string, string[]> = {
+  stock: ["AAPL","MSFT","NVDA","META","AMZN","TSLA","GOOGL","AMD","AVGO",
+          "PLTR","NFLX","CRM","ORCL","ADBE","QCOM","MU","INTC","ARM",
+          "JPM","GS","BAC","V","MA","PYPL",
+          "SPY","QQQ","IWM","XLK","XLF","XLE","GLD"],
+  crypto: ["BTC/USD","ETH/USD","SOL/USD","BNB/USD","XRP/USD","DOGE/USD"],
+  forex: ["EUR/USD","GBP/USD","USD/JPY","XAU/USD"],
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -420,9 +429,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch market features
+    // Fetch market features — expand universe if watchlist < 10 symbols
+    let querySymbols = targetSymbols;
+    if (targetSymbols.length < 10) {
+      const allExtended = [
+        ...EXTENDED_UNIVERSE.stock,
+        ...EXTENDED_UNIVERSE.crypto,
+      ];
+      querySymbols = [...new Set([...targetSymbols, ...allExtended])];
+      console.log(`[signal-engine] Expanded universe: ${targetSymbols.length} watchlist → ${querySymbols.length} total`);
+    }
+
     let featuresQuery = supabase.from("market_features").select("*").eq("timeframe", "1d");
-    if (targetSymbols.length > 0) featuresQuery = featuresQuery.in("symbol", targetSymbols);
+    if (querySymbols.length > 0) featuresQuery = featuresQuery.in("symbol", querySymbols);
     const { data: allFeaturesData } = await featuresQuery;
     if (!allFeaturesData || allFeaturesData.length === 0) {
       return new Response(JSON.stringify({ signals: [], count: 0, message: "No market features available" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -739,6 +758,9 @@ Deno.serve(async (req) => {
         operator_mode,
         filters_applied: { min_score, min_r, min_confidence, max_signals },
         macro_context: { equity: equityMacro, crypto: cryptoMacro },
+        universe_size: featuresData.length,
+        watchlist_size: targetSymbols.length,
+        universe_expanded: querySymbols.length > targetSymbols.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
