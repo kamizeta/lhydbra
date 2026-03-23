@@ -658,7 +658,7 @@ Deno.serve(async (req) => {
         baseScore += w * subscores[k];
         totalWeight += w;
       }
-      if (totalWeight > 0) baseScore = (baseScore / totalWeight) * 100;
+      if (totalWeight > 0) baseScore = baseScore / totalWeight;
 
       const stratMod = computeStrategyModifier(strategyFamily, regime, perf);
       const regimeMod = computeRegimeModifier(regime, Number(feat.regime_confidence || 50));
