@@ -63,11 +63,17 @@ interface SignalBacktestResult {
   trade_log: Array<{ date: string; direction: string; score: number; entry: number; sl: number; tp: number; r_planned: number; exit_price: number; pnl_pct: number; r_actual: number; outcome: string }>;
 }
 
-type Tab = "backtest" | "learning";
+type Tab = "backtest" | "learning" | "sim6m";
 
 export default function ResearchPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("backtest");
+
+  // ─── Sim 6M state ───
+  const [simConfig, setSimConfig] = useState({ min_score: 65, min_r: 1.5, risk_pct: 1, initial_capital: 10000 });
+  const [simLoading, setSimLoading] = useState(false);
+  const [simResults, setSimResults] = useState<any>(null);
+  const [simError, setSimError] = useState<string | null>(null);
 
   // ─── Backtest state ───
   const [templates, setTemplates] = useState<StrategyTemplate[]>([]);
