@@ -175,9 +175,12 @@ export default function Dashboard() {
   const cooldownActive = operatorStatus?.cooldown_active || false;
   const dailyCapReached = (operatorStatus?.trades_today || 0) >= (operatorStatus?.max_trades_per_day || 3);
 
-  const hour = new Date().getHours();
+  const now = new Date();
+  const hour = now.getHours();
+  const dayOfWeek = now.getDay(); // 0=Sun, 6=Sat
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
   const phase: 'pre_market' | 'market_open' | 'post_market' =
-    hour < 9 ? 'pre_market' : hour < 16 ? 'market_open' : 'post_market';
+    isWeekend ? 'post_market' : hour < 9 ? 'pre_market' : hour < 16 ? 'market_open' : 'post_market';
 
   const tradingDaysPassed = Math.floor(new Date().getDate() * 22 / 30);
 

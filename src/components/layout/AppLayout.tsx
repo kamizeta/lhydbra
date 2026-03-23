@@ -121,10 +121,22 @@ export default function AppLayout() {
         </div>
 
         <div className="border-t border-border p-3">
-          <div className="flex items-center gap-2">
-            <Activity className="h-3 w-3 text-profit animate-pulse-glow" />
-            {(!collapsed || mobileOpen) && <span className="text-[10px] font-mono text-muted-foreground">{t.common.marketOpen}</span>}
-          </div>
+          {(() => {
+            const now = new Date();
+            const day = now.getDay();
+            const h = now.getHours();
+            const isOpen = day > 0 && day < 6 && h >= 9 && h < 16;
+            return (
+              <div className="flex items-center gap-2">
+                <Activity className={`h-3 w-3 ${isOpen ? 'text-profit animate-pulse-glow' : 'text-muted-foreground'}`} />
+                {(!collapsed || mobileOpen) && (
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {isOpen ? t.common.marketOpen : 'MERCADO CERRADO'}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </aside>
 
