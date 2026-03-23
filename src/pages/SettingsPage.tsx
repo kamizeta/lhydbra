@@ -247,6 +247,7 @@ export default function SettingsPage() {
     { key: 'risk', label: 'Capital & Riesgo', icon: Shield },
     { key: 'scoring', label: 'Scoring Weights', icon: Target },
     { key: 'notifications', label: 'Notificaciones', icon: Bell },
+    { key: 'alerts', label: 'External Alerts', icon: Send },
     { key: 'profile', label: 'Perfil', icon: User },
     { key: 'binance', label: 'Binance API', icon: Key },
   ];
