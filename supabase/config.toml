@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.signal-engine]
 verify_jwt = false
+
+[functions.run-backtest-simulation]
+verify_jwt = false

@@ -1,15 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Brain, FlaskConical, Play, Loader2, TrendingUp, BarChart3, Target,
-  Award, Plus, Beaker, RefreshCw, Zap, Activity,
+  Award, Plus, Beaker, RefreshCw, Zap, Activity, FileSpreadsheet,
 } from "lucide-react";
 import BacktestCharts from "@/components/strategy/BacktestCharts";
+import StatusBadge from "@/components/shared/StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import MetricCard from "@/components/shared/MetricCard";
-import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
 
 // ─── Types ───
@@ -62,11 +62,17 @@ interface SignalBacktestResult {
   trade_log: Array<{ date: string; direction: string; score: number; entry: number; sl: number; tp: number; r_planned: number; exit_price: number; pnl_pct: number; r_actual: number; outcome: string }>;
 }
 
-type Tab = "backtest" | "learning";
+type Tab = "backtest" | "learning" | "sim6m";
 
 export default function ResearchPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("backtest");
+
+  // ─── Sim 6M state ───
+  const [simConfig, setSimConfig] = useState({ min_score: 65, min_r: 1.5, risk_pct: 1, initial_capital: 10000 });
+  const [simLoading, setSimLoading] = useState(false);
+  const [simResults, setSimResults] = useState<any>(null);
+  const [simError, setSimError] = useState<string | null>(null);
 
   // ─── Backtest state ───
   const [templates, setTemplates] = useState<StrategyTemplate[]>([]);
@@ -158,7 +164,43 @@ export default function ResearchPage() {
     setSeRunning(false);
   };
 
-  // ─── Learning handlers ───
+  // ─── Sim 6M handlers ───
+  const runSimulation = async () => {
+    setSimLoading(true);
+    setSimError(null);
+    setSimResults(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('run-backtest-simulation', {
+        body: simConfig,
+      });
+      if (error) throw new Error(error.message);
+      setSimResults(data);
+    } catch (e: any) {
+      setSimError(e.message || 'Simulation failed');
+    }
+    setSimLoading(false);
+  };
+
+  const downloadExcel = async () => {
+    if (!simResults) return;
+    const XLSX = (await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any)) as any;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([simResults.summary]), 'Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(simResults.by_symbol), 'By Symbol');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(simResults.trade_log), 'Trade Log');
+    const checklist = [
+      { Metric: 'Win Rate %', Target: '≥ 45%', Actual: `${simResults.summary.win_rate}%`, Pass: simResults.summary.win_rate >= 45 ? 'YES' : 'NO' },
+      { Metric: 'Profit Factor', Target: '≥ 1.3', Actual: simResults.summary.profit_factor, Pass: simResults.summary.profit_factor >= 1.3 ? 'YES' : 'NO' },
+      { Metric: 'Avg R', Target: '≥ 1.1', Actual: simResults.summary.avg_r, Pass: simResults.summary.avg_r >= 1.1 ? 'YES' : 'NO' },
+      { Metric: 'Max Drawdown %', Target: '< 8%', Actual: `${simResults.summary.max_drawdown_pct}%`, Pass: simResults.summary.max_drawdown_pct < 8 ? 'YES' : 'NO' },
+      { Metric: 'Total Trades', Target: '≥ 30', Actual: simResults.summary.total_trades, Pass: simResults.summary.total_trades >= 30 ? 'YES' : 'NO' },
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(checklist), 'Fase 9 Checklist');
+    const today = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `LHYDBRA_Sim6M_${today}.xlsx`);
+  };
+
+
   const runAdaptation = async () => {
     if (!user) return;
     setAdapting(true);
@@ -203,7 +245,7 @@ export default function ResearchPage() {
 
       {/* Main Tabs */}
       <div className="flex gap-1 border-b border-border">
-        {([["backtest", "Backtest"], ["learning", "Learning"]] as const).map(([key, label]) => (
+        {([["backtest", "Backtest"], ["learning", "Learning"], ["sim6m", "Sim 6M"]] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={cn("px-4 py-2.5 text-xs font-medium transition-colors border-b-2 -mb-px",
               tab === key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
@@ -562,6 +604,153 @@ export default function ResearchPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ─── Sim 6M Tab ─── */}
+      {tab === "sim6m" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-foreground">6-Month Signal Engine Simulation</h2>
+              <p className="text-[10px] text-muted-foreground font-mono mt-1">
+                Walk-forward backtest on 12 symbols using real TwelveData prices. Takes ~2 minutes due to API rate limits.
+              </p>
+            </div>
+          </div>
+
+          {/* Config */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: "Min Score", key: "min_score", step: 1 },
+              { label: "Min R", key: "min_r", step: 0.1 },
+              { label: "Risk per Trade %", key: "risk_pct", step: 0.1 },
+              { label: "Initial Capital $", key: "initial_capital", step: 1000 },
+            ].map(({ label, key, step }) => (
+              <div key={key}>
+                <label className="text-[10px] text-muted-foreground font-mono block mb-1">{label}</label>
+                <input
+                  type="number"
+                  step={step}
+                  value={(simConfig as any)[key]}
+                  onChange={e => setSimConfig(prev => ({ ...prev, [key]: parseFloat(e.target.value) }))}
+                  className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+              </div>
+            ))}
+          </div>
+
+          <button onClick={runSimulation} disabled={simLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
+            {simLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            {simLoading ? "Running simulation (~2 min)..." : "Run 6-Month Simulation"}
+          </button>
+
+          {simError && (
+            <div className="terminal-border rounded-lg p-4 text-loss text-sm font-mono">{simError}</div>
+          )}
+
+          {simResults && (
+            <div className="space-y-6">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  { label: "Final Capital", value: `$${simResults.summary.final_capital.toLocaleString()}`, positive: simResults.summary.total_pnl >= 0 },
+                  { label: "Total Return", value: `${simResults.summary.total_return_pct}%`, positive: simResults.summary.total_return_pct >= 0 },
+                  { label: "Total Trades", value: simResults.summary.total_trades, positive: true },
+                  { label: "Win Rate", value: `${simResults.summary.win_rate}%`, positive: simResults.summary.win_rate >= 45 },
+                  { label: "Profit Factor", value: simResults.summary.profit_factor, positive: simResults.summary.profit_factor >= 1.3 },
+                  { label: "Max Drawdown", value: `${simResults.summary.max_drawdown_pct}%`, positive: simResults.summary.max_drawdown_pct < 8 },
+                ].map(({ label, value, positive }) => (
+                  <div key={label} className="terminal-border rounded-lg p-3 text-center">
+                    <div className="text-[10px] text-muted-foreground font-mono uppercase">{label}</div>
+                    <div className={cn("text-lg font-bold font-mono mt-1", positive ? "text-profit" : "text-loss")}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* By symbol table */}
+              <div className="terminal-border rounded-lg p-4">
+                <h3 className="text-sm font-bold text-foreground mb-3">By Symbol</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs font-mono">
+                    <thead>
+                      <tr className="text-muted-foreground uppercase tracking-wider border-b border-border">
+                        <th className="text-left p-2">Symbol</th>
+                        <th className="text-right p-2">Trades</th>
+                        <th className="text-right p-2">Win Rate</th>
+                        <th className="text-right p-2">PF</th>
+                        <th className="text-right p-2">Avg R</th>
+                        <th className="text-right p-2">PnL ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...simResults.by_symbol].sort((a: any, b: any) => b.total_pnl - a.total_pnl).map((s: any) => (
+                        <tr key={s.symbol} className="border-b border-border/50">
+                          <td className="p-2 font-bold text-foreground">{s.symbol}</td>
+                          <td className="p-2 text-right text-foreground">{s.trades}</td>
+                          <td className={cn("p-2 text-right font-bold", s.win_rate >= 45 ? "text-profit" : "text-loss")}>{s.win_rate}%</td>
+                          <td className={cn("p-2 text-right font-bold", s.profit_factor >= 1.3 ? "text-profit" : "text-loss")}>{s.profit_factor}</td>
+                          <td className={cn("p-2 text-right font-bold", s.avg_r >= 1.1 ? "text-profit" : "text-loss")}>{s.avg_r}R</td>
+                          <td className={cn("p-2 text-right font-bold", s.total_pnl >= 0 ? "text-profit" : "text-loss")}>${s.total_pnl.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Trade log */}
+              <div className="terminal-border rounded-lg p-4">
+                <h3 className="text-sm font-bold text-foreground mb-3">
+                  Trade Log ({simResults.trade_log.length} trades)
+                </h3>
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <table className="w-full text-[10px] font-mono">
+                    <thead>
+                      <tr className="text-muted-foreground uppercase tracking-wider border-b border-border">
+                        <th className="text-left p-1.5">Entry Date</th>
+                        <th className="text-left p-1.5">Symbol</th>
+                        <th className="text-left p-1.5">Dir</th>
+                        <th className="text-right p-1.5">Score</th>
+                        <th className="text-right p-1.5">Entry</th>
+                        <th className="text-right p-1.5">Exit</th>
+                        <th className="text-right p-1.5">R</th>
+                        <th className="text-right p-1.5">PnL ($)</th>
+                        <th className="text-left p-1.5">Result</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {simResults.trade_log.map((t: any, i: number) => (
+                        <tr key={i} className="border-b border-border/50">
+                          <td className="p-1.5 text-muted-foreground">{t.date_entry}</td>
+                          <td className="p-1.5 font-bold text-foreground">{t.symbol}</td>
+                          <td className={cn("p-1.5", t.direction === "long" ? "text-profit" : "text-loss")}>{t.direction}</td>
+                          <td className="p-1.5 text-right text-primary">{t.score}</td>
+                          <td className="p-1.5 text-right text-foreground">{t.entry_price}</td>
+                          <td className="p-1.5 text-right text-foreground">{t.exit_price}</td>
+                          <td className={cn("p-1.5 text-right font-bold", t.r_actual >= 0 ? "text-profit" : "text-loss")}>{t.r_actual}R</td>
+                          <td className={cn("p-1.5 text-right font-bold", t.pnl_dollars >= 0 ? "text-profit" : "text-loss")}>${t.pnl_dollars}</td>
+                          <td className="p-1.5">
+                            <StatusBadge variant={t.outcome === "take_profit" ? "profit" : "loss"}>
+                              {t.outcome === "take_profit" ? "✓ TP" : "✗ SL"}
+                            </StatusBadge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Download button */}
+              <button onClick={downloadExcel}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors">
+                <FileSpreadsheet className="h-4 w-4" />
+                Download Excel — Fase 9 Checklist
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
