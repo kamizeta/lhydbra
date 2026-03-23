@@ -361,12 +361,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     if (!user_id) return jsonRes({ error: "user_id required" }, 400);
 
-    const twelveKey = Deno.env.get("TWELVE_DATA_API_KEY") ?? "";
+    const alpacaKeyId = Deno.env.get("ALPACA_API_KEY_ID") ?? "";
+    const alpacaSecret = Deno.env.get("ALPACA_API_SECRET_KEY") ?? "";
 
     // Fetch macro sentiment — both are optional with safe fallbacks
     const [fearGreedScore, vixScore] = await Promise.all([
       fetchFearGreedScore(),
-      fetchVIXScore(twelveKey),
+      fetchVIXScore(alpacaKeyId, alpacaSecret),
     ]);
 
     const supabase = createClient(
