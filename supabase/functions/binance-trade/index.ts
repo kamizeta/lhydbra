@@ -33,7 +33,16 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) throw new Error("Not authenticated");
 
-    const { action, symbol, side, quantity, type = "MARKET", price, timeInForce } = await req.json();
+    const body = await req.json();
+    const { action, symbol, side, quantity, type = "MARKET", price, timeInForce } = body;
+
+    // Guard: Binance spot does not support short selling
+    if (side === 'sell' || side === 'short') {
+      return new Response(JSON.stringify({
+        error: 'Short selling not supported on Binance spot. Use Alpaca for short positions.',
+        supported_sides: ['buy']
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Get user's Binance API keys
     const { data: settings } = await supabase

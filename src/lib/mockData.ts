@@ -1,5 +1,6 @@
-// Mock data simulating Twelve Data API responses
-// Structured to be easily replaced with real API calls
+// WARNING: This file contains mock data for development/testing only.
+// Never import this in production hooks or components.
+// Use only in .test.ts or .stories.ts files.
 
 export type AssetType = 'crypto' | 'stock' | 'etf' | 'commodity' | 'forex';
 
