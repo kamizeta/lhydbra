@@ -87,8 +87,10 @@ function srProximity(bars: {high:number;low:number;close:number}[], direction: s
 
 function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:number}[]): {
   score: number; direction: string | null; entry: number; sl: number; tp: number; r: number;
+  macd_momentum: number; volume_ratio: number; sr_score: number;
 } {
-  if (bars.length < 50) return { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0 };
+  const empty = { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0, macd_momentum: 0, volume_ratio: 1, sr_score: 0 };
+  if (bars.length < 50) return empty;
   const closes = bars.map(b => b.close);
   const price = closes[closes.length - 1];
   const rsiVal = rsi(closes);
@@ -96,26 +98,45 @@ function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:
   const sma50 = sma(closes, 50) || price;
   const atrVal = atrCalc(bars);
   const strength = Math.abs(sma20 - sma50) / sma50;
-  if (strength < 0.005) return { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0 };
+  if (strength < 0.005) return empty;
   const trendUp = sma20 > sma50;
   let lScore = 0, sScore = 0;
   if (trendUp) lScore += 2; else sScore += 2;
   if (rsiVal > 55) lScore++; else if (rsiVal < 45) sScore++;
-  if (Math.abs(lScore - sScore) < 2) return { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0 };
+  if (Math.abs(lScore - sScore) < 2) return empty;
   const direction = lScore > sScore ? "long" : "short";
   let score = 50;
   if ((trendUp && direction === "long") || (!trendUp && direction === "short")) score += 15;
   if (direction === "long" && rsiVal > 50 && rsiVal < 70) score += 12;
   else if (direction === "short" && rsiVal < 50 && rsiVal > 30) score += 12;
   score += Math.min(15, strength * 1000);
+
+  // Factor 1: MACD Histogram Confirmation
+  const macdMomentum = macdHistogram(closes);
+  if (direction === "long" && macdMomentum < -0.01) score -= 15;
+  if (direction === "short" && macdMomentum > 0.01) score -= 15;
+  if (direction === "long" && macdMomentum > 0.01) score += 10;
+  if (direction === "short" && macdMomentum < -0.01) score += 10;
+
+  // Factor 2: Volume Confirmation
+  const volRatio = volumeRatio(bars);
+  if (volRatio > 1.5) score += 8;
+  if (volRatio < 0.7) score -= 12;
+  if (volRatio < 0.5) score -= 10;
+
+  // Factor 3: Support/Resistance Proximity
+  const srScore = srProximity(bars, direction);
+  score += srScore;
+
   const entry = price;
   const sl = direction === "long"
     ? Math.max(sma20 - atrVal * 0.5, entry - atrVal * 1.5)
     : Math.min(sma20 + atrVal * 0.5, entry + atrVal * 1.5);
   const stopDist = Math.abs(entry - sl);
-  if (stopDist <= 0) return { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0 };
+  if (stopDist <= 0) return empty;
   const tp = direction === "long" ? entry + stopDist * 2 : entry - stopDist * 2;
-  return { score: Math.min(100, score), direction, entry, sl, tp, r: Math.abs(tp - entry) / stopDist };
+  return { score: Math.min(100, score), direction, entry, sl, tp, r: Math.abs(tp - entry) / stopDist,
+    macd_momentum: +macdMomentum.toFixed(4), volume_ratio: +volRatio.toFixed(2), sr_score: srScore };
 }
 
 Deno.serve(async (req) => {
