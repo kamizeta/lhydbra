@@ -376,8 +376,13 @@ Deno.serve(async (req) => {
                 : outcome === "stop_loss" ? -1.0
                 : stopDist > 0 ? rawPnl / stopDist : 0;
 
-              const riskDollars = totalCapital * (risk_pct / 100);
-              const qty = stopDist > 0 ? riskDollars / stopDist : 0;
+              // Cap sizing capital at 3x initial capital to protect compounded gains
+              const SIZING_CAPITAL_CAP = initial_capital * 3;
+              const sizingCapital = Math.min(totalCapital, SIZING_CAPITAL_CAP);
+              const riskDollars = sizingCapital * (risk_pct / 100);
+              const MAX_LOSS_DOLLARS = initial_capital * 0.03;
+              const cappedRisk = Math.min(riskDollars, MAX_LOSS_DOLLARS);
+              const qty = stopDist > 0 ? cappedRisk / stopDist : 0;
               const pnlDollars = rawPnl * qty;
               totalCapital += pnlDollars;
 
