@@ -1858,6 +1858,7 @@ export type Database = {
           notify_on_trade_executed: boolean | null
           notify_telegram_chat_id: string | null
           operator_mode: boolean
+          paper_trading: boolean | null
           risk_per_trade: number
           stop_loss_required: boolean
           trades_today: number
@@ -1898,6 +1899,7 @@ export type Database = {
           notify_on_trade_executed?: boolean | null
           notify_telegram_chat_id?: string | null
           operator_mode?: boolean
+          paper_trading?: boolean | null
           risk_per_trade?: number
           stop_loss_required?: boolean
           trades_today?: number
@@ -1938,6 +1940,7 @@ export type Database = {
           notify_on_trade_executed?: boolean | null
           notify_telegram_chat_id?: string | null
           operator_mode?: boolean
+          paper_trading?: boolean | null
           risk_per_trade?: number
           stop_loss_required?: boolean
           trades_today?: number
