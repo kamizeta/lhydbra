@@ -352,6 +352,7 @@ Deno.serve(async (req) => {
     // ─── Execute based on automation level ───
     const shouldExecute = automationLevel === "full_operator" || (automationLevel === "assisted" && autoExecute);
     const execResults: Record<string, unknown>[] = [];
+    let totalOutcomes = 0;
 
     const executableTrades = sized.filter((t: Record<string, unknown>) => !t.skip);
     if (shouldExecute && action === "run") {
