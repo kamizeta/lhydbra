@@ -30,7 +30,7 @@ const ASSET_CLASS_ADJUSTMENTS: Record<string, Record<string, number>> = {
   forex:     { macro_context: 0.03, volatility_suitability: 0.02, historical_performance: -0.03, sentiment_flow: -0.02 },
 };
 
-const UNCLEAR_REGIMES = new Set(["undefined", "transitional"]);
+const UNCLEAR_REGIMES = new Set(["undefined", "transitional", "unknown", "neutral"]);
 
 const SYMBOL_SECTORS: Record<string, string> = {
   AAPL: "tech", MSFT: "tech", NVDA: "tech", GOOGL: "tech", META: "tech",
