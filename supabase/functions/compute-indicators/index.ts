@@ -209,7 +209,7 @@ serve(async (req) => {
         .eq('symbol', symbol)
         .eq('timeframe', timeframe)
         .order('timestamp', { ascending: true })
-        .limit(200);
+        .limit(250);
 
       if (!bars || bars.length < 20) {
         results[symbol] = { error: 'insufficient_data', bars_found: bars?.length || 0 };
