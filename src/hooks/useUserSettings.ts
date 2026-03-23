@@ -24,6 +24,10 @@ export interface UserSettings {
   trades_today: number;
   last_trade_date: string | null;
   daily_risk_used: number;
+  // Signal filter fields
+  min_score: number;
+  min_r: number;
+  min_confidence: number;
 }
 
 const defaultSettings: UserSettings = {
@@ -48,6 +52,9 @@ const defaultSettings: UserSettings = {
   trades_today: 0,
   last_trade_date: null,
   daily_risk_used: 0,
+  min_score: 60,
+  min_r: 1.5,
+  min_confidence: 55,
 };
 
 function parseSettings(data: Record<string, unknown>): UserSettings {
@@ -72,6 +79,9 @@ function parseSettings(data: Record<string, unknown>): UserSettings {
     trades_today: Number(data.trades_today ?? 0),
     last_trade_date: data.last_trade_date ? String(data.last_trade_date) : null,
     daily_risk_used: Number(data.daily_risk_used ?? 0),
+    min_score: Number(data.min_score ?? 60),
+    min_r: Number(data.min_r ?? 1.5),
+    min_confidence: Number(data.min_confidence ?? 55),
   };
 }
 
