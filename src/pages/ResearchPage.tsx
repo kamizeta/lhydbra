@@ -209,7 +209,7 @@ export default function ResearchPage() {
 
       {/* Main Tabs */}
       <div className="flex gap-1 border-b border-border">
-        {([["backtest", "Backtest"], ["learning", "Learning"]] as const).map(([key, label]) => (
+        {([["backtest", "Backtest"], ["learning", "Learning"], ["sim6m", "Sim 6M"]] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={cn("px-4 py-2.5 text-xs font-medium transition-colors border-b-2 -mb-px",
               tab === key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
