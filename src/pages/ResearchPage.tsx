@@ -622,15 +622,34 @@ export default function ResearchPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-foreground">6-Month Signal Engine Simulation</h2>
+              <h2 className="text-sm font-bold text-foreground">Signal Engine Simulation</h2>
               <p className="text-[10px] text-muted-foreground font-mono mt-1">
-                Walk-forward backtest on 12 symbols using real TwelveData prices. Takes ~2 minutes due to API rate limits.
+                Uses your configured Watchlist symbols. Symbols noted as forex may be skipped (Alpaca doesn't provide forex history). Date range supports up to 3 years.
               </p>
             </div>
           </div>
 
-          {/* Config */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Config — Row 1: Date range */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-[10px] text-muted-foreground font-mono block mb-1">Date From</label>
+              <input type="date" value={simConfig.date_from}
+                onChange={e => setSimConfig(prev => ({ ...prev, date_from: e.target.value }))}
+                className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground font-mono block mb-1">Date To</label>
+              <input type="date" value={simConfig.date_to}
+                onChange={e => setSimConfig(prev => ({ ...prev, date_to: e.target.value }))}
+                className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
+            </div>
+            <div className="col-span-2 md:col-span-1 flex items-end">
+              <p className="text-[9px] text-muted-foreground font-mono pb-2">Supports up to 3 years of historical data</p>
+            </div>
+          </div>
+
+          {/* Config — Row 2: Parameters */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
               { label: "Min Score", key: "min_score", step: 1 },
               { label: "Min R", key: "min_r", step: 0.1 },
@@ -639,21 +658,26 @@ export default function ResearchPage() {
             ].map(({ label, key, step }) => (
               <div key={key}>
                 <label className="text-[10px] text-muted-foreground font-mono block mb-1">{label}</label>
-                <input
-                  type="number"
-                  step={step}
+                <input type="number" step={step}
                   value={(simConfig as any)[key]}
                   onChange={e => setSimConfig(prev => ({ ...prev, [key]: parseFloat(e.target.value) }))}
-                  className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm font-mono focus:ring-1 focus:ring-primary focus:outline-none"
-                />
+                  className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
               </div>
             ))}
+            <div>
+              <label className="text-[10px] text-muted-foreground font-mono block mb-1">Max Concurrent Trades</label>
+              <input type="number" step={1} min={1} max={10}
+                value={simConfig.max_concurrent_trades}
+                onChange={e => setSimConfig(prev => ({ ...prev, max_concurrent_trades: parseInt(e.target.value) || 3 }))}
+                className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
+              <p className="text-[9px] text-muted-foreground font-mono mt-1">Higher = more trades but more drawdown risk</p>
+            </div>
           </div>
 
           <button onClick={runSimulation} disabled={simLoading}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
             {simLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            {simLoading ? "Running simulation (~2 min)..." : "Run 6-Month Simulation"}
+            {simLoading ? "Running simulation..." : "Run Simulation"}
           </button>
 
           {simError && (
@@ -663,10 +687,12 @@ export default function ResearchPage() {
           {simResults && (
             <div className="space-y-6">
               {/* Summary cards */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                 {[
                   { label: "Final Capital", value: `$${simResults.summary.final_capital.toLocaleString()}`, positive: simResults.summary.total_pnl >= 0 },
                   { label: "Total Return", value: `${simResults.summary.total_return_pct}%`, positive: simResults.summary.total_return_pct >= 0 },
+                  { label: "Avg Monthly PnL", value: `$${simResults.summary.avg_monthly_pnl?.toLocaleString() ?? 0}`, positive: (simResults.summary.avg_monthly_pnl ?? 0) >= 0 },
+                  { label: "Months", value: simResults.summary.months_simulated ?? '-', positive: true },
                   { label: "Total Trades", value: simResults.summary.total_trades, positive: true },
                   { label: "Win Rate", value: `${simResults.summary.win_rate}%`, positive: simResults.summary.win_rate >= 45 },
                   { label: "Profit Factor", value: simResults.summary.profit_factor, positive: simResults.summary.profit_factor >= 1.3 },
@@ -678,6 +704,39 @@ export default function ResearchPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Monthly PnL */}
+              {simResults.monthly && simResults.monthly.length > 0 && (
+                <div className="terminal-border rounded-lg p-4">
+                  <h3 className="text-sm font-bold text-foreground mb-3">Monthly PnL</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs font-mono">
+                      <thead>
+                        <tr className="text-muted-foreground uppercase tracking-wider border-b border-border">
+                          <th className="text-left p-2">Month</th>
+                          <th className="text-right p-2">Trades</th>
+                          <th className="text-right p-2">Wins</th>
+                          <th className="text-right p-2">Win Rate</th>
+                          <th className="text-right p-2">PnL ($)</th>
+                          <th className="text-right p-2">Capital</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {simResults.monthly.map((m: any) => (
+                          <tr key={m.month} className="border-b border-border/50">
+                            <td className="p-2 font-bold text-foreground">{m.month}</td>
+                            <td className="p-2 text-right text-foreground">{m.trades}</td>
+                            <td className="p-2 text-right text-foreground">{m.wins}</td>
+                            <td className={cn("p-2 text-right font-bold", m.win_rate >= 45 ? "text-profit" : "text-loss")}>{m.win_rate}%</td>
+                            <td className={cn("p-2 text-right font-bold", m.pnl >= 0 ? "text-profit" : "text-loss")}>${m.pnl.toFixed(2)}</td>
+                            <td className="p-2 text-right text-foreground">${m.capital_end.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* By symbol table */}
               <div className="terminal-border rounded-lg p-4">
