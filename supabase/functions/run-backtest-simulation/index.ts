@@ -276,6 +276,7 @@ Deno.serve(async (req) => {
         let inTrade = false;
         let tradeEntry = 0, tradeSL = 0, tradeTP = 0;
         let tradeDir = "", tradeDate = "", tradeScore = 0;
+        let tradeMacd = 0, tradeVolRatio = 1, tradeSrScore = 0;
 
         for (let i = simStartIdx; i < bars.length; i++) {
           if (!inTrade) {
@@ -283,13 +284,14 @@ Deno.serve(async (req) => {
             if (openTradesCount >= max_concurrent_trades) continue;
             if (openTradesBySymbol[sym]) continue;
 
-            const { score, direction, entry, sl, tp, r } = scoreDay(bars.slice(0, i + 1));
+            const { score, direction, entry, sl, tp, r, macd_momentum, volume_ratio: vr, sr_score: sr } = scoreDay(bars.slice(0, i + 1));
             if (score >= min_score && direction && r >= min_r && Math.abs(entry - sl) / entry <= 0.10) {
               inTrade = true;
               openTradesCount++;
               openTradesBySymbol[sym] = true;
               tradeEntry = entry; tradeSL = sl; tradeTP = tp;
               tradeDir = direction; tradeDate = bars[i].timestamp; tradeScore = score;
+              tradeMacd = macd_momentum; tradeVolRatio = vr; tradeSrScore = sr;
             }
           } else {
             const bar = bars[i];
