@@ -399,6 +399,7 @@ Deno.serve(async (req) => {
                 macd_momentum: tradeMacd,
                 volume_ratio: tradeVolRatio,
                 sr_score: tradeSrScore,
+                macro_regime: tradeRegime,
               };
               symTrades.push(trade);
               allTrades.push(trade);
