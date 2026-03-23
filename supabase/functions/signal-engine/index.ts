@@ -518,6 +518,23 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Macro regime filter
+      const isCrypto = ['crypto'].includes(assetClass);
+      const activeMacro = isCrypto ? cryptoMacro : equityMacro;
+
+      if (activeMacro === "choppy") {
+        rejections.push({ asset: symbol, reason: `Macro choppy (${isCrypto ? 'BTC' : 'SPY'} SMA20/50 spread < 1.5%)` });
+        continue;
+      }
+      if (activeMacro === "bull" && direction === "short") {
+        rejections.push({ asset: symbol, reason: `Counter-trend short blocked: ${isCrypto ? 'BTC' : 'SPY'} macro is bullish` });
+        continue;
+      }
+      if (activeMacro === "bear" && direction === "long") {
+        rejections.push({ asset: symbol, reason: `Counter-trend long blocked: ${isCrypto ? 'BTC' : 'SPY'} macro is bearish` });
+        continue;
+      }
+
       // Skip if already has position
       if (openPositionMap.has(symbol) && openPositionMap.get(symbol) === direction) {
         rejections.push({ asset: symbol, reason: `Already has open ${direction} position` });
