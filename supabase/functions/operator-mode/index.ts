@@ -287,13 +287,48 @@ Deno.serve(async (req) => {
       }
     } catch { /* fallback to currentCapital */ }
 
+    // ─── Fetch recent performance per symbol for adaptive sizing ───
+    const symbolMultiplier: Record<string, number> = {};
+    try {
+      const { data: recentTrades } = await supabase
+        .from("positions")
+        .select("symbol, pnl")
+        .eq("user_id", user.id)
+        .eq("status", "closed")
+        .order("closed_at", { ascending: false })
+        .limit(50);
+
+      if (recentTrades && recentTrades.length > 0) {
+        const bySymbol: Record<string, { wins: number; losses: number }> = {};
+        for (const t of recentTrades) {
+          const sym = String(t.symbol);
+          if (!bySymbol[sym]) bySymbol[sym] = { wins: 0, losses: 0 };
+          if (Number(t.pnl || 0) > 0) bySymbol[sym].wins++;
+          else bySymbol[sym].losses++;
+        }
+        for (const [sym, data] of Object.entries(bySymbol)) {
+          const total = data.wins + data.losses;
+          if (total < 3) { symbolMultiplier[sym] = 1.0; continue; }
+          const recentWR = data.wins / total;
+          if (recentWR >= 0.6) symbolMultiplier[sym] = 1.4;
+          else if (recentWR >= 0.5) symbolMultiplier[sym] = 1.2;
+          else if (recentWR >= 0.4) symbolMultiplier[sym] = 1.0;
+          else if (recentWR >= 0.3) symbolMultiplier[sym] = 0.7;
+          else symbolMultiplier[sym] = 0.5;
+        }
+      }
+    } catch { /* no recent trades, all multipliers default to 1.0 */ }
+
     // ─── Size positions with adaptive risk ───
     const sized = signals.map((sig: Record<string, unknown>) => {
       const entryPrice = Number(sig.entry_price);
       const stopLoss = Number(sig.stop_loss);
       const stopDist = Math.abs(entryPrice - stopLoss);
       const effectiveRisk = Math.min(riskPerTrade, remainingRisk / signals.length);
-      const riskDollars = liveCapital * (effectiveRisk / 100);
+      const symMult = symbolMultiplier[String(sig.asset)] ?? 1.0;
+      const adjustedRisk = effectiveRisk * symMult;
+      const cappedRisk = Math.min(adjustedRisk, maxDailyRisk * 0.5);
+      const riskDollars = liveCapital * (cappedRisk / 100);
       let quantity = stopDist > 0 ? Math.floor(riskDollars / stopDist) : 0;
       if (quantity <= 0) {
         return { ...sig, quantity: 0, skip: true, skip_reason: `Inviable sizing: stop_dist=${stopDist.toFixed(4)}, risk_dollars=${riskDollars.toFixed(2)}` };
