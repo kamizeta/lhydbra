@@ -706,6 +706,9 @@ export type Database = {
           trend_direction: string | null
           trend_strength: number | null
           volatility_regime: string | null
+          volume: number | null
+          volume_ratio: number | null
+          volume_sma_20: number | null
         }
         Insert: {
           asset_type?: string
@@ -733,6 +736,9 @@ export type Database = {
           trend_direction?: string | null
           trend_strength?: number | null
           volatility_regime?: string | null
+          volume?: number | null
+          volume_ratio?: number | null
+          volume_sma_20?: number | null
         }
         Update: {
           asset_type?: string
@@ -760,6 +766,9 @@ export type Database = {
           trend_direction?: string | null
           trend_strength?: number | null
           volatility_regime?: string | null
+          volume?: number | null
+          volume_ratio?: number | null
+          volume_sma_20?: number | null
         }
         Relationships: []
       }
