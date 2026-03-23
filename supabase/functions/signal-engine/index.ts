@@ -429,9 +429,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch market features
+    // Fetch market features — expand universe if watchlist < 10 symbols
+    let querySymbols = targetSymbols;
+    if (targetSymbols.length < 10) {
+      const allExtended = [
+        ...EXTENDED_UNIVERSE.stock,
+        ...EXTENDED_UNIVERSE.crypto,
+      ];
+      querySymbols = [...new Set([...targetSymbols, ...allExtended])];
+      console.log(`[signal-engine] Expanded universe: ${targetSymbols.length} watchlist → ${querySymbols.length} total`);
+    }
+
     let featuresQuery = supabase.from("market_features").select("*").eq("timeframe", "1d");
-    if (targetSymbols.length > 0) featuresQuery = featuresQuery.in("symbol", targetSymbols);
+    if (querySymbols.length > 0) featuresQuery = featuresQuery.in("symbol", querySymbols);
     const { data: allFeaturesData } = await featuresQuery;
     if (!allFeaturesData || allFeaturesData.length === 0) {
       return new Response(JSON.stringify({ signals: [], count: 0, message: "No market features available" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
