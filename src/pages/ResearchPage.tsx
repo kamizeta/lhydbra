@@ -195,6 +195,7 @@ export default function ResearchPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([simResults.summary]), 'Summary');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(simResults.by_symbol), 'By Symbol');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(simResults.monthly || []), 'Monthly PnL');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(simResults.trade_log), 'Trade Log');
     const checklist = [
       { Metric: 'Win Rate %', Target: '≥ 45%', Actual: `${simResults.summary.win_rate}%`, Pass: simResults.summary.win_rate >= 45 ? 'YES' : 'NO' },
@@ -202,6 +203,7 @@ export default function ResearchPage() {
       { Metric: 'Avg R', Target: '≥ 1.1', Actual: simResults.summary.avg_r, Pass: simResults.summary.avg_r >= 1.1 ? 'YES' : 'NO' },
       { Metric: 'Max Drawdown %', Target: '< 8%', Actual: `${simResults.summary.max_drawdown_pct}%`, Pass: simResults.summary.max_drawdown_pct < 8 ? 'YES' : 'NO' },
       { Metric: 'Total Trades', Target: '≥ 30', Actual: simResults.summary.total_trades, Pass: simResults.summary.total_trades >= 30 ? 'YES' : 'NO' },
+      { Metric: 'Avg Monthly PnL', Target: '≥ $500', Actual: `$${simResults.summary.avg_monthly_pnl}`, Pass: simResults.summary.avg_monthly_pnl >= 500 ? 'YES' : 'NO' },
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(checklist), 'Fase 9 Checklist');
     const today = new Date().toISOString().split('T')[0];
