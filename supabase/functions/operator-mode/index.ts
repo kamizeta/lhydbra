@@ -352,6 +352,7 @@ Deno.serve(async (req) => {
     // ─── Execute based on automation level ───
     const shouldExecute = automationLevel === "full_operator" || (automationLevel === "assisted" && autoExecute);
     const execResults: Record<string, unknown>[] = [];
+    let totalOutcomes = 0;
 
     const executableTrades = sized.filter((t: Record<string, unknown>) => !t.skip);
     if (shouldExecute && action === "run") {
@@ -497,6 +498,34 @@ Deno.serve(async (req) => {
           });
         } catch {}
       }
+
+      // ─── Auto-trigger adaptive scoring if enough outcomes exist ───
+      try {
+        const { count } = await supabase
+          .from("signal_outcomes")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .neq("outcome", "pending");
+
+        totalOutcomes = count || 0;
+
+        if (totalOutcomes >= 10) {
+          fetch(`${supabaseUrl}/functions/v1/adaptive-scoring`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({
+              user_id: user.id,
+              window_days: 30,
+            }),
+          }).catch(e => console.warn("Adaptive scoring trigger failed:", e));
+          console.log(`[operator-mode] Triggered adaptive scoring (${totalOutcomes} outcomes available)`);
+        }
+      } catch (adaptErr) {
+        console.warn("Adaptive scoring check failed:", adaptErr);
+      }
     }
 
     return jsonRes({
@@ -526,6 +555,7 @@ Deno.serve(async (req) => {
         max_daily_risk: maxDailyRisk,
         consecutive_losses: consecutiveLosses,
       },
+      adaptive_scoring: shouldExecute ? (totalOutcomes >= 10 ? "triggered" : `waiting (${totalOutcomes}/10 outcomes)`) : "skipped",
     });
   } catch (e) {
     console.error("Operator mode error:", e);
