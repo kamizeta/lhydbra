@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 // ─── Weight Profiles by Regime ───
@@ -280,6 +280,18 @@ function determineBestStrategy(features: Record<string, unknown>): string {
   return map[regime] || 'hybrid';
 }
 
+// ─── Macro Regime Detection ───
+
+function getMacroRegime(feat: Record<string, unknown> | null): "bull" | "bear" | "choppy" {
+  if (!feat) return "choppy";
+  const sma20 = Number(feat.sma_20 || 0);
+  const sma50 = Number(feat.sma_50 || 0);
+  if (sma20 <= 0 || sma50 <= 0) return "choppy";
+  const spread = Math.abs(sma20 - sma50) / sma50;
+  if (spread < 0.015) return "choppy";
+  return sma20 > sma50 ? "bull" : "bear";
+}
+
 // ─── Real Macro & Sentiment Data ───
 
 async function fetchFearGreedScore(): Promise<number> {
@@ -485,16 +497,6 @@ Deno.serve(async (req) => {
       .eq("timeframe", "1d")
       .maybeSingle();
 
-    function getMacroRegime(feat: Record<string, unknown> | null): "bull" | "bear" | "choppy" {
-      if (!feat) return "choppy";
-      const sma20 = Number(feat.sma_20 || 0);
-      const sma50 = Number(feat.sma_50 || 0);
-      if (sma20 <= 0 || sma50 <= 0) return "choppy";
-      const spread = Math.abs(sma20 - sma50) / sma50;
-      if (spread < 0.015) return "choppy";
-      return sma20 > sma50 ? "bull" : "bear";
-    }
-
     const equityMacro = getMacroRegime(spyFeatures as Record<string, unknown> | null);
     const cryptoMacro = getMacroRegime(btcFeatures as Record<string, unknown> | null);
 
@@ -656,7 +658,7 @@ Deno.serve(async (req) => {
         baseScore += w * subscores[k];
         totalWeight += w;
       }
-      if (totalWeight > 0) baseScore = (baseScore / totalWeight) * 100;
+      if (totalWeight > 0) baseScore = baseScore / totalWeight;
 
       const stratMod = computeStrategyModifier(strategyFamily, regime, perf);
       const regimeMod = computeRegimeModifier(regime, Number(feat.regime_confidence || 50));
