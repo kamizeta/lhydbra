@@ -265,6 +265,8 @@ Deno.serve(async (req) => {
         intraday_unrealized_pct: +intradayUnrealizedPct.toFixed(2),
         circuit_breaker_active: intradayUnrealizedPct < -maxDailyRisk,
         preflight_warnings: preflight,
+        vix: currentVIX,
+        thresholds,
         goal: goal ? {
           monthly_target: Number(goal.monthly_target),
           daily_target: Number(goal.daily_target),
