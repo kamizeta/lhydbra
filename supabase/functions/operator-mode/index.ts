@@ -251,12 +251,20 @@ Deno.serve(async (req) => {
     }
 
     // Now run signal engine (data is fresh)
+    const minScore = Number((settings as any).min_score || 60);
+    const minR = Number((settings as any).min_r || 1.5);
+    const minConfidence = Number((settings as any).min_confidence || 55);
+
     const signalResponse = await fetch(`${supabaseUrl}/functions/v1/signal-engine`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
       body: JSON.stringify({
-        user_id: user.id, min_score: 70, min_r: 1.8, min_confidence: 60,
-        max_signals: Math.min(remainingSlots, 3), operator_mode: true,
+        user_id: user.id,
+        min_score: minScore,
+        min_r: minR,
+        min_confidence: minConfidence,
+        max_signals: Math.min(remainingSlots, 3),
+        operator_mode: true,
         symbols: watchlistSymbols,
       }),
     });

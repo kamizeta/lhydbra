@@ -629,7 +629,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
         volatility_suitability: computeVolatilitySuitability(enriched, strategyFamily),
         strategy_confluence: computeStrategyConfluence(enriched, strategyFamily),
         macro_context: vixScore,
-        sentiment_flow: fearGreedScore,
+        sentiment_flow: (() => {
+          if (direction === 'short') {
+            if (fearGreedScore <= 20) return 80;
+            if (fearGreedScore <= 35) return 65;
+            if (fearGreedScore <= 50) return 50;
+            if (fearGreedScore <= 70) return 40;
+            return 25;
+          } else {
+            if (fearGreedScore >= 80) return 80;
+            if (fearGreedScore >= 65) return 65;
+            if (fearGreedScore >= 50) return 50;
+            if (fearGreedScore >= 30) return 40;
+            return 25;
+          }
+        })(),
         risk_reward: computeRiskReward(expectedR, setup.targets, setup.entry, setup.sl),
         historical_performance: STRATEGY_PRIORS[strategyFamily] || 50,
         macd_confirmation: computeMacdConfirmation(enriched, direction),

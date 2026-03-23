@@ -1834,7 +1834,10 @@ export type Database = {
           max_single_asset: number
           max_trades_per_day: number
           max_weekly_risk: number
+          min_confidence: number | null
+          min_r: number | null
           min_rr_ratio: number
+          min_score: number | null
           notify_drawdown_threshold: number | null
           notify_email: string | null
           notify_on_cooldown: boolean | null
@@ -1871,7 +1874,10 @@ export type Database = {
           max_single_asset?: number
           max_trades_per_day?: number
           max_weekly_risk?: number
+          min_confidence?: number | null
+          min_r?: number | null
           min_rr_ratio?: number
+          min_score?: number | null
           notify_drawdown_threshold?: number | null
           notify_email?: string | null
           notify_on_cooldown?: boolean | null
@@ -1908,7 +1914,10 @@ export type Database = {
           max_single_asset?: number
           max_trades_per_day?: number
           max_weekly_risk?: number
+          min_confidence?: number | null
+          min_r?: number | null
           min_rr_ratio?: number
+          min_score?: number | null
           notify_drawdown_threshold?: number | null
           notify_email?: string | null
           notify_on_cooldown?: boolean | null
