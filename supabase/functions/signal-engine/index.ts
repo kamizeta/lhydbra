@@ -305,21 +305,28 @@ async function fetchFearGreedScore(): Promise<number> {
   }
 }
 
-async function fetchVIXScore(apiKey: string): Promise<number> {
-  if (!apiKey) return 50;
+async function fetchVIXScore(alpacaKeyId: string, alpacaSecret: string): Promise<number> {
   try {
     const r = await fetch(
-      `https://api.twelvedata.com/price?symbol=VIX&apikey=${apiKey}`,
-      { signal: AbortSignal.timeout(3000) }
+      "https://data.alpaca.markets/v2/stocks/VIXY/bars?timeframe=1Day&limit=2&feed=iex",
+      {
+        headers: {
+          "APCA-API-KEY-ID": alpacaKeyId,
+          "APCA-API-SECRET-KEY": alpacaSecret,
+        },
+        signal: AbortSignal.timeout(3000),
+      }
     );
-    if (!r.ok) { await r.text().catch(() => {}); return 50; }
+    if (!r.ok) return 50;
     const d = await r.json();
-    const vix = parseFloat(d?.price ?? "20");
-    if (isNaN(vix)) return 50;
-    if (vix < 12) return 85;
-    if (vix < 17) return 70;
-    if (vix < 25) return 50;
-    if (vix < 35) return 30;
+    const bars = d?.bars || [];
+    const vixy = bars.length > 0 ? parseFloat(bars[bars.length - 1].c ?? "0") : 0;
+    if (vixy <= 0) return 50;
+    const vixEquiv = vixy * 10;
+    if (vixEquiv < 12) return 85;
+    if (vixEquiv < 17) return 70;
+    if (vixEquiv < 25) return 50;
+    if (vixEquiv < 35) return 30;
     return 15;
   } catch {
     return 50;
