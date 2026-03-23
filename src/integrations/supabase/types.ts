@@ -1835,6 +1835,13 @@ export type Database = {
           max_trades_per_day: number
           max_weekly_risk: number
           min_rr_ratio: number
+          notify_drawdown_threshold: number | null
+          notify_email: string | null
+          notify_on_cooldown: boolean | null
+          notify_on_stop_loss: boolean | null
+          notify_on_take_profit: boolean | null
+          notify_on_trade_executed: boolean | null
+          notify_telegram_chat_id: string | null
           operator_mode: boolean
           risk_per_trade: number
           stop_loss_required: boolean
@@ -1865,6 +1872,13 @@ export type Database = {
           max_trades_per_day?: number
           max_weekly_risk?: number
           min_rr_ratio?: number
+          notify_drawdown_threshold?: number | null
+          notify_email?: string | null
+          notify_on_cooldown?: boolean | null
+          notify_on_stop_loss?: boolean | null
+          notify_on_take_profit?: boolean | null
+          notify_on_trade_executed?: boolean | null
+          notify_telegram_chat_id?: string | null
           operator_mode?: boolean
           risk_per_trade?: number
           stop_loss_required?: boolean
@@ -1895,6 +1909,13 @@ export type Database = {
           max_trades_per_day?: number
           max_weekly_risk?: number
           min_rr_ratio?: number
+          notify_drawdown_threshold?: number | null
+          notify_email?: string | null
+          notify_on_cooldown?: boolean | null
+          notify_on_stop_loss?: boolean | null
+          notify_on_take_profit?: boolean | null
+          notify_on_trade_executed?: boolean | null
+          notify_telegram_chat_id?: string | null
           operator_mode?: boolean
           risk_per_trade?: number
           stop_loss_required?: boolean
