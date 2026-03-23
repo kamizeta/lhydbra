@@ -5,7 +5,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYMBOLS = ["AAPL","MSFT","NVDA","TSLA","SPY","QQQ","BTC/USD","ETH/USD","EUR/USD","GBP/USD","USD/JPY","XAU/USD"];
+const SYMBOLS = ["AAPL","MSFT","NVDA","TSLA","SPY","QQQ","BTC/USD","ETH/USD"];
+const FOREX_SYMBOLS = ["EUR/USD","GBP/USD","USD/JPY","XAU/USD"];
+// Forex will be added back when FCS API integration is added
 
 function sma(values: number[], period: number): number | null {
   if (values.length < period) return null;
@@ -69,8 +71,14 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const { min_score = 65, min_r = 1.5, initial_capital = 10000, risk_pct = 1 } = await req.json().catch(() => ({}));
-    const twelveKey = Deno.env.get("TWELVE_DATA_API_KEY");
-    if (!twelveKey) throw new Error("TWELVE_DATA_API_KEY not set");
+    const alpacaKeyId = Deno.env.get("ALPACA_API_KEY_ID") ?? "";
+    const alpacaSecret = Deno.env.get("ALPACA_API_SECRET_KEY") ?? "";
+    if (!alpacaKeyId || !alpacaSecret) throw new Error("ALPACA_API_KEY_ID or ALPACA_API_SECRET_KEY not set");
+
+    const alpacaHeaders = {
+      "APCA-API-KEY-ID": alpacaKeyId,
+      "APCA-API-SECRET-KEY": alpacaSecret,
+    };
 
     const allTrades: Record<string, unknown>[] = [];
     const symbolSummaries: Record<string, unknown>[] = [];
@@ -78,17 +86,46 @@ Deno.serve(async (req) => {
 
     for (const sym of SYMBOLS) {
       try {
-        const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=1day&outputsize=365&apikey=${twelveKey}`;
-        const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        if (!resp.ok) { console.warn(`${sym}: API error`); continue; }
-        const json = await resp.json();
-        if (!json.values || json.values.length < 60) { console.warn(`${sym}: insufficient data`); continue; }
+        const isCrypto = sym.includes("/");
+        const isForex = FOREX_SYMBOLS.includes(sym);
+        let bars: {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[] = [];
 
-        const bars = json.values.reverse().map((v: Record<string, string>) => ({
-          open: parseFloat(v.open), high: parseFloat(v.high),
-          low: parseFloat(v.low), close: parseFloat(v.close),
-          volume: parseFloat(v.volume || "0"), timestamp: v.datetime,
-        }));
+        if (isForex) {
+          console.log(`${sym}: skipping forex (use FCS or TwelveData)`);
+          symbolSummaries.push({ symbol: sym, trades: 0, wins: 0, losses: 0, win_rate: 0, profit_factor: 0, total_pnl: 0, avg_r: 0, skipped: true, reason: "forex_not_supported" });
+          continue;
+        }
+
+        if (isCrypto) {
+          const cryptoSym = sym.replace("/", "/");
+          const start = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const cryptoUrl = `https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=${encodeURIComponent(cryptoSym)}&timeframe=1Day&start=${start}&limit=365`;
+          const r = await fetch(cryptoUrl, { headers: alpacaHeaders, signal: AbortSignal.timeout(10000) });
+          if (!r.ok) { console.warn(`${sym}: crypto fetch error ${r.status}`); continue; }
+          const d = await r.json();
+          const rawBars = d.bars?.[cryptoSym] || d.bars?.[sym] || [];
+          bars = rawBars.map((b: Record<string,unknown>) => ({
+            open: Number(b.o), high: Number(b.h), low: Number(b.l),
+            close: Number(b.c), volume: Number(b.v),
+            timestamp: String(b.t).split('T')[0],
+          }));
+        } else {
+          const start = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const stockUrl = `https://data.alpaca.markets/v2/stocks/${sym}/bars?timeframe=1Day&start=${start}&limit=365&adjustment=split`;
+          const r = await fetch(stockUrl, { headers: alpacaHeaders, signal: AbortSignal.timeout(10000) });
+          if (!r.ok) { console.warn(`${sym}: stock fetch error ${r.status}`); continue; }
+          const d = await r.json();
+          bars = (d.bars || []).map((b: Record<string,unknown>) => ({
+            open: Number(b.o), high: Number(b.h), low: Number(b.l),
+            close: Number(b.c), volume: Number(b.v),
+            timestamp: String(b.t).split('T')[0],
+          }));
+        }
+
+        if (bars.length < 60) {
+          console.warn(`${sym}: insufficient bars (${bars.length})`);
+          continue;
+        }
 
         const startIdx = Math.max(50, bars.length - 180);
         const symTrades: Record<string, unknown>[] = [];
@@ -148,8 +185,6 @@ Deno.serve(async (req) => {
           total_pnl: +totalPnl.toFixed(2),
           avg_r: symTrades.length > 0 ? +(symTrades.reduce((s, t) => s + Number(t.r_actual), 0) / symTrades.length).toFixed(2) : 0,
         });
-
-        await new Promise(r => setTimeout(r, 8000));
       } catch (e) { console.error(`${sym}:`, e); }
     }
 
