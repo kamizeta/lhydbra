@@ -555,6 +555,7 @@ Deno.serve(async (req) => {
         max_daily_risk: maxDailyRisk,
         consecutive_losses: consecutiveLosses,
       },
+      adaptive_scoring: shouldExecute ? (typeof totalOutcomes !== 'undefined' && totalOutcomes >= 10 ? "triggered" : `waiting (${typeof totalOutcomes !== 'undefined' ? totalOutcomes : 0}/10 outcomes)`) : "skipped",
     });
   } catch (e) {
     console.error("Operator mode error:", e);
