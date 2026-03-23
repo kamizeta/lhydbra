@@ -691,6 +691,7 @@ export type Database = {
           id: string
           macd: number | null
           macd_histogram: number | null
+          macd_histogram_prev: number | null
           macd_signal: number | null
           market_regime: string | null
           momentum_score: number | null
@@ -721,6 +722,7 @@ export type Database = {
           id?: string
           macd?: number | null
           macd_histogram?: number | null
+          macd_histogram_prev?: number | null
           macd_signal?: number | null
           market_regime?: string | null
           momentum_score?: number | null
@@ -751,6 +753,7 @@ export type Database = {
           id?: string
           macd?: number | null
           macd_histogram?: number | null
+          macd_histogram_prev?: number | null
           macd_signal?: number | null
           market_regime?: string | null
           momentum_score?: number | null

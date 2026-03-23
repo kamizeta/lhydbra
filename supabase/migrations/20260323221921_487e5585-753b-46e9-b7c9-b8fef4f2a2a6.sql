@@ -1,0 +1,1 @@
+ALTER TABLE public.market_features ADD COLUMN IF NOT EXISTS macd_histogram_prev NUMERIC DEFAULT NULL;
