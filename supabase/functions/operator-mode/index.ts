@@ -615,6 +615,8 @@ Deno.serve(async (req) => {
       signals_generated: signals.length,
       signals_rejected: signalResult.rejected || 0,
       effective_risk_per_trade: riskPerTrade,
+      vix: currentVIX,
+      thresholds_applied: thresholds,
       skipped: sized.filter((t: Record<string, unknown>) => t.skip).map((t: Record<string, unknown>) => ({ symbol: t.asset, reason: t.skip_reason })),
       trades: executableTrades.map((t: Record<string, unknown>) => ({
         symbol: t.asset, direction: t.direction,
