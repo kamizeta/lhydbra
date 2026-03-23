@@ -69,7 +69,15 @@ export default function ResearchPage() {
   const [tab, setTab] = useState<Tab>("backtest");
 
   // ─── Sim 6M state ───
-  const [simConfig, setSimConfig] = useState({ min_score: 65, min_r: 1.5, risk_pct: 1, initial_capital: 10000 });
+  const [simConfig, setSimConfig] = useState({
+    min_score: 65,
+    min_r: 1.5,
+    risk_pct: 1,
+    initial_capital: 10000,
+    max_concurrent_trades: 3,
+    date_from: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    date_to: new Date().toISOString().split('T')[0],
+  });
   const [simLoading, setSimLoading] = useState(false);
   const [simResults, setSimResults] = useState<any>(null);
   const [simError, setSimError] = useState<string | null>(null);

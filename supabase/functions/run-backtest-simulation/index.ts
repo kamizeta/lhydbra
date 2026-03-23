@@ -5,16 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYMBOLS = [
-  // Top US stocks by volume & momentum
-  "AAPL","MSFT","NVDA","TSLA","AMZN","GOOGL","META","AMD","NFLX","COIN","PLTR","AVGO",
-  // Major ETFs
-  "SPY","QQQ",
-  // Top crypto pairs (Alpaca supported)
-  "BTC/USD","ETH/USD","SOL/USD","DOGE/USD","XRP/USD","AVAX/USD",
-];
-const FOREX_SYMBOLS = ["EUR/USD","GBP/USD","USD/JPY","XAU/USD"];
-// Forex will be added back when FCS API integration is added
+const FOREX_SYMBOLS = ["EUR/USD","GBP/USD","USD/JPY","XAU/USD","USD/MXN","USD/CAD","USD/CHF"];
 
 function sma(values: number[], period: number): number | null {
   if (values.length < period) return null;
@@ -32,11 +23,15 @@ function rsi(closes: number[], period = 14): number {
   return al === 0 ? 100 : 100 - 100 / (1 + ag / al);
 }
 
-function atr(bars: {high:number;low:number;close:number}[], period = 14): number {
+function atrCalc(bars: {high:number;low:number;close:number}[], period = 14): number {
   if (bars.length < period + 1) return bars[bars.length-1]?.close * 0.02 || 1;
   let sum = 0;
   for (let i = bars.length - period; i < bars.length; i++) {
-    sum += Math.max(bars[i].high - bars[i].low, Math.abs(bars[i].high - bars[i-1].close), Math.abs(bars[i].low - bars[i-1].close));
+    sum += Math.max(
+      bars[i].high - bars[i].low,
+      Math.abs(bars[i].high - bars[i-1].close),
+      Math.abs(bars[i].low - bars[i-1].close)
+    );
   }
   return sum / period;
 }
@@ -50,7 +45,7 @@ function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:
   const rsiVal = rsi(closes);
   const sma20 = sma(closes, 20) || price;
   const sma50 = sma(closes, 50) || price;
-  const atrVal = atr(bars);
+  const atrVal = atrCalc(bars);
   const strength = Math.abs(sma20 - sma50) / sma50;
   if (strength < 0.005) return { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0 };
   const trendUp = sma20 > sma50;
@@ -77,38 +72,90 @@ function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { min_score = 65, min_r = 1.5, initial_capital = 10000, risk_pct = 1 } = await req.json().catch(() => ({}));
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const {
+      min_score = 65,
+      min_r = 1.5,
+      initial_capital = 10000,
+      risk_pct = 1,
+      date_from,
+      date_to,
+      max_concurrent_trades = 3,
+    } = await req.json().catch(() => ({}));
+
     const alpacaKeyId = Deno.env.get("ALPACA_API_KEY_ID") ?? "";
     const alpacaSecret = Deno.env.get("ALPACA_API_SECRET_KEY") ?? "";
-    if (!alpacaKeyId || !alpacaSecret) throw new Error("ALPACA_API_KEY_ID or ALPACA_API_SECRET_KEY not set");
+    if (!alpacaKeyId || !alpacaSecret) throw new Error("Alpaca credentials not set");
 
     const alpacaHeaders = {
       "APCA-API-KEY-ID": alpacaKeyId,
       "APCA-API-SECRET-KEY": alpacaSecret,
     };
 
+    // Get user's watchlist from user_settings
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Get user from JWT
+    const userRes = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
+    const userId = userRes.data.user?.id;
+
+    let SYMBOLS = ["AAPL","MSFT","NVDA","TSLA","SPY","QQQ","BTC/USD","ETH/USD"];
+    if (userId) {
+      const { data: settings } = await supabaseClient
+        .from("user_settings")
+        .select("watchlist")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (settings?.watchlist && Array.isArray(settings.watchlist) && settings.watchlist.length > 0) {
+        SYMBOLS = settings.watchlist;
+      }
+    }
+
+    // Date range: default last 180 days, supports up to 3 years
+    const endDate = date_to ? new Date(date_to) : new Date();
+    const startDate = date_from
+      ? new Date(date_from)
+      : new Date(endDate.getTime() - 180 * 24 * 60 * 60 * 1000);
+
+    // Cap at 3 years max
+    const maxMs = 3 * 365 * 24 * 60 * 60 * 1000;
+    const actualStart = endDate.getTime() - startDate.getTime() > maxMs
+      ? new Date(endDate.getTime() - maxMs)
+      : startDate;
+
+    const startStr = actualStart.toISOString().split('T')[0];
+    const endStr = endDate.toISOString().split('T')[0];
+
+    // Fetch bars per symbol and run walk-forward
     const allTrades: Record<string, unknown>[] = [];
     const symbolSummaries: Record<string, unknown>[] = [];
     let totalCapital = initial_capital;
+    let openTradesCount = 0;
+    const openTradesBySymbol: Record<string, boolean> = {};
 
     for (const sym of SYMBOLS) {
       try {
-        const isCrypto = sym.includes("/");
         const isForex = FOREX_SYMBOLS.includes(sym);
+        const isCrypto = sym.includes("/") && !isForex;
         let bars: {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[] = [];
 
         if (isForex) {
-          console.log(`${sym}: skipping forex (use FCS or TwelveData)`);
-          symbolSummaries.push({ symbol: sym, trades: 0, wins: 0, losses: 0, win_rate: 0, profit_factor: 0, total_pnl: 0, avg_r: 0, skipped: true, reason: "forex_not_supported" });
+          symbolSummaries.push({
+            symbol: sym, trades: 0, wins: 0, losses: 0,
+            win_rate: 0, profit_factor: 0, total_pnl: 0, avg_r: 0,
+            skipped: true, reason: "forex_not_supported_by_alpaca"
+          });
           continue;
         }
 
         if (isCrypto) {
-          const cryptoSym = sym.replace("/", "/");
-          const start = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-          const cryptoUrl = `https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=${encodeURIComponent(cryptoSym)}&timeframe=1Day&start=${start}&limit=365`;
-          const r = await fetch(cryptoUrl, { headers: alpacaHeaders, signal: AbortSignal.timeout(10000) });
-          if (!r.ok) { console.warn(`${sym}: crypto fetch error ${r.status}`); continue; }
+          const cryptoSym = sym;
+          const url = `https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=${encodeURIComponent(cryptoSym)}&timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000`;
+          const r = await fetch(url, { headers: alpacaHeaders, signal: AbortSignal.timeout(15000) });
+          if (!r.ok) { console.warn(`${sym}: error ${r.status}`); continue; }
           const d = await r.json();
           const rawBars = d.bars?.[cryptoSym] || d.bars?.[sym] || [];
           bars = rawBars.map((b: Record<string,unknown>) => ({
@@ -117,10 +164,9 @@ Deno.serve(async (req) => {
             timestamp: String(b.t).split('T')[0],
           }));
         } else {
-          const start = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-          const stockUrl = `https://data.alpaca.markets/v2/stocks/${sym}/bars?timeframe=1Day&start=${start}&limit=365&adjustment=split`;
-          const r = await fetch(stockUrl, { headers: alpacaHeaders, signal: AbortSignal.timeout(10000) });
-          if (!r.ok) { console.warn(`${sym}: stock fetch error ${r.status}`); continue; }
+          const url = `https://data.alpaca.markets/v2/stocks/${sym}/bars?timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000&adjustment=split`;
+          const r = await fetch(url, { headers: alpacaHeaders, signal: AbortSignal.timeout(15000) });
+          if (!r.ok) { console.warn(`${sym}: error ${r.status}`); continue; }
           const d = await r.json();
           bars = (d.bars || []).map((b: Record<string,unknown>) => ({
             open: Number(b.o), high: Number(b.h), low: Number(b.l),
@@ -134,22 +180,31 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const startIdx = Math.max(50, bars.length - 180);
-        const symTrades: Record<string, unknown>[] = [];
+        // Need extra lookback for indicators (50 bars minimum)
+        const simStartIdx = Math.max(50, bars.length - Math.ceil((endDate.getTime() - actualStart.getTime()) / (24 * 60 * 60 * 1000)));
+        const symTrades: Record<string,unknown>[] = [];
         let inTrade = false;
-        let tradeEntry = 0, tradeSL = 0, tradeTP = 0, tradeDir = "", tradeDate = "", tradeScore = 0;
+        let tradeEntry = 0, tradeSL = 0, tradeTP = 0;
+        let tradeDir = "", tradeDate = "", tradeScore = 0;
 
-        for (let i = startIdx; i < bars.length; i++) {
+        for (let i = simStartIdx; i < bars.length; i++) {
           if (!inTrade) {
+            // Respect max concurrent trades limit
+            if (openTradesCount >= max_concurrent_trades) continue;
+            if (openTradesBySymbol[sym]) continue;
+
             const { score, direction, entry, sl, tp, r } = scoreDay(bars.slice(0, i + 1));
             if (score >= min_score && direction && r >= min_r && Math.abs(entry - sl) / entry <= 0.10) {
               inTrade = true;
+              openTradesCount++;
+              openTradesBySymbol[sym] = true;
               tradeEntry = entry; tradeSL = sl; tradeTP = tp;
               tradeDir = direction; tradeDate = bars[i].timestamp; tradeScore = score;
             }
           } else {
             const bar = bars[i];
             let exitPrice = 0, outcome = "";
+
             if (tradeDir === "long") {
               if (bar.low <= tradeSL) { exitPrice = tradeSL; outcome = "stop_loss"; }
               else if (bar.high >= tradeTP) { exitPrice = tradeTP; outcome = "take_profit"; }
@@ -157,24 +212,43 @@ Deno.serve(async (req) => {
               if (bar.high >= tradeSL) { exitPrice = tradeSL; outcome = "stop_loss"; }
               else if (bar.low <= tradeTP) { exitPrice = tradeTP; outcome = "take_profit"; }
             }
+
             if (outcome) {
               const stopDist = Math.abs(tradeEntry - tradeSL);
-              const rActual = stopDist > 0 ? (tradeDir === "long" ? exitPrice - tradeEntry : tradeEntry - exitPrice) / stopDist : 0;
+              // Fix: r_actual sign based on outcome
+              const rawPnl = tradeDir === "long"
+                ? exitPrice - tradeEntry
+                : tradeEntry - exitPrice;
+              const rActual = outcome === "take_profit" ? 2.0
+                : outcome === "stop_loss" ? -1.0
+                : stopDist > 0 ? rawPnl / stopDist : 0;
+
               const riskDollars = totalCapital * (risk_pct / 100);
               const qty = stopDist > 0 ? riskDollars / stopDist : 0;
-              const pnlDollars = (tradeDir === "long" ? exitPrice - tradeEntry : tradeEntry - exitPrice) * qty;
+              const pnlDollars = rawPnl * qty;
               totalCapital += pnlDollars;
+
               const trade = {
-                date_entry: tradeDate, date_exit: bar.timestamp,
-                symbol: sym, direction: tradeDir, score: tradeScore,
-                entry_price: +tradeEntry.toFixed(4), exit_price: +exitPrice.toFixed(4),
-                stop_loss: +tradeSL.toFixed(4), take_profit: +tradeTP.toFixed(4),
-                r_actual: +rActual.toFixed(2), pnl_dollars: +pnlDollars.toFixed(2),
-                outcome, capital_after: +totalCapital.toFixed(2),
+                date_entry: tradeDate,
+                date_exit: bar.timestamp,
+                month: tradeDate.substring(0, 7),
+                symbol: sym,
+                direction: tradeDir,
+                score: +tradeScore.toFixed(1),
+                entry_price: +tradeEntry.toFixed(4),
+                exit_price: +exitPrice.toFixed(4),
+                stop_loss: +tradeSL.toFixed(4),
+                take_profit: +tradeTP.toFixed(4),
+                r_actual: rActual,
+                pnl_dollars: +pnlDollars.toFixed(2),
+                outcome,
+                capital_after: +totalCapital.toFixed(2),
               };
               symTrades.push(trade);
               allTrades.push(trade);
               inTrade = false;
+              openTradesCount = Math.max(0, openTradesCount - 1);
+              delete openTradesBySymbol[sym];
             }
           }
         }
@@ -184,18 +258,47 @@ Deno.serve(async (req) => {
         const totalPnl = symTrades.reduce((s, t) => s + Number(t.pnl_dollars), 0);
         const gp = wins.reduce((s, t) => s + Number(t.pnl_dollars), 0);
         const gl = Math.abs(losses.reduce((s, t) => s + Number(t.pnl_dollars), 0));
+
         symbolSummaries.push({
           symbol: sym, trades: symTrades.length,
           wins: wins.length, losses: losses.length,
           win_rate: symTrades.length > 0 ? +((wins.length / symTrades.length) * 100).toFixed(1) : 0,
           profit_factor: gl > 0 ? +(gp / gl).toFixed(2) : gp > 0 ? 999 : 0,
           total_pnl: +totalPnl.toFixed(2),
-          avg_r: symTrades.length > 0 ? +(symTrades.reduce((s, t) => s + Number(t.r_actual), 0) / symTrades.length).toFixed(2) : 0,
+          avg_r: symTrades.length > 0
+            ? +(symTrades.reduce((s, t) => s + Number(t.r_actual), 0) / symTrades.length).toFixed(2)
+            : 0,
         });
-      } catch (e) { console.error(`${sym}:`, e); }
+      } catch (e) {
+        console.error(`${sym}:`, e);
+      }
     }
 
+    // Sort all trades by date
     allTrades.sort((a, b) => String(a.date_entry).localeCompare(String(b.date_entry)));
+
+    // Monthly PnL breakdown
+    const monthlyMap: Record<string, { pnl: number; trades: number; wins: number; capital_end: number }> = {};
+    for (const t of allTrades) {
+      const month = String(t.month || String(t.date_entry).substring(0, 7));
+      if (!monthlyMap[month]) monthlyMap[month] = { pnl: 0, trades: 0, wins: 0, capital_end: 0 };
+      monthlyMap[month].pnl += Number(t.pnl_dollars);
+      monthlyMap[month].trades++;
+      if (t.outcome === "take_profit") monthlyMap[month].wins++;
+      monthlyMap[month].capital_end = Number(t.capital_after);
+    }
+    const monthly = Object.entries(monthlyMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, d]) => ({
+        month,
+        pnl: +d.pnl.toFixed(2),
+        trades: d.trades,
+        wins: d.wins,
+        win_rate: d.trades > 0 ? +((d.wins / d.trades) * 100).toFixed(1) : 0,
+        capital_end: d.capital_end,
+      }));
+
+    // Global metrics
     const allWins = allTrades.filter(t => t.outcome === "take_profit");
     const allLosses = allTrades.filter(t => t.outcome === "stop_loss");
     const globalPnl = totalCapital - initial_capital;
@@ -207,22 +310,35 @@ Deno.serve(async (req) => {
       if (cap > peak) peak = cap;
       maxDD = Math.max(maxDD, ((peak - cap) / peak) * 100);
     }
+    const months = monthly.length || 1;
+    const avgMonthlyPnl = globalPnl / months;
 
     return new Response(JSON.stringify({
+      config: { date_from: startStr, date_to: endStr, min_score, min_r, risk_pct, initial_capital, max_concurrent_trades, symbols: SYMBOLS },
       summary: {
-        initial_capital, final_capital: +totalCapital.toFixed(2),
+        initial_capital,
+        final_capital: +totalCapital.toFixed(2),
         total_pnl: +globalPnl.toFixed(2),
         total_return_pct: +((globalPnl / initial_capital) * 100).toFixed(1),
-        total_trades: allTrades.length, wins: allWins.length, losses: allLosses.length,
+        avg_monthly_pnl: +avgMonthlyPnl.toFixed(2),
+        months_simulated: months,
+        total_trades: allTrades.length,
+        wins: allWins.length,
+        losses: allLosses.length,
         win_rate: allTrades.length > 0 ? +((allWins.length / allTrades.length) * 100).toFixed(1) : 0,
         profit_factor: gl2 > 0 ? +(gp2 / gl2).toFixed(2) : gp2 > 0 ? 999 : 0,
         max_drawdown_pct: +maxDD.toFixed(2),
-        avg_r: allTrades.length > 0 ? +(allTrades.reduce((s, t) => s + Number(t.r_actual), 0) / allTrades.length).toFixed(2) : 0,
+        avg_r: allTrades.length > 0
+          ? +(allTrades.reduce((s, t) => s + Number(t.r_actual), 0) / allTrades.length).toFixed(2)
+          : 0,
         symbols_tested: SYMBOLS.length,
+        symbols_with_trades: symbolSummaries.filter((s: Record<string, unknown>) => Number(s.trades) > 0).length,
       },
+      monthly,
       by_symbol: symbolSummaries,
       trade_log: allTrades,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
   } catch (e) {
     return new Response(JSON.stringify({ error: (e as Error).message }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
