@@ -44,6 +44,14 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('risk');
   const [localNotifPrefs, setLocalNotifPrefs] = useState<NotificationPreferences>(notifPrefs);
 
+  // External alerts state
+  const [notifyEmail, setNotifyEmail] = useState('');
+  const [notifyTelegramChatId, setNotifyTelegramChatId] = useState('');
+  const [notifyOnTradeExecuted, setNotifyOnTradeExecuted] = useState(true);
+  const [notifyOnStopLoss, setNotifyOnStopLoss] = useState(true);
+  const [notifyOnTakeProfit, setNotifyOnTakeProfit] = useState(true);
+  const [notifyOnCooldown, setNotifyOnCooldown] = useState(true);
+
   // Profile state
   const [fullName, setFullName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
