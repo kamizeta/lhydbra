@@ -52,6 +52,9 @@ const defaultSettings: UserSettings = {
   trades_today: 0,
   last_trade_date: null,
   daily_risk_used: 0,
+  min_score: 60,
+  min_r: 1.5,
+  min_confidence: 55,
 };
 
 function parseSettings(data: Record<string, unknown>): UserSettings {
