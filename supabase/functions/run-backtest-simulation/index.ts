@@ -376,8 +376,13 @@ Deno.serve(async (req) => {
                 : outcome === "stop_loss" ? -1.0
                 : stopDist > 0 ? rawPnl / stopDist : 0;
 
-              const riskDollars = totalCapital * (risk_pct / 100);
-              const qty = stopDist > 0 ? riskDollars / stopDist : 0;
+              // Cap sizing capital at 3x initial capital to protect compounded gains
+              const SIZING_CAPITAL_CAP = initial_capital * 3;
+              const sizingCapital = Math.min(totalCapital, SIZING_CAPITAL_CAP);
+              const riskDollars = sizingCapital * (risk_pct / 100);
+              const MAX_LOSS_DOLLARS = initial_capital * 0.03;
+              const cappedRisk = Math.min(riskDollars, MAX_LOSS_DOLLARS);
+              const qty = stopDist > 0 ? cappedRisk / stopDist : 0;
               const pnlDollars = rawPnl * qty;
               totalCapital += pnlDollars;
 
@@ -475,7 +480,7 @@ Deno.serve(async (req) => {
     const avgMonthlyPnl = globalPnl / months;
 
     return new Response(JSON.stringify({
-      config: { date_from: startStr, date_to: endStr, min_score, min_r, risk_pct, initial_capital, max_concurrent_trades, symbols: SYMBOLS, macro_filter: "Equity trades follow SPY SMA50 trend. Crypto trades follow BTC SMA50 trend. Choppy markets (SMA20/SMA50 spread < 1.5%) are skipped entirely." },
+      config: { date_from: startStr, date_to: endStr, min_score, min_r, risk_pct, initial_capital, max_concurrent_trades, symbols: SYMBOLS, sizing_capital_cap: initial_capital * 3, max_loss_per_trade: initial_capital * 0.03, macro_filter: "Equity trades follow SPY SMA50 trend. Crypto trades follow BTC SMA50 trend. Choppy markets (SMA20/SMA50 spread < 1.5%) are skipped entirely." },
       summary: {
         initial_capital,
         final_capital: +totalCapital.toFixed(2),
