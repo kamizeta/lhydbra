@@ -497,6 +497,35 @@ Deno.serve(async (req) => {
           });
         } catch {}
       }
+
+      // ─── Auto-trigger adaptive scoring if enough outcomes exist ───
+      let totalOutcomes = 0;
+      try {
+        const { count } = await supabase
+          .from("signal_outcomes")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .neq("outcome", "pending");
+
+        totalOutcomes = count || 0;
+
+        if (totalOutcomes >= 10) {
+          fetch(`${supabaseUrl}/functions/v1/adaptive-scoring`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({
+              user_id: user.id,
+              window_days: 30,
+            }),
+          }).catch(e => console.warn("Adaptive scoring trigger failed:", e));
+          console.log(`[operator-mode] Triggered adaptive scoring (${totalOutcomes} outcomes available)`);
+        }
+      } catch (adaptErr) {
+        console.warn("Adaptive scoring check failed:", adaptErr);
+      }
     }
 
     return jsonRes({
