@@ -85,6 +85,28 @@ function srProximity(bars: {high:number;low:number;close:number}[], direction: s
   return proximityScore;
 }
 
+function calcRegime(bars: {close:number}[]): "bull" | "bear" | "choppy" {
+  if (bars.length < 50) return "choppy";
+  const closes = bars.map(b => b.close);
+  const price = closes[closes.length - 1];
+  const sma20val = sma(closes, 20) || price;
+  const sma50val = sma(closes, 50) || price;
+  const spread = Math.abs(sma20val - sma50val) / sma50val;
+  if (spread < 0.015) return "choppy";
+  if (price > sma50val && sma20val > sma50val) return "bull";
+  if (price < sma50val && sma20val < sma50val) return "bear";
+  return "choppy";
+}
+
+function getMacroRegime(
+  spyBars: {close:number}[],
+  btcBars: {close:number}[]
+): { equityRegime: "bull" | "bear" | "choppy"; cryptoRegime: "bull" | "bear" | "choppy" } {
+  return { equityRegime: calcRegime(spyBars), cryptoRegime: calcRegime(btcBars) };
+}
+
+const CRYPTO_SYMBOLS = ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD"];
+
 function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:number}[]): {
   score: number; direction: string | null; entry: number; sl: number; tp: number; r: number;
   macd_momentum: number; volume_ratio: number; sr_score: number;
@@ -207,6 +229,26 @@ Deno.serve(async (req) => {
     const startStr = actualStart.toISOString().split('T')[0];
     const endStr = endDate.toISOString().split('T')[0];
 
+    // Fetch macro reference bars (SPY for equities, BTC for crypto)
+    const alpacaHdrs = { "APCA-API-KEY-ID": alpacaKeyId, "APCA-API-SECRET-KEY": alpacaSecret, "Accept": "application/json" };
+    let spyBars: {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[] = [];
+    let btcBars: {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[] = [];
+    try {
+      const spyRes = await fetch(`https://data.alpaca.markets/v2/stocks/SPY/bars?timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000&adjustment=split&feed=iex`, { headers: alpacaHdrs, signal: AbortSignal.timeout(10000) });
+      if (spyRes.ok) {
+        const spyData = await spyRes.json();
+        spyBars = (spyData.bars || []).map((b: Record<string,unknown>) => ({ open: Number(b.o), high: Number(b.h), low: Number(b.l), close: Number(b.c), volume: Number(b.v), timestamp: String(b.t).split('T')[0] }));
+      }
+    } catch (e) { console.warn("SPY macro fetch failed:", e); }
+    try {
+      const btcRes = await fetch(`https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=BTC%2FUSD&timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000`, { headers: alpacaHdrs, signal: AbortSignal.timeout(10000) });
+      if (btcRes.ok) {
+        const btcData = await btcRes.json();
+        btcBars = (btcData.bars?.["BTC/USD"] || []).map((b: Record<string,unknown>) => ({ open: Number(b.o), high: Number(b.h), low: Number(b.l), close: Number(b.c), volume: Number(b.v), timestamp: String(b.t).split('T')[0] }));
+      }
+    } catch (e) { console.warn("BTC macro fetch failed:", e); }
+    console.log(`[backtest] Macro bars: SPY=${spyBars.length}, BTC=${btcBars.length}`);
+
     // Fetch bars per symbol and run walk-forward
     const allTrades: Record<string, unknown>[] = [];
     const symbolSummaries: Record<string, unknown>[] = [];
@@ -273,10 +315,12 @@ Deno.serve(async (req) => {
         // Need extra lookback for indicators (50 bars minimum)
         const simStartIdx = Math.max(50, bars.length - Math.ceil((endDate.getTime() - actualStart.getTime()) / (24 * 60 * 60 * 1000)));
         const symTrades: Record<string,unknown>[] = [];
+        const isCryptoSym = CRYPTO_SYMBOLS.includes(sym);
         let inTrade = false;
         let tradeEntry = 0, tradeSL = 0, tradeTP = 0;
         let tradeDir = "", tradeDate = "", tradeScore = 0;
         let tradeMacd = 0, tradeVolRatio = 1, tradeSrScore = 0;
+        let tradeRegime = "";
 
         for (let i = simStartIdx; i < bars.length; i++) {
           if (!inTrade) {
@@ -284,14 +328,31 @@ Deno.serve(async (req) => {
             if (openTradesCount >= max_concurrent_trades) continue;
             if (openTradesBySymbol[sym]) continue;
 
+            // Macro regime filter
+            const currentDate = bars[i].timestamp;
+            const macroSpyBars = spyBars.filter(b => b.timestamp <= currentDate);
+            const macroBtcBars = btcBars.filter(b => b.timestamp <= currentDate);
+            const { equityRegime, cryptoRegime } = getMacroRegime(macroSpyBars, macroBtcBars);
+            const activeRegime = isCryptoSym ? cryptoRegime : equityRegime;
+
+            // Skip choppy markets
+            if (activeRegime === "choppy") continue;
+
             const { score, direction, entry, sl, tp, r, macd_momentum, volume_ratio: vr, sr_score: sr } = scoreDay(bars.slice(0, i + 1));
-            if (score >= min_score && direction && r >= min_r && Math.abs(entry - sl) / entry <= 0.10) {
+            if (!direction) continue;
+
+            // Block counter-trend trades
+            if (activeRegime === "bull" && direction === "short") continue;
+            if (activeRegime === "bear" && direction === "long") continue;
+
+            if (score >= min_score && r >= min_r && Math.abs(entry - sl) / entry <= 0.10) {
               inTrade = true;
               openTradesCount++;
               openTradesBySymbol[sym] = true;
               tradeEntry = entry; tradeSL = sl; tradeTP = tp;
               tradeDir = direction; tradeDate = bars[i].timestamp; tradeScore = score;
               tradeMacd = macd_momentum; tradeVolRatio = vr; tradeSrScore = sr;
+              tradeRegime = activeRegime;
             }
           } else {
             const bar = bars[i];
@@ -338,6 +399,7 @@ Deno.serve(async (req) => {
                 macd_momentum: tradeMacd,
                 volume_ratio: tradeVolRatio,
                 sr_score: tradeSrScore,
+                macro_regime: tradeRegime,
               };
               symTrades.push(trade);
               allTrades.push(trade);
@@ -373,13 +435,15 @@ Deno.serve(async (req) => {
     allTrades.sort((a, b) => String(a.date_entry).localeCompare(String(b.date_entry)));
 
     // Monthly PnL breakdown
-    const monthlyMap: Record<string, { pnl: number; trades: number; wins: number; capital_end: number }> = {};
+    const monthlyMap: Record<string, { pnl: number; trades: number; wins: number; capital_end: number; bull: number; bear: number }> = {};
     for (const t of allTrades) {
       const month = String(t.month || String(t.date_entry).substring(0, 7));
-      if (!monthlyMap[month]) monthlyMap[month] = { pnl: 0, trades: 0, wins: 0, capital_end: 0 };
+      if (!monthlyMap[month]) monthlyMap[month] = { pnl: 0, trades: 0, wins: 0, capital_end: 0, bull: 0, bear: 0 };
       monthlyMap[month].pnl += Number(t.pnl_dollars);
       monthlyMap[month].trades++;
       if (t.outcome === "take_profit") monthlyMap[month].wins++;
+      if (t.macro_regime === "bull") monthlyMap[month].bull++;
+      if (t.macro_regime === "bear") monthlyMap[month].bear++;
       monthlyMap[month].capital_end = Number(t.capital_after);
     }
     const monthly = Object.entries(monthlyMap)
@@ -391,6 +455,8 @@ Deno.serve(async (req) => {
         wins: d.wins,
         win_rate: d.trades > 0 ? +((d.wins / d.trades) * 100).toFixed(1) : 0,
         capital_end: d.capital_end,
+        bull_trades: d.bull,
+        bear_trades: d.bear,
       }));
 
     // Global metrics
@@ -409,7 +475,7 @@ Deno.serve(async (req) => {
     const avgMonthlyPnl = globalPnl / months;
 
     return new Response(JSON.stringify({
-      config: { date_from: startStr, date_to: endStr, min_score, min_r, risk_pct, initial_capital, max_concurrent_trades, symbols: SYMBOLS },
+      config: { date_from: startStr, date_to: endStr, min_score, min_r, risk_pct, initial_capital, max_concurrent_trades, symbols: SYMBOLS, macro_filter: "Equity trades follow SPY SMA50 trend. Crypto trades follow BTC SMA50 trend. Choppy markets (SMA20/SMA50 spread < 1.5%) are skipped entirely." },
       summary: {
         initial_capital,
         final_capital: +totalCapital.toFixed(2),
