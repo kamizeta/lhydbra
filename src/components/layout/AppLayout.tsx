@@ -50,6 +50,7 @@ export default function AppLayout() {
     
     { to: "/advanced/risk", icon: Shield, label: "Risk" },
     { to: "/advanced/reports", icon: FileSpreadsheet, label: "Reports" },
+    { to: "/advanced/diagnostic", icon: Activity, label: "Diag" },
   ];
 
   const renderNavItem = (item: typeof coreNavItems[0], dimmed = false) => (
