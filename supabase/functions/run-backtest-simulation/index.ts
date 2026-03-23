@@ -435,13 +435,15 @@ Deno.serve(async (req) => {
     allTrades.sort((a, b) => String(a.date_entry).localeCompare(String(b.date_entry)));
 
     // Monthly PnL breakdown
-    const monthlyMap: Record<string, { pnl: number; trades: number; wins: number; capital_end: number }> = {};
+    const monthlyMap: Record<string, { pnl: number; trades: number; wins: number; capital_end: number; bull: number; bear: number }> = {};
     for (const t of allTrades) {
       const month = String(t.month || String(t.date_entry).substring(0, 7));
-      if (!monthlyMap[month]) monthlyMap[month] = { pnl: 0, trades: 0, wins: 0, capital_end: 0 };
+      if (!monthlyMap[month]) monthlyMap[month] = { pnl: 0, trades: 0, wins: 0, capital_end: 0, bull: 0, bear: 0 };
       monthlyMap[month].pnl += Number(t.pnl_dollars);
       monthlyMap[month].trades++;
       if (t.outcome === "take_profit") monthlyMap[month].wins++;
+      if (t.macro_regime === "bull") monthlyMap[month].bull++;
+      if (t.macro_regime === "bear") monthlyMap[month].bear++;
       monthlyMap[month].capital_end = Number(t.capital_after);
     }
     const monthly = Object.entries(monthlyMap)
@@ -453,6 +455,8 @@ Deno.serve(async (req) => {
         wins: d.wins,
         win_rate: d.trades > 0 ? +((d.wins / d.trades) * 100).toFixed(1) : 0,
         capital_end: d.capital_end,
+        bull_trades: d.bull,
+        bear_trades: d.bear,
       }));
 
     // Global metrics
