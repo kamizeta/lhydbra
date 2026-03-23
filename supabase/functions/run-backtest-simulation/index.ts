@@ -36,10 +36,61 @@ function atrCalc(bars: {high:number;low:number;close:number}[], period = 14): nu
   return sum / period;
 }
 
+function ema(values: number[], period: number): number {
+  if (values.length === 0) return 0;
+  const k = 2 / (period + 1);
+  let emaVal = values[0];
+  for (let i = 1; i < values.length; i++) {
+    emaVal = values[i] * k + emaVal * (1 - k);
+  }
+  return emaVal;
+}
+
+function macdHistogram(closes: number[]): number {
+  if (closes.length < 35) return 0;
+  const recent = closes.slice(-60);
+  const macdLine = ema(recent, 12) - ema(recent, 26);
+  const older = closes.slice(-63, -3);
+  const macdOld = ema(older, 12) - ema(older, 26);
+  return macdLine - macdOld;
+}
+
+function volumeRatio(bars: {volume:number}[]): number {
+  if (bars.length < 21) return 1;
+  const recent = bars[bars.length - 1].volume;
+  const avg20 = bars.slice(-21, -1).reduce((s, b) => s + b.volume, 0) / 20;
+  return avg20 > 0 ? recent / avg20 : 1;
+}
+
+function srProximity(bars: {high:number;low:number;close:number}[], direction: string): number {
+  if (bars.length < 20) return 0;
+  const price = bars[bars.length - 1].close;
+  const lookback = bars.slice(-20);
+  const recentHighs = lookback.map(b => b.high).sort((a, b) => b - a).slice(0, 3);
+  const recentLows = lookback.map(b => b.low).sort((a, b) => a - b).slice(0, 3);
+  const nearestResistance = recentHighs[0];
+  const nearestSupport = recentLows[0];
+  const distToResistance = (nearestResistance - price) / price;
+  const distToSupport = (price - nearestSupport) / price;
+  let proximityScore = 0;
+  if (direction === "long") {
+    if (distToSupport < 0.02) proximityScore += 10;
+    if (distToResistance < 0.015) proximityScore -= 20;
+    if (distToResistance < 0.005) proximityScore -= 15;
+  } else {
+    if (distToResistance < 0.02) proximityScore += 10;
+    if (distToSupport < 0.015) proximityScore -= 20;
+    if (distToSupport < 0.005) proximityScore -= 15;
+  }
+  return proximityScore;
+}
+
 function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:number}[]): {
   score: number; direction: string | null; entry: number; sl: number; tp: number; r: number;
+  macd_momentum: number; volume_ratio: number; sr_score: number;
 } {
-  if (bars.length < 50) return { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0 };
+  const empty = { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0, macd_momentum: 0, volume_ratio: 1, sr_score: 0 };
+  if (bars.length < 50) return empty;
   const closes = bars.map(b => b.close);
   const price = closes[closes.length - 1];
   const rsiVal = rsi(closes);
@@ -47,26 +98,45 @@ function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:
   const sma50 = sma(closes, 50) || price;
   const atrVal = atrCalc(bars);
   const strength = Math.abs(sma20 - sma50) / sma50;
-  if (strength < 0.005) return { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0 };
+  if (strength < 0.005) return empty;
   const trendUp = sma20 > sma50;
   let lScore = 0, sScore = 0;
   if (trendUp) lScore += 2; else sScore += 2;
   if (rsiVal > 55) lScore++; else if (rsiVal < 45) sScore++;
-  if (Math.abs(lScore - sScore) < 2) return { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0 };
+  if (Math.abs(lScore - sScore) < 2) return empty;
   const direction = lScore > sScore ? "long" : "short";
   let score = 50;
   if ((trendUp && direction === "long") || (!trendUp && direction === "short")) score += 15;
   if (direction === "long" && rsiVal > 50 && rsiVal < 70) score += 12;
   else if (direction === "short" && rsiVal < 50 && rsiVal > 30) score += 12;
   score += Math.min(15, strength * 1000);
+
+  // Factor 1: MACD Histogram Confirmation
+  const macdMomentum = macdHistogram(closes);
+  if (direction === "long" && macdMomentum < -0.01) score -= 15;
+  if (direction === "short" && macdMomentum > 0.01) score -= 15;
+  if (direction === "long" && macdMomentum > 0.01) score += 10;
+  if (direction === "short" && macdMomentum < -0.01) score += 10;
+
+  // Factor 2: Volume Confirmation
+  const volRatio = volumeRatio(bars);
+  if (volRatio > 1.5) score += 8;
+  if (volRatio < 0.7) score -= 12;
+  if (volRatio < 0.5) score -= 10;
+
+  // Factor 3: Support/Resistance Proximity
+  const srScore = srProximity(bars, direction);
+  score += srScore;
+
   const entry = price;
   const sl = direction === "long"
     ? Math.max(sma20 - atrVal * 0.5, entry - atrVal * 1.5)
     : Math.min(sma20 + atrVal * 0.5, entry + atrVal * 1.5);
   const stopDist = Math.abs(entry - sl);
-  if (stopDist <= 0) return { score: 0, direction: null, entry: 0, sl: 0, tp: 0, r: 0 };
+  if (stopDist <= 0) return empty;
   const tp = direction === "long" ? entry + stopDist * 2 : entry - stopDist * 2;
-  return { score: Math.min(100, score), direction, entry, sl, tp, r: Math.abs(tp - entry) / stopDist };
+  return { score: Math.min(100, score), direction, entry, sl, tp, r: Math.abs(tp - entry) / stopDist,
+    macd_momentum: +macdMomentum.toFixed(4), volume_ratio: +volRatio.toFixed(2), sr_score: srScore };
 }
 
 Deno.serve(async (req) => {
@@ -74,7 +144,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const {
-      min_score = 65,
+      min_score = 72,
       min_r = 1.5,
       initial_capital = 10000,
       risk_pct = 1,
@@ -206,6 +276,7 @@ Deno.serve(async (req) => {
         let inTrade = false;
         let tradeEntry = 0, tradeSL = 0, tradeTP = 0;
         let tradeDir = "", tradeDate = "", tradeScore = 0;
+        let tradeMacd = 0, tradeVolRatio = 1, tradeSrScore = 0;
 
         for (let i = simStartIdx; i < bars.length; i++) {
           if (!inTrade) {
@@ -213,13 +284,14 @@ Deno.serve(async (req) => {
             if (openTradesCount >= max_concurrent_trades) continue;
             if (openTradesBySymbol[sym]) continue;
 
-            const { score, direction, entry, sl, tp, r } = scoreDay(bars.slice(0, i + 1));
+            const { score, direction, entry, sl, tp, r, macd_momentum, volume_ratio: vr, sr_score: sr } = scoreDay(bars.slice(0, i + 1));
             if (score >= min_score && direction && r >= min_r && Math.abs(entry - sl) / entry <= 0.10) {
               inTrade = true;
               openTradesCount++;
               openTradesBySymbol[sym] = true;
               tradeEntry = entry; tradeSL = sl; tradeTP = tp;
               tradeDir = direction; tradeDate = bars[i].timestamp; tradeScore = score;
+              tradeMacd = macd_momentum; tradeVolRatio = vr; tradeSrScore = sr;
             }
           } else {
             const bar = bars[i];
@@ -263,6 +335,9 @@ Deno.serve(async (req) => {
                 pnl_dollars: +pnlDollars.toFixed(2),
                 outcome,
                 capital_after: +totalCapital.toFixed(2),
+                macd_momentum: tradeMacd,
+                volume_ratio: tradeVolRatio,
+                sr_score: tradeSrScore,
               };
               symTrades.push(trade);
               allTrades.push(trade);
