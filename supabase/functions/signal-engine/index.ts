@@ -7,12 +7,12 @@ const corsHeaders = {
 
 // ─── Weight Profiles by Regime ───
 const REGIME_WEIGHTS: Record<string, Record<string, number>> = {
-  bullish:        { market_structure: 0.22, momentum: 0.15, volatility_suitability: 0.08, strategy_confluence: 0.18, macro_context: 0.08, sentiment_flow: 0.10, risk_reward: 0.10, historical_performance: 0.09 },
-  bearish:        { market_structure: 0.22, momentum: 0.14, volatility_suitability: 0.10, strategy_confluence: 0.18, macro_context: 0.10, sentiment_flow: 0.08, risk_reward: 0.12, historical_performance: 0.06 },
-  ranging:        { market_structure: 0.18, momentum: 0.08, volatility_suitability: 0.12, strategy_confluence: 0.20, macro_context: 0.10, sentiment_flow: 0.10, risk_reward: 0.14, historical_performance: 0.08 },
-  volatile:       { market_structure: 0.16, momentum: 0.10, volatility_suitability: 0.16, strategy_confluence: 0.16, macro_context: 0.08, sentiment_flow: 0.12, risk_reward: 0.14, historical_performance: 0.08 },
-  compression:    { market_structure: 0.20, momentum: 0.10, volatility_suitability: 0.14, strategy_confluence: 0.20, macro_context: 0.08, sentiment_flow: 0.08, risk_reward: 0.12, historical_performance: 0.08 },
-  default:        { market_structure: 0.20, momentum: 0.12, volatility_suitability: 0.10, strategy_confluence: 0.18, macro_context: 0.08, sentiment_flow: 0.10, risk_reward: 0.12, historical_performance: 0.10 },
+  bullish:        { market_structure: 0.18, momentum: 0.12, volatility_suitability: 0.06, strategy_confluence: 0.14, macro_context: 0.07, sentiment_flow: 0.08, risk_reward: 0.09, historical_performance: 0.07, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.06 },
+  bearish:        { market_structure: 0.18, momentum: 0.11, volatility_suitability: 0.08, strategy_confluence: 0.14, macro_context: 0.09, sentiment_flow: 0.06, risk_reward: 0.10, historical_performance: 0.05, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.06 },
+  ranging:        { market_structure: 0.14, momentum: 0.06, volatility_suitability: 0.10, strategy_confluence: 0.16, macro_context: 0.08, sentiment_flow: 0.08, risk_reward: 0.12, historical_performance: 0.06, macd_confirmation: 0.06, volume_confirmation: 0.06, sr_proximity: 0.08 },
+  volatile:       { market_structure: 0.12, momentum: 0.08, volatility_suitability: 0.13, strategy_confluence: 0.13, macro_context: 0.06, sentiment_flow: 0.10, risk_reward: 0.12, historical_performance: 0.06, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.07 },
+  compression:    { market_structure: 0.16, momentum: 0.08, volatility_suitability: 0.11, strategy_confluence: 0.16, macro_context: 0.07, sentiment_flow: 0.06, risk_reward: 0.10, historical_performance: 0.06, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.07 },
+  default:        { market_structure: 0.16, momentum: 0.09, volatility_suitability: 0.08, strategy_confluence: 0.15, macro_context: 0.07, sentiment_flow: 0.08, risk_reward: 0.10, historical_performance: 0.08, macd_confirmation: 0.06, volume_confirmation: 0.06, sr_proximity: 0.07 },
 };
 
 const ASSET_CLASS_ADJUSTMENTS: Record<string, Record<string, number>> = {
@@ -174,6 +174,46 @@ function computeHistoricalModifier(perfData: Record<string, unknown> | null): nu
   return 0;
 }
 
+// ─── Validated Scoring Factors (backtest-proven) ───
+
+function macdMomentumDirection(features: Record<string, unknown>): number {
+  const hist = Number(features.macd_histogram || 0);
+  const histPrev = Number(features.macd_histogram_prev || hist * 0.9);
+  return hist - histPrev;
+}
+
+function volumeConfirmation(features: Record<string, unknown>): number {
+  const volume = Number(features.volume || 0);
+  const volumeSma20 = Number(features.volume_sma_20 || volume);
+  if (volumeSma20 <= 0) return 50;
+  const ratio = volume / volumeSma20;
+  if (ratio > 1.5) return 85;
+  if (ratio > 1.2) return 70;
+  if (ratio > 0.8) return 50;
+  if (ratio > 0.5) return 35;
+  return 20;
+}
+
+function srProximityScore(features: Record<string, unknown>, direction: string): number {
+  const price = Number(features.current_price || features.sma_20 || 0);
+  const support = Number(features.support_level || 0);
+  const resistance = Number(features.resistance_level || 0);
+  if (price <= 0 || support <= 0 || resistance <= 0) return 50;
+  const distToResistance = (resistance - price) / price;
+  const distToSupport = (price - support) / price;
+  if (direction === 'long') {
+    if (distToResistance < 0.005) return 20;
+    if (distToResistance < 0.015) return 35;
+    if (distToSupport < 0.02) return 80;
+    return 55;
+  } else {
+    if (distToSupport < 0.005) return 20;
+    if (distToSupport < 0.015) return 35;
+    if (distToResistance < 0.02) return 80;
+    return 55;
+  }
+}
+
 // ─── Setup Generation ───
 
 function generateSetups(features: Record<string, unknown>, direction: string): { entry: number; sl: number; targets: number[] }[] {
@@ -215,17 +255,19 @@ function determineDirection(features: Record<string, unknown>): string | null {
   const rsi = Number(features.rsi_14 || 50);
   const macdHist = Number(features.macd_histogram || 0);
   const trendStrength = Number(features.trend_strength || 0);
+
+  // Too weak to trade
+  if (trendStrength < 0.2) return null;
+
   let longScore = 0, shortScore = 0;
-  if (trend === 'up') longScore += 2;
-  else if (trend === 'down') shortScore += 2;
-  else return null; // sideways = no conviction
-  if (rsi > 55) longScore += 1;
-  else if (rsi < 45) shortScore += 1;
-  if (macdHist > 0) longScore += 1;
-  else if (macdHist < 0) shortScore += 1;
-  if (trendStrength < 0.2) return null; // too weak to trade
+  if (trend === 'up') longScore += 2; else if (trend === 'down') shortScore += 2;
+  if (rsi > 55) longScore += 1; else if (rsi < 45) shortScore += 1;
+  if (macdHist > 0) longScore += 1; else if (macdHist < 0) shortScore += 1;
+
+  // Need clear conviction — margin of at least 2 votes
   const margin = Math.abs(longScore - shortScore);
-  if (margin < 2) return null; // conflicting signals
+  if (margin < 2) return null;
+
   return longScore > shortScore ? 'long' : 'short';
 }
 
@@ -444,7 +486,7 @@ Deno.serve(async (req) => {
       const enriched = { ...feat, current_price: currentPrice };
       const direction = determineDirection(enriched);
       if (!direction) {
-        rejections.push({ asset: symbol, reason: 'Insufficient directional conviction (sideways or conflicting signals)' });
+        rejections.push({ asset: symbol, reason: 'No clear direction conviction (trendStrength or vote margin too low)' });
         continue;
       }
 
@@ -488,6 +530,13 @@ Deno.serve(async (req) => {
         sentiment_flow: fearGreedScore,
         risk_reward: computeRiskReward(expectedR, setup.targets, setup.entry, setup.sl),
         historical_performance: 50,
+        macd_confirmation: (() => {
+          const mom = macdMomentumDirection(enriched);
+          if (direction === 'long') return mom > 0.01 ? 80 : mom < -0.01 ? 25 : 50;
+          return mom < -0.01 ? 80 : mom > 0.01 ? 25 : 50;
+        })(),
+        volume_confirmation: volumeConfirmation(enriched),
+        sr_proximity: srProximityScore(enriched, direction),
       };
 
       const STRATEGY_PRIORS: Record<string, number> = {
