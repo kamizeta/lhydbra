@@ -229,6 +229,26 @@ Deno.serve(async (req) => {
     const startStr = actualStart.toISOString().split('T')[0];
     const endStr = endDate.toISOString().split('T')[0];
 
+    // Fetch macro reference bars (SPY for equities, BTC for crypto)
+    const alpacaHdrs = { "APCA-API-KEY-ID": alpacaKeyId, "APCA-API-SECRET-KEY": alpacaSecret, "Accept": "application/json" };
+    let spyBars: {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[] = [];
+    let btcBars: {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[] = [];
+    try {
+      const spyRes = await fetch(`https://data.alpaca.markets/v2/stocks/SPY/bars?timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000&adjustment=split&feed=iex`, { headers: alpacaHdrs, signal: AbortSignal.timeout(10000) });
+      if (spyRes.ok) {
+        const spyData = await spyRes.json();
+        spyBars = (spyData.bars || []).map((b: Record<string,unknown>) => ({ open: Number(b.o), high: Number(b.h), low: Number(b.l), close: Number(b.c), volume: Number(b.v), timestamp: String(b.t).split('T')[0] }));
+      }
+    } catch (e) { console.warn("SPY macro fetch failed:", e); }
+    try {
+      const btcRes = await fetch(`https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=BTC%2FUSD&timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000`, { headers: alpacaHdrs, signal: AbortSignal.timeout(10000) });
+      if (btcRes.ok) {
+        const btcData = await btcRes.json();
+        btcBars = (btcData.bars?.["BTC/USD"] || []).map((b: Record<string,unknown>) => ({ open: Number(b.o), high: Number(b.h), low: Number(b.l), close: Number(b.c), volume: Number(b.v), timestamp: String(b.t).split('T')[0] }));
+      }
+    } catch (e) { console.warn("BTC macro fetch failed:", e); }
+    console.log(`[backtest] Macro bars: SPY=${spyBars.length}, BTC=${btcBars.length}`);
+
     // Fetch bars per symbol and run walk-forward
     const allTrades: Record<string, unknown>[] = [];
     const symbolSummaries: Record<string, unknown>[] = [];
