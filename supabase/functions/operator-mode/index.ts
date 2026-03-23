@@ -514,6 +514,8 @@ Deno.serve(async (req) => {
         quantity: t.quantity, entry: t.entry_price,
         stop_loss: t.stop_loss, take_profit: t.take_profit,
         risk_pct: Number(t.risk_pct).toFixed(2),
+        symbol_multiplier: t.symbol_multiplier,
+        adjusted_risk_pct: t.adjusted_risk_pct,
         strategy: t.strategy_family, regime: t.market_regime,
       })),
       execution: shouldExecute ? execResults : null,
