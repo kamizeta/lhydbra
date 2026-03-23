@@ -164,7 +164,43 @@ export default function ResearchPage() {
     setSeRunning(false);
   };
 
-  // ─── Learning handlers ───
+  // ─── Sim 6M handlers ───
+  const runSimulation = async () => {
+    setSimLoading(true);
+    setSimError(null);
+    setSimResults(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('run-backtest-simulation', {
+        body: simConfig,
+      });
+      if (error) throw new Error(error.message);
+      setSimResults(data);
+    } catch (e: any) {
+      setSimError(e.message || 'Simulation failed');
+    }
+    setSimLoading(false);
+  };
+
+  const downloadExcel = async () => {
+    if (!simResults) return;
+    const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs');
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([simResults.summary]), 'Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(simResults.by_symbol), 'By Symbol');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(simResults.trade_log), 'Trade Log');
+    const checklist = [
+      { Metric: 'Win Rate %', Target: '≥ 45%', Actual: `${simResults.summary.win_rate}%`, Pass: simResults.summary.win_rate >= 45 ? 'YES' : 'NO' },
+      { Metric: 'Profit Factor', Target: '≥ 1.3', Actual: simResults.summary.profit_factor, Pass: simResults.summary.profit_factor >= 1.3 ? 'YES' : 'NO' },
+      { Metric: 'Avg R', Target: '≥ 1.1', Actual: simResults.summary.avg_r, Pass: simResults.summary.avg_r >= 1.1 ? 'YES' : 'NO' },
+      { Metric: 'Max Drawdown %', Target: '< 8%', Actual: `${simResults.summary.max_drawdown_pct}%`, Pass: simResults.summary.max_drawdown_pct < 8 ? 'YES' : 'NO' },
+      { Metric: 'Total Trades', Target: '≥ 30', Actual: simResults.summary.total_trades, Pass: simResults.summary.total_trades >= 30 ? 'YES' : 'NO' },
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(checklist), 'Fase 9 Checklist');
+    const today = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `LHYDBRA_Sim6M_${today}.xlsx`);
+  };
+
+
   const runAdaptation = async () => {
     if (!user) return;
     setAdapting(true);
