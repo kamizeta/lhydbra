@@ -249,18 +249,18 @@ Deno.serve(async (req) => {
     } catch (e) { console.warn("BTC macro fetch failed:", e); }
     console.log(`[backtest] Macro bars: SPY=${spyBars.length}, BTC=${btcBars.length}`);
 
-    // Fetch bars per symbol and run walk-forward
+    // ─── PHASE 1: Fetch all bars first ───
     const allTrades: Record<string, unknown>[] = [];
     const symbolSummaries: Record<string, unknown>[] = [];
     let totalCapital = initial_capital;
-    let openTradesCount = 0;
-    const openTradesBySymbol: Record<string, boolean> = {};
+    const capitalPerSlot = initial_capital / max_concurrent_trades;
+
+    const allBars: Record<string, {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[]> = {};
 
     for (const sym of SYMBOLS) {
       try {
         const isForex = FOREX_SYMBOLS.includes(sym);
         const isCrypto = sym.includes("/") && !isForex;
-        let bars: {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[] = [];
 
         if (isForex) {
           symbolSummaries.push({
@@ -271,13 +271,14 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        let bars: {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[] = [];
+
         if (isCrypto) {
-          const cryptoSym = sym;
-          const url = `https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=${encodeURIComponent(cryptoSym)}&timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000`;
+          const url = `https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=${encodeURIComponent(sym)}&timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000`;
           const r = await fetch(url, { headers: alpacaHeaders, signal: AbortSignal.timeout(15000) });
           if (!r.ok) { console.warn(`${sym}: error ${r.status}`); continue; }
           const d = await r.json();
-          const rawBars = d.bars?.[cryptoSym] || d.bars?.[sym] || [];
+          const rawBars = d.bars?.[sym] || [];
           bars = rawBars.map((b: Record<string,unknown>) => ({
             open: Number(b.o), high: Number(b.h), low: Number(b.l),
             close: Number(b.c), volume: Number(b.v),
@@ -286,18 +287,10 @@ Deno.serve(async (req) => {
         } else {
           const stockUrl = `https://data.alpaca.markets/v2/stocks/bars?symbols=${encodeURIComponent(sym)}&timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000&adjustment=split&feed=iex`;
           const r = await fetch(stockUrl, {
-            headers: {
-              "APCA-API-KEY-ID": alpacaKeyId,
-              "APCA-API-SECRET-KEY": alpacaSecret,
-              "Accept": "application/json",
-            },
+            headers: { "APCA-API-KEY-ID": alpacaKeyId, "APCA-API-SECRET-KEY": alpacaSecret, "Accept": "application/json" },
             signal: AbortSignal.timeout(15000),
           });
-          if (!r.ok) {
-            const errText = await r.text();
-            console.warn(`${sym}: stock fetch error ${r.status} - ${errText}`);
-            continue;
-          }
+          if (!r.ok) { console.warn(`${sym}: stock fetch error ${r.status}`); continue; }
           const d = await r.json();
           const symBars = d.bars?.[sym] || [];
           bars = symBars.map((b: Record<string,unknown>) => ({
@@ -307,128 +300,194 @@ Deno.serve(async (req) => {
           }));
         }
 
-        if (bars.length < 60) {
-          console.warn(`${sym}: insufficient bars (${bars.length})`);
-          continue;
+        if (bars.length >= 60) {
+          allBars[sym] = bars;
+        } else {
+          symbolSummaries.push({
+            symbol: sym, trades: 0, wins: 0, losses: 0,
+            win_rate: 0, profit_factor: 0, total_pnl: 0, avg_r: 0,
+            skipped: true, reason: `insufficient_bars_${bars.length}`
+          });
         }
-
-        // Need extra lookback for indicators (50 bars minimum)
-        const simStartIdx = Math.max(50, bars.length - Math.ceil((endDate.getTime() - actualStart.getTime()) / (24 * 60 * 60 * 1000)));
-        const symTrades: Record<string,unknown>[] = [];
-        const isCryptoSym = CRYPTO_SYMBOLS.includes(sym);
-        let inTrade = false;
-        let tradeEntry = 0, tradeSL = 0, tradeTP = 0;
-        let tradeDir = "", tradeDate = "", tradeScore = 0;
-        let tradeMacd = 0, tradeVolRatio = 1, tradeSrScore = 0;
-        let tradeRegime = "";
-
-        for (let i = simStartIdx; i < bars.length; i++) {
-          if (!inTrade) {
-            // Respect max concurrent trades limit
-            if (openTradesCount >= max_concurrent_trades) continue;
-            if (openTradesBySymbol[sym]) continue;
-
-            // Macro regime filter
-            const currentDate = bars[i].timestamp;
-            const macroSpyBars = spyBars.filter(b => b.timestamp <= currentDate);
-            const macroBtcBars = btcBars.filter(b => b.timestamp <= currentDate);
-            const { equityRegime, cryptoRegime } = getMacroRegime(macroSpyBars, macroBtcBars);
-            const activeRegime = isCryptoSym ? cryptoRegime : equityRegime;
-
-            // Skip choppy markets
-            if (activeRegime === "choppy") continue;
-
-            const { score, direction, entry, sl, tp, r, macd_momentum, volume_ratio: vr, sr_score: sr } = scoreDay(bars.slice(0, i + 1));
-            if (!direction) continue;
-
-            // Block counter-trend trades
-            if (activeRegime === "bull" && direction === "short") continue;
-            if (activeRegime === "bear" && direction === "long") continue;
-
-            if (score >= min_score && r >= min_r && Math.abs(entry - sl) / entry <= 0.10) {
-              inTrade = true;
-              openTradesCount++;
-              openTradesBySymbol[sym] = true;
-              tradeEntry = entry; tradeSL = sl; tradeTP = tp;
-              tradeDir = direction; tradeDate = bars[i].timestamp; tradeScore = score;
-              tradeMacd = macd_momentum; tradeVolRatio = vr; tradeSrScore = sr;
-              tradeRegime = activeRegime;
-            }
-          } else {
-            const bar = bars[i];
-            let exitPrice = 0, outcome = "";
-
-            if (tradeDir === "long") {
-              if (bar.low <= tradeSL) { exitPrice = tradeSL; outcome = "stop_loss"; }
-              else if (bar.high >= tradeTP) { exitPrice = tradeTP; outcome = "take_profit"; }
-            } else {
-              if (bar.high >= tradeSL) { exitPrice = tradeSL; outcome = "stop_loss"; }
-              else if (bar.low <= tradeTP) { exitPrice = tradeTP; outcome = "take_profit"; }
-            }
-
-            if (outcome) {
-              const stopDist = Math.abs(tradeEntry - tradeSL);
-              // Fix: r_actual sign based on outcome
-              const rawPnl = tradeDir === "long"
-                ? exitPrice - tradeEntry
-                : tradeEntry - exitPrice;
-              const rActual = outcome === "take_profit" ? 2.0
-                : outcome === "stop_loss" ? -1.0
-                : stopDist > 0 ? rawPnl / stopDist : 0;
-
-              const riskDollars = totalCapital * (risk_pct / 100);
-              const qty = stopDist > 0 ? riskDollars / stopDist : 0;
-              const pnlDollars = rawPnl * qty;
-              totalCapital += pnlDollars;
-
-              const trade = {
-                date_entry: tradeDate,
-                date_exit: bar.timestamp,
-                month: tradeDate.substring(0, 7),
-                symbol: sym,
-                direction: tradeDir,
-                score: +tradeScore.toFixed(1),
-                entry_price: +tradeEntry.toFixed(4),
-                exit_price: +exitPrice.toFixed(4),
-                stop_loss: +tradeSL.toFixed(4),
-                take_profit: +tradeTP.toFixed(4),
-                r_actual: rActual,
-                pnl_dollars: +pnlDollars.toFixed(2),
-                outcome,
-                capital_after: +totalCapital.toFixed(2),
-                macd_momentum: tradeMacd,
-                volume_ratio: tradeVolRatio,
-                sr_score: tradeSrScore,
-                macro_regime: tradeRegime,
-              };
-              symTrades.push(trade);
-              allTrades.push(trade);
-              inTrade = false;
-              openTradesCount = Math.max(0, openTradesCount - 1);
-              delete openTradesBySymbol[sym];
-            }
-          }
-        }
-
-        const wins = symTrades.filter(t => t.outcome === "take_profit");
-        const losses = symTrades.filter(t => t.outcome === "stop_loss");
-        const totalPnl = symTrades.reduce((s, t) => s + Number(t.pnl_dollars), 0);
-        const gp = wins.reduce((s, t) => s + Number(t.pnl_dollars), 0);
-        const gl = Math.abs(losses.reduce((s, t) => s + Number(t.pnl_dollars), 0));
-
-        symbolSummaries.push({
-          symbol: sym, trades: symTrades.length,
-          wins: wins.length, losses: losses.length,
-          win_rate: symTrades.length > 0 ? +((wins.length / symTrades.length) * 100).toFixed(1) : 0,
-          profit_factor: gl > 0 ? +(gp / gl).toFixed(2) : gp > 0 ? 999 : 0,
-          total_pnl: +totalPnl.toFixed(2),
-          avg_r: symTrades.length > 0
-            ? +(symTrades.reduce((s, t) => s + Number(t.r_actual), 0) / symTrades.length).toFixed(2)
-            : 0,
-        });
       } catch (e) {
-        console.error(`${sym}:`, e);
+        console.error(`${sym} fetch error:`, e);
       }
+    }
+
+    // ─── PHASE 2: Day-based walk-forward ───
+    const allDates = [...new Set(
+      Object.values(allBars).flat().map((b) => b.timestamp)
+    )].sort();
+
+    const openPositions: Record<string, {
+      entry: number; sl: number; tp: number; direction: string;
+      entryDate: string; score: number; regime: string;
+      macd_momentum: number; volume_ratio: number; sr_score: number;
+    }> = {};
+
+    for (const date of allDates) {
+      // ── CHECK EXITS FIRST ──
+      for (const [sym, pos] of Object.entries(openPositions)) {
+        const symBars = allBars[sym];
+        if (!symBars) continue;
+        const bar = symBars.find((b) => b.timestamp === date);
+        if (!bar) continue;
+
+        let exitPrice = 0;
+        let outcome = "";
+
+        if (pos.direction === "long") {
+          if (bar.low <= pos.sl) { exitPrice = pos.sl; outcome = "stop_loss"; }
+          else if (bar.high >= pos.tp) { exitPrice = pos.tp; outcome = "take_profit"; }
+        } else {
+          if (bar.high >= pos.sl) { exitPrice = pos.sl; outcome = "stop_loss"; }
+          else if (bar.low <= pos.tp) { exitPrice = pos.tp; outcome = "take_profit"; }
+        }
+
+        if (outcome) {
+          const stopDist = Math.abs(pos.entry - pos.sl);
+          const rawPnl = pos.direction === "long"
+            ? exitPrice - pos.entry
+            : pos.entry - exitPrice;
+          const rActual = outcome === "take_profit" ? 2.0 : -1.0;
+
+          const slotCapital = Math.min(capitalPerSlot, totalCapital / max_concurrent_trades);
+          const riskDollars = slotCapital * (risk_pct / 100);
+          const qty = stopDist > 0 ? riskDollars / stopDist : 0;
+          const pnlDollars = rawPnl * qty;
+          totalCapital += pnlDollars;
+
+          allTrades.push({
+            date_entry: pos.entryDate,
+            date_exit: date,
+            month: pos.entryDate.substring(0, 7),
+            symbol: sym,
+            direction: pos.direction,
+            score: +pos.score.toFixed(1),
+            entry_price: +pos.entry.toFixed(4),
+            exit_price: +exitPrice.toFixed(4),
+            stop_loss: +pos.sl.toFixed(4),
+            take_profit: +pos.tp.toFixed(4),
+            r_actual: rActual,
+            pnl_dollars: +pnlDollars.toFixed(2),
+            outcome,
+            capital_after: +totalCapital.toFixed(2),
+            macro_regime: pos.regime,
+            macd_momentum: pos.macd_momentum,
+            volume_ratio: pos.volume_ratio,
+            sr_score: pos.sr_score,
+          });
+          delete openPositions[sym];
+        }
+      }
+
+      // ── CHECK ENTRIES ──
+      const openCount = Object.keys(openPositions).length;
+      const availableSlots = max_concurrent_trades - openCount;
+      if (availableSlots <= 0) continue;
+
+      const candidates: {
+        sym: string; score: number; direction: string;
+        entry: number; sl: number; tp: number; r: number;
+        regime: string; macd_momentum: number; volume_ratio: number; sr_score: number;
+      }[] = [];
+
+      for (const sym of SYMBOLS) {
+        if (openPositions[sym]) continue;
+        const symBars = allBars[sym];
+        if (!symBars) continue;
+        const idx = symBars.findIndex((b) => b.timestamp === date);
+        if (idx < 50) continue;
+
+        const isCryptoSym = CRYPTO_SYMBOLS.includes(sym);
+        const macroSpySlice = spyBars.filter((b) => b.timestamp <= date);
+        const macroBtcSlice = btcBars.filter((b) => b.timestamp <= date);
+        const { equityRegime, cryptoRegime } = getMacroRegime(macroSpySlice, macroBtcSlice);
+        const activeRegime = isCryptoSym ? cryptoRegime : equityRegime;
+
+        if (activeRegime === "choppy") continue;
+
+        const result = scoreDay(symBars.slice(0, idx + 1));
+        if (!result.direction) continue;
+        if (activeRegime === "bull" && result.direction === "short") continue;
+        if (activeRegime === "bear" && result.direction === "long") continue;
+        if (result.score < min_score || result.r < min_r) continue;
+        if (Math.abs(result.entry - result.sl) / result.entry > 0.10) continue;
+
+        candidates.push({
+          sym, score: result.score, direction: result.direction,
+          entry: result.entry, sl: result.sl, tp: result.tp, r: result.r,
+          regime: activeRegime, macd_momentum: result.macd_momentum,
+          volume_ratio: result.volume_ratio, sr_score: result.sr_score,
+        });
+      }
+
+      candidates.sort((a, b) => b.score - a.score);
+      for (const c of candidates.slice(0, availableSlots)) {
+        openPositions[c.sym] = {
+          entry: c.entry, sl: c.sl, tp: c.tp, direction: c.direction,
+          entryDate: date, score: c.score, regime: c.regime,
+          macd_momentum: c.macd_momentum, volume_ratio: c.volume_ratio,
+          sr_score: c.sr_score,
+        };
+      }
+    }
+
+    // Close remaining open positions at last available price
+    for (const [sym, pos] of Object.entries(openPositions)) {
+      const symBars = allBars[sym];
+      if (!symBars || symBars.length === 0) continue;
+      const lastBar = symBars[symBars.length - 1];
+      const rawPnl = pos.direction === "long"
+        ? lastBar.close - pos.entry
+        : pos.entry - lastBar.close;
+      const stopDist = Math.abs(pos.entry - pos.sl);
+      const riskDollars = capitalPerSlot * (risk_pct / 100);
+      const qty = stopDist > 0 ? riskDollars / stopDist : 0;
+      const pnlDollars = rawPnl * qty;
+      totalCapital += pnlDollars;
+
+      allTrades.push({
+        date_entry: pos.entryDate,
+        date_exit: lastBar.timestamp,
+        month: pos.entryDate.substring(0, 7),
+        symbol: sym,
+        direction: pos.direction,
+        score: +pos.score.toFixed(1),
+        entry_price: +pos.entry.toFixed(4),
+        exit_price: +lastBar.close.toFixed(4),
+        stop_loss: +pos.sl.toFixed(4),
+        take_profit: +pos.tp.toFixed(4),
+        r_actual: rawPnl > 0 ? 1 : -1,
+        pnl_dollars: +pnlDollars.toFixed(2),
+        outcome: "timeout",
+        capital_after: +totalCapital.toFixed(2),
+        macro_regime: pos.regime,
+        macd_momentum: pos.macd_momentum,
+        volume_ratio: pos.volume_ratio,
+        sr_score: pos.sr_score,
+      });
+    }
+
+    // Build per-symbol summaries from allTrades
+    for (const sym of SYMBOLS) {
+      if (symbolSummaries.find((s: any) => s.symbol === sym)) continue;
+      const symTrades = allTrades.filter((t) => t.symbol === sym);
+      const wins = symTrades.filter((t) => t.outcome === "take_profit");
+      const losses = symTrades.filter((t) => t.outcome === "stop_loss");
+      const totalPnl = symTrades.reduce((s, t) => s + Number(t.pnl_dollars), 0);
+      const gp = wins.reduce((s, t) => s + Number(t.pnl_dollars), 0);
+      const gl = Math.abs(losses.reduce((s, t) => s + Number(t.pnl_dollars), 0));
+      symbolSummaries.push({
+        symbol: sym, trades: symTrades.length,
+        wins: wins.length, losses: losses.length,
+        win_rate: symTrades.length > 0 ? +((wins.length / symTrades.length) * 100).toFixed(1) : 0,
+        profit_factor: gl > 0 ? +(gp / gl).toFixed(2) : gp > 0 ? 999 : 0,
+        total_pnl: +totalPnl.toFixed(2),
+        avg_r: symTrades.length > 0
+          ? +(symTrades.reduce((s, t) => s + Number(t.r_actual), 0) / symTrades.length).toFixed(2)
+          : 0,
+      });
     }
 
     // Sort all trades by date
