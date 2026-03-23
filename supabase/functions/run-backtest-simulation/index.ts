@@ -102,17 +102,25 @@ Deno.serve(async (req) => {
     const userRes = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
     const userId = userRes.data.user?.id;
 
-    let SYMBOLS = ["AAPL","MSFT","NVDA","TSLA","SPY","QQQ","BTC/USD","ETH/USD"];
+    const DEFAULT_SYMBOLS = [
+      "AAPL", "MSFT", "NVDA", "TSLA", "SPY", "QQQ",
+      "BTC/USD", "ETH/USD"
+    ];
+    let SYMBOLS = [...DEFAULT_SYMBOLS];
     if (userId) {
       const { data: settings } = await supabaseClient
         .from("user_settings")
         .select("watchlist")
         .eq("user_id", userId)
         .maybeSingle();
-      if (settings?.watchlist && Array.isArray(settings.watchlist) && settings.watchlist.length > 0) {
-        SYMBOLS = settings.watchlist;
+      if (Array.isArray(settings?.watchlist) && settings.watchlist.length > 0) {
+        SYMBOLS = settings.watchlist.filter((s: string) =>
+          !FOREX_SYMBOLS.includes(s)
+        );
+        if (SYMBOLS.length === 0) SYMBOLS = [...DEFAULT_SYMBOLS];
       }
     }
+    console.log(`[backtest] Processing ${SYMBOLS.length} symbols:`, SYMBOLS);
 
     // Date range: default last 180 days, supports up to 3 years
     const endDate = date_to ? new Date(date_to) : new Date();
