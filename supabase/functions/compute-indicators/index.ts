@@ -267,12 +267,9 @@ serve(async (req) => {
         macd_signal: macdVal?.signal || null,
         macd_histogram: macdVal?.histogram || null,
         macd_histogram_prev: (() => {
-          if (closes.length >= 36) {
-            const prevCloses = closes.slice(0, -1);
-            const prevMacd = macd(prevCloses);
-            return prevMacd ? prevMacd.histogram : null;
-          }
-          return null;
+          const prevCloses = closes.slice(0, -1);
+          const prevMacdVal = prevCloses.length >= 35 ? macd(prevCloses) : null;
+          return prevMacdVal ? prevMacdVal.histogram : null;
         })(),
         momentum_score: momentumScore,
         atr_14: atr14,
