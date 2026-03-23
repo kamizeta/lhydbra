@@ -67,14 +67,22 @@ export default function SettingsPage() {
   const [weightsLoading, setWeightsLoading] = useState(true);
   const [watchlistInput, setWatchlistInput] = useState('');
   const [localWatchlist, setLocalWatchlist] = useState<string[]>(
-    (savedSettings as any).watchlist || ['AAPL','MSFT','NVDA','TSLA','SPY','QQQ','BTC/USD','ETH/USD','EUR/USD','GBP/USD','XAU/USD']
+    ['AAPL','MSFT','NVDA','TSLA','SPY','QQQ','BTC/USD','ETH/USD','EUR/USD','GBP/USD','XAU/USD']
   );
+
+  // Load watchlist directly from DB (useUserSettings strips it)
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('user_settings').select('watchlist').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => {
+        if (data?.watchlist && Array.isArray(data.watchlist) && data.watchlist.length > 0) {
+          setLocalWatchlist(data.watchlist);
+        }
+      });
+  }, [user]);
 
   useEffect(() => {
     setSettings(savedSettings);
-    if ((savedSettings as any).watchlist) {
-      setLocalWatchlist((savedSettings as any).watchlist);
-    }
   }, [savedSettings]);
   useEffect(() => { setLocalNotifPrefs(notifPrefs); }, [notifPrefs]);
 
