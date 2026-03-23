@@ -36,6 +36,55 @@ function atrCalc(bars: {high:number;low:number;close:number}[], period = 14): nu
   return sum / period;
 }
 
+function ema(values: number[], period: number): number {
+  if (values.length === 0) return 0;
+  const k = 2 / (period + 1);
+  let emaVal = values[0];
+  for (let i = 1; i < values.length; i++) {
+    emaVal = values[i] * k + emaVal * (1 - k);
+  }
+  return emaVal;
+}
+
+function macdHistogram(closes: number[]): number {
+  if (closes.length < 35) return 0;
+  const recent = closes.slice(-60);
+  const macdLine = ema(recent, 12) - ema(recent, 26);
+  const older = closes.slice(-63, -3);
+  const macdOld = ema(older, 12) - ema(older, 26);
+  return macdLine - macdOld;
+}
+
+function volumeRatio(bars: {volume:number}[]): number {
+  if (bars.length < 21) return 1;
+  const recent = bars[bars.length - 1].volume;
+  const avg20 = bars.slice(-21, -1).reduce((s, b) => s + b.volume, 0) / 20;
+  return avg20 > 0 ? recent / avg20 : 1;
+}
+
+function srProximity(bars: {high:number;low:number;close:number}[], direction: string): number {
+  if (bars.length < 20) return 0;
+  const price = bars[bars.length - 1].close;
+  const lookback = bars.slice(-20);
+  const recentHighs = lookback.map(b => b.high).sort((a, b) => b - a).slice(0, 3);
+  const recentLows = lookback.map(b => b.low).sort((a, b) => a - b).slice(0, 3);
+  const nearestResistance = recentHighs[0];
+  const nearestSupport = recentLows[0];
+  const distToResistance = (nearestResistance - price) / price;
+  const distToSupport = (price - nearestSupport) / price;
+  let proximityScore = 0;
+  if (direction === "long") {
+    if (distToSupport < 0.02) proximityScore += 10;
+    if (distToResistance < 0.015) proximityScore -= 20;
+    if (distToResistance < 0.005) proximityScore -= 15;
+  } else {
+    if (distToResistance < 0.02) proximityScore += 10;
+    if (distToSupport < 0.015) proximityScore -= 20;
+    if (distToSupport < 0.005) proximityScore -= 15;
+  }
+  return proximityScore;
+}
+
 function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:number}[]): {
   score: number; direction: string | null; entry: number; sl: number; tp: number; r: number;
 } {
