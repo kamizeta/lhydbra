@@ -34,6 +34,29 @@ function getDynamicThresholds(vix: number, baseMinScore: number, baseMinR: numbe
   };
 }
 
+function calcPositionSize(params: {
+  capital: number;
+  riskPct: number;
+  entryPrice: number;
+  stopLoss: number;
+  maxSingleAssetPct: number;
+  maxLeverage: number;
+  isFractional: boolean;
+}): number {
+  if (params.capital <= 0 || params.entryPrice <= 0) return 0;
+  const riskPerUnit = Math.abs(params.entryPrice - params.stopLoss);
+  if (riskPerUnit <= 0) return 0;
+  const dollarRisk = params.capital * (params.riskPct / 100);
+  const riskBasedSize = dollarRisk / riskPerUnit;
+  const maxAssetValue = params.capital * params.maxSingleAssetPct / 100;
+  const concentrationCap = maxAssetValue / params.entryPrice;
+  const maxExposure = params.capital * params.maxLeverage;
+  const leverageCap = maxExposure / params.entryPrice;
+  const idealSize = Math.max(0, Math.min(riskBasedSize, concentrationCap, leverageCap));
+  if (params.isFractional) return parseFloat(idealSize.toFixed(6));
+  return Math.floor(idealSize);
+}
+
 function isUSMarketOpen(): boolean {
   const now = new Date();
   const day = now.getUTCDay();
