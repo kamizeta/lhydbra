@@ -6,6 +6,34 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function getDynamicThresholds(vix: number, baseMinScore: number, baseMinR: number, baseMinConfidence: number) {
+  let scoreAdj = 0, rAdj = 0, confAdj = 0;
+  if (vix < 15) {
+    scoreAdj = +5; rAdj = +0.2; confAdj = +5;
+  } else if (vix <= 20) {
+    scoreAdj = 0; rAdj = 0; confAdj = 0;
+  } else if (vix <= 25) {
+    scoreAdj = -5; rAdj = -0.1; confAdj = -3;
+  } else if (vix <= 30) {
+    scoreAdj = -8; rAdj = -0.2; confAdj = -5;
+  } else if (vix <= 40) {
+    scoreAdj = -12; rAdj = -0.3; confAdj = -8;
+  } else {
+    scoreAdj = -15; rAdj = -0.3; confAdj = -10;
+  }
+  return {
+    min_score: Math.max(45, Math.min(85, baseMinScore + scoreAdj)),
+    min_r: Math.max(1.2, Math.min(3.0, baseMinR + rAdj)),
+    min_confidence: Math.max(40, Math.min(80, baseMinConfidence + confAdj)),
+    vix,
+    adjustment_reason: vix < 15 ? "calm_market" :
+                       vix <= 20 ? "normal" :
+                       vix <= 25 ? "elevated_volatility" :
+                       vix <= 30 ? "high_volatility" :
+                       vix <= 40 ? "extreme_volatility" : "crisis",
+  };
+}
+
 function isUSMarketOpen(): boolean {
   const now = new Date();
   const day = now.getUTCDay();
@@ -156,6 +184,29 @@ Deno.serve(async (req) => {
       return jsonRes({ status: "blocked", reasons: preflight, trades_today: tradesToday, consecutive_losses: consecutiveLosses, daily_risk_used: dailyRiskUsed });
     }
 
+    // ─── Fetch VIX for dynamic thresholds ───
+    let currentVIX = 20;
+    try {
+      const twelveKey = Deno.env.get("TWELVE_DATA_API_KEY") ?? "";
+      if (twelveKey) {
+        const vixRes = await fetch(
+          `https://api.twelvedata.com/price?symbol=VIX&apikey=${twelveKey}`,
+          { signal: AbortSignal.timeout(3000) }
+        );
+        if (vixRes.ok) {
+          const vixData = await vixRes.json();
+          currentVIX = parseFloat(vixData?.price ?? "20");
+          if (isNaN(currentVIX) || currentVIX <= 0) currentVIX = 20;
+        }
+      }
+    } catch { /* use default */ }
+
+    const baseMinScore = Number((settings as any).min_score || 60);
+    const baseMinR = Number((settings as any).min_r || 1.5);
+    const baseMinConfidence = Number((settings as any).min_confidence || 55);
+    const thresholds = getDynamicThresholds(currentVIX, baseMinScore, baseMinR, baseMinConfidence);
+    console.log(`[operator-mode] VIX: ${currentVIX} → thresholds: score≥${thresholds.min_score}, R≥${thresholds.min_r}, conf≥${thresholds.min_confidence} (${thresholds.adjustment_reason})`);
+
     // ─── ACTION: status ───
     if (action === "status") {
       const { data: openPositions } = await supabase
@@ -214,6 +265,8 @@ Deno.serve(async (req) => {
         intraday_unrealized_pct: +intradayUnrealizedPct.toFixed(2),
         circuit_breaker_active: intradayUnrealizedPct < -maxDailyRisk,
         preflight_warnings: preflight,
+        vix: currentVIX,
+        thresholds,
         goal: goal ? {
           monthly_target: Number(goal.monthly_target),
           daily_target: Number(goal.daily_target),
@@ -250,19 +303,15 @@ Deno.serve(async (req) => {
       console.warn("[operator-mode] Data refresh failed (continuing):", refreshErr);
     }
 
-    // Now run signal engine (data is fresh)
-    const minScore = Number((settings as any).min_score || 60);
-    const minR = Number((settings as any).min_r || 1.5);
-    const minConfidence = Number((settings as any).min_confidence || 55);
-
+    // Now run signal engine with VIX-adjusted thresholds
     const signalResponse = await fetch(`${supabaseUrl}/functions/v1/signal-engine`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
       body: JSON.stringify({
         user_id: user.id,
-        min_score: minScore,
-        min_r: minR,
-        min_confidence: minConfidence,
+        min_score: thresholds.min_score,
+        min_r: thresholds.min_r,
+        min_confidence: thresholds.min_confidence,
         max_signals: Math.min(remainingSlots, 3),
         operator_mode: true,
         symbols: watchlistSymbols,
@@ -566,6 +615,8 @@ Deno.serve(async (req) => {
       signals_generated: signals.length,
       signals_rejected: signalResult.rejected || 0,
       effective_risk_per_trade: riskPerTrade,
+      vix: currentVIX,
+      thresholds_applied: thresholds,
       skipped: sized.filter((t: Record<string, unknown>) => t.skip).map((t: Record<string, unknown>) => ({ symbol: t.asset, reason: t.skip_reason })),
       trades: executableTrades.map((t: Record<string, unknown>) => ({
         symbol: t.asset, direction: t.direction,
