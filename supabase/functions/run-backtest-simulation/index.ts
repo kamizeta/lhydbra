@@ -315,10 +315,12 @@ Deno.serve(async (req) => {
         // Need extra lookback for indicators (50 bars minimum)
         const simStartIdx = Math.max(50, bars.length - Math.ceil((endDate.getTime() - actualStart.getTime()) / (24 * 60 * 60 * 1000)));
         const symTrades: Record<string,unknown>[] = [];
+        const isCryptoSym = CRYPTO_SYMBOLS.includes(sym);
         let inTrade = false;
         let tradeEntry = 0, tradeSL = 0, tradeTP = 0;
         let tradeDir = "", tradeDate = "", tradeScore = 0;
         let tradeMacd = 0, tradeVolRatio = 1, tradeSrScore = 0;
+        let tradeRegime = "";
 
         for (let i = simStartIdx; i < bars.length; i++) {
           if (!inTrade) {
