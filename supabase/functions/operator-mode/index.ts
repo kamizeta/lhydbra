@@ -34,6 +34,29 @@ function getDynamicThresholds(vix: number, baseMinScore: number, baseMinR: numbe
   };
 }
 
+function calcPositionSize(params: {
+  capital: number;
+  riskPct: number;
+  entryPrice: number;
+  stopLoss: number;
+  maxSingleAssetPct: number;
+  maxLeverage: number;
+  isFractional: boolean;
+}): number {
+  if (params.capital <= 0 || params.entryPrice <= 0) return 0;
+  const riskPerUnit = Math.abs(params.entryPrice - params.stopLoss);
+  if (riskPerUnit <= 0) return 0;
+  const dollarRisk = params.capital * (params.riskPct / 100);
+  const riskBasedSize = dollarRisk / riskPerUnit;
+  const maxAssetValue = params.capital * params.maxSingleAssetPct / 100;
+  const concentrationCap = maxAssetValue / params.entryPrice;
+  const maxExposure = params.capital * params.maxLeverage;
+  const leverageCap = maxExposure / params.entryPrice;
+  const idealSize = Math.max(0, Math.min(riskBasedSize, concentrationCap, leverageCap));
+  if (params.isFractional) return parseFloat(idealSize.toFixed(6));
+  return Math.floor(idealSize);
+}
+
 function isUSMarketOpen(): boolean {
   const now = new Date();
   const day = now.getUTCDay();
@@ -121,14 +144,14 @@ Deno.serve(async (req) => {
     const today = new Date().toISOString().split("T")[0];
     const maxTradesPerDay = Number(settings.max_trades_per_day || 3);
     const lossCooldownCount = Number(settings.loss_cooldown_count || 2);
-    const consecutiveLosses = Number(settings.consecutive_losses || 0);
-    const tradesToday = settings.last_trade_date === today ? Number(settings.trades_today || 0) : 0;
+    let consecutiveLosses = Number(settings.consecutive_losses || 0);
+    let tradesToday = settings.last_trade_date === today ? Number(settings.trades_today || 0) : 0;
     const autoExecute = Boolean(settings.auto_execute);
-    const currentCapital = Number(settings.current_capital || 10000);
+    let currentCapital = Number(settings.current_capital || 10000);
     const baseRiskPerTrade = Number(settings.risk_per_trade || 1);
     const maxDailyRisk = Number(settings.max_daily_risk || 2);
     const maxDrawdown = Number(settings.max_drawdown || 15);
-    const dailyRiskUsed = settings.last_trade_date === today ? Number(settings.daily_risk_used || 0) : 0;
+    let dailyRiskUsed = settings.last_trade_date === today ? Number(settings.daily_risk_used || 0) : 0;
     const automationLevel = goal?.automation_level || "guided";
 
     // ─── Adaptive risk: reduce after losses ───
@@ -281,6 +304,36 @@ Deno.serve(async (req) => {
     }
 
     // ─── ACTION: run ───
+
+    // ─── Sync with Alpaca before running ───
+    try {
+      await fetch(`${supabaseUrl}/functions/v1/alpaca-sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({ paper, user_id_override: user.id }),
+      });
+      console.log("[operator-mode] Pre-run sync completed");
+
+      // Reload fresh settings after sync
+      const freshRes = await supabase
+        .from("user_settings")
+        .select("consecutive_losses, trades_today, daily_risk_used, last_trade_date, current_capital")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (freshRes.data) {
+        const fs = freshRes.data;
+        consecutiveLosses = Number(fs.consecutive_losses ?? 0);
+        tradesToday = fs.last_trade_date === today ? Number(fs.trades_today ?? 0) : 0;
+        dailyRiskUsed = fs.last_trade_date === today ? Number(fs.daily_risk_used ?? 0) : 0;
+        currentCapital = Number(fs.current_capital ?? currentCapital);
+      }
+    } catch (syncErr) {
+      console.warn("[operator-mode] Pre-run sync failed (continuing):", syncErr);
+    }
+
     const remainingSlots = maxTradesPerDay - tradesToday;
     const remainingRisk = maxDailyRisk - dailyRiskUsed;
 
@@ -416,18 +469,21 @@ Deno.serve(async (req) => {
       const adjustedRisk = effectiveRisk * symMult;
       const cappedRisk = Math.min(adjustedRisk, maxDailyRisk * 0.5);
       const riskDollars = liveCapital * (cappedRisk / 100);
-      let quantity = stopDist > 0 ? Math.floor(riskDollars / stopDist) : 0;
-      if (quantity <= 0) {
-        return { ...sig, quantity: 0, skip: true, skip_reason: `Inviable sizing: stop_dist=${stopDist.toFixed(4)}, risk_dollars=${riskDollars.toFixed(2)}` };
-      }
 
-      const maxSingleAsset = Number(settings.max_single_asset || 25);
-      const positionValue = quantity * entryPrice;
-      const positionPct = (positionValue / liveCapital) * 100;
-      if (positionPct > maxSingleAsset) quantity = Math.floor((liveCapital * maxSingleAsset / 100) / entryPrice);
+      const isFractional = ['crypto'].includes(String(sig.asset_class || 'stock'));
+      const quantity = calcPositionSize({
+        capital: liveCapital,
+        riskPct: cappedRisk,
+        entryPrice,
+        stopLoss,
+        maxSingleAssetPct: Number(settings.max_single_asset || 25),
+        maxLeverage: Number(settings.max_leverage || 2.0),
+        isFractional,
+      });
 
       if (quantity <= 0) {
-        return { ...sig, quantity: 0, skip: true, skip_reason: `Concentration cap zeroed quantity` };
+        return { ...sig, quantity: 0, skip: true,
+          skip_reason: `Sizing returned 0: entry=${entryPrice}, sl=${stopLoss}, risk=${cappedRisk.toFixed(2)}%` };
       }
 
       const targets = (sig.targets as number[]) || [];
