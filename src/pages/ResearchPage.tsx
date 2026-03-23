@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Brain, FlaskConical, Play, Loader2, TrendingUp, BarChart3, Target,
-  Award, Plus, Beaker, RefreshCw, Zap, Activity,
+  Award, Plus, Beaker, RefreshCw, Zap, Activity, FileSpreadsheet,
 } from "lucide-react";
 import BacktestCharts from "@/components/strategy/BacktestCharts";
+import StatusBadge from "@/components/shared/StatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
