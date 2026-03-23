@@ -44,10 +44,9 @@ export default function AppLayout() {
 
   const advancedNavItems = [
     { to: "/advanced/agents", icon: Bot, label: t.nav.agents },
-    { to: "/advanced/strategy-lab", icon: FlaskConical, label: t.nav.strategyLab },
-    { to: "/advanced/learning", icon: Brain, label: t.nav.learning },
+    { to: "/advanced/performance", icon: BarChart3, label: "Performance" },
+    { to: "/advanced/research", icon: Brain, label: "Research" },
     { to: "/advanced/market", icon: BarChart3, label: t.nav.market },
-    { to: "/advanced/backtest", icon: FlaskConical, label: "Backtest" },
     
     { to: "/advanced/risk", icon: Shield, label: "Risk" },
   ];
