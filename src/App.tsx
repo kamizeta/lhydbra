@@ -25,6 +25,7 @@ import OpportunityRadar from "@/pages/OpportunityRadar";
 import AlgoEffectiveness from "@/pages/AlgoEffectiveness";
 import PerformancePage from "@/pages/PerformancePage";
 import ResearchPage from "@/pages/ResearchPage";
+import ReportsPage from "@/pages/ReportsPage";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,7 @@ function ProtectedRoutes() {
         <Route path="/advanced/risk" element={<RiskManagement />} />
         
         <Route path="/advanced/radar" element={<OpportunityRadar />} />
+        <Route path="/advanced/reports" element={<ReportsPage />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
