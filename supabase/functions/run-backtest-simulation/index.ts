@@ -328,14 +328,31 @@ Deno.serve(async (req) => {
             if (openTradesCount >= max_concurrent_trades) continue;
             if (openTradesBySymbol[sym]) continue;
 
+            // Macro regime filter
+            const currentDate = bars[i].timestamp;
+            const macroSpyBars = spyBars.filter(b => b.timestamp <= currentDate);
+            const macroBtcBars = btcBars.filter(b => b.timestamp <= currentDate);
+            const { equityRegime, cryptoRegime } = getMacroRegime(macroSpyBars, macroBtcBars);
+            const activeRegime = isCryptoSym ? cryptoRegime : equityRegime;
+
+            // Skip choppy markets
+            if (activeRegime === "choppy") continue;
+
             const { score, direction, entry, sl, tp, r, macd_momentum, volume_ratio: vr, sr_score: sr } = scoreDay(bars.slice(0, i + 1));
-            if (score >= min_score && direction && r >= min_r && Math.abs(entry - sl) / entry <= 0.10) {
+            if (!direction) continue;
+
+            // Block counter-trend trades
+            if (activeRegime === "bull" && direction === "short") continue;
+            if (activeRegime === "bear" && direction === "long") continue;
+
+            if (score >= min_score && r >= min_r && Math.abs(entry - sl) / entry <= 0.10) {
               inTrade = true;
               openTradesCount++;
               openTradesBySymbol[sym] = true;
               tradeEntry = entry; tradeSL = sl; tradeTP = tp;
               tradeDir = direction; tradeDate = bars[i].timestamp; tradeScore = score;
               tradeMacd = macd_momentum; tradeVolRatio = vr; tradeSrScore = sr;
+              tradeRegime = activeRegime;
             }
           } else {
             const bar = bars[i];
