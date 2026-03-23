@@ -303,19 +303,15 @@ Deno.serve(async (req) => {
       console.warn("[operator-mode] Data refresh failed (continuing):", refreshErr);
     }
 
-    // Now run signal engine (data is fresh)
-    const minScore = Number((settings as any).min_score || 60);
-    const minR = Number((settings as any).min_r || 1.5);
-    const minConfidence = Number((settings as any).min_confidence || 55);
-
+    // Now run signal engine with VIX-adjusted thresholds
     const signalResponse = await fetch(`${supabaseUrl}/functions/v1/signal-engine`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
       body: JSON.stringify({
         user_id: user.id,
-        min_score: minScore,
-        min_r: minR,
-        min_confidence: minConfidence,
+        min_score: thresholds.min_score,
+        min_r: thresholds.min_r,
+        min_confidence: thresholds.min_confidence,
         max_signals: Math.min(remainingSlots, 3),
         operator_mode: true,
         symbols: watchlistSymbols,
