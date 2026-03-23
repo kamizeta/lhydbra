@@ -26,6 +26,7 @@ import AlgoEffectiveness from "@/pages/AlgoEffectiveness";
 import PerformancePage from "@/pages/PerformancePage";
 import ResearchPage from "@/pages/ResearchPage";
 import ReportsPage from "@/pages/ReportsPage";
+import DiagnosticPage from "@/pages/DiagnosticPage";
 
 const queryClient = new QueryClient();
 
