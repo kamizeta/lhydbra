@@ -24,6 +24,10 @@ export interface UserSettings {
   trades_today: number;
   last_trade_date: string | null;
   daily_risk_used: number;
+  // Signal filter fields
+  min_score: number;
+  min_r: number;
+  min_confidence: number;
 }
 
 const defaultSettings: UserSettings = {
