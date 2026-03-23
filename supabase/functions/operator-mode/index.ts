@@ -144,14 +144,14 @@ Deno.serve(async (req) => {
     const today = new Date().toISOString().split("T")[0];
     const maxTradesPerDay = Number(settings.max_trades_per_day || 3);
     const lossCooldownCount = Number(settings.loss_cooldown_count || 2);
-    const consecutiveLosses = Number(settings.consecutive_losses || 0);
-    const tradesToday = settings.last_trade_date === today ? Number(settings.trades_today || 0) : 0;
+    let consecutiveLosses = Number(settings.consecutive_losses || 0);
+    let tradesToday = settings.last_trade_date === today ? Number(settings.trades_today || 0) : 0;
     const autoExecute = Boolean(settings.auto_execute);
-    const currentCapital = Number(settings.current_capital || 10000);
+    let currentCapital = Number(settings.current_capital || 10000);
     const baseRiskPerTrade = Number(settings.risk_per_trade || 1);
     const maxDailyRisk = Number(settings.max_daily_risk || 2);
     const maxDrawdown = Number(settings.max_drawdown || 15);
-    const dailyRiskUsed = settings.last_trade_date === today ? Number(settings.daily_risk_used || 0) : 0;
+    let dailyRiskUsed = settings.last_trade_date === today ? Number(settings.daily_risk_used || 0) : 0;
     const automationLevel = goal?.automation_level || "guided";
 
     // ─── Adaptive risk: reduce after losses ───
