@@ -2,30 +2,69 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ─── Weight Profiles by Regime ───
+function jsonRes(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// ─── Weight Profiles by Regime (11 factors) ───
 const REGIME_WEIGHTS: Record<string, Record<string, number>> = {
-  bullish:        { market_structure: 0.18, momentum: 0.12, volatility_suitability: 0.06, strategy_confluence: 0.14, macro_context: 0.07, sentiment_flow: 0.08, risk_reward: 0.09, historical_performance: 0.07, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.06 },
-  bearish:        { market_structure: 0.18, momentum: 0.11, volatility_suitability: 0.08, strategy_confluence: 0.14, macro_context: 0.09, sentiment_flow: 0.06, risk_reward: 0.10, historical_performance: 0.05, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.06 },
-  ranging:        { market_structure: 0.14, momentum: 0.06, volatility_suitability: 0.10, strategy_confluence: 0.16, macro_context: 0.08, sentiment_flow: 0.08, risk_reward: 0.12, historical_performance: 0.06, macd_confirmation: 0.06, volume_confirmation: 0.06, sr_proximity: 0.08 },
-  volatile:       { market_structure: 0.12, momentum: 0.08, volatility_suitability: 0.13, strategy_confluence: 0.13, macro_context: 0.06, sentiment_flow: 0.10, risk_reward: 0.12, historical_performance: 0.06, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.07 },
-  compression:    { market_structure: 0.16, momentum: 0.08, volatility_suitability: 0.11, strategy_confluence: 0.16, macro_context: 0.07, sentiment_flow: 0.06, risk_reward: 0.10, historical_performance: 0.06, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.07 },
-  default:        { market_structure: 0.16, momentum: 0.09, volatility_suitability: 0.08, strategy_confluence: 0.15, macro_context: 0.07, sentiment_flow: 0.08, risk_reward: 0.10, historical_performance: 0.08, macd_confirmation: 0.06, volume_confirmation: 0.06, sr_proximity: 0.07 },
+  bullish:     { market_structure: 0.18, momentum: 0.12, volatility_suitability: 0.06, strategy_confluence: 0.14, macro_context: 0.07, sentiment_flow: 0.08, risk_reward: 0.09, historical_performance: 0.07, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.06 },
+  bearish:     { market_structure: 0.18, momentum: 0.11, volatility_suitability: 0.08, strategy_confluence: 0.14, macro_context: 0.09, sentiment_flow: 0.06, risk_reward: 0.10, historical_performance: 0.05, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.06 },
+  ranging:     { market_structure: 0.14, momentum: 0.06, volatility_suitability: 0.10, strategy_confluence: 0.16, macro_context: 0.08, sentiment_flow: 0.08, risk_reward: 0.12, historical_performance: 0.06, macd_confirmation: 0.06, volume_confirmation: 0.06, sr_proximity: 0.08 },
+  volatile:    { market_structure: 0.12, momentum: 0.08, volatility_suitability: 0.13, strategy_confluence: 0.13, macro_context: 0.06, sentiment_flow: 0.10, risk_reward: 0.12, historical_performance: 0.06, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.07 },
+  compression: { market_structure: 0.16, momentum: 0.08, volatility_suitability: 0.11, strategy_confluence: 0.16, macro_context: 0.07, sentiment_flow: 0.06, risk_reward: 0.10, historical_performance: 0.06, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.07 },
+  default:     { market_structure: 0.16, momentum: 0.09, volatility_suitability: 0.08, strategy_confluence: 0.15, macro_context: 0.07, sentiment_flow: 0.08, risk_reward: 0.10, historical_performance: 0.08, macd_confirmation: 0.06, volume_confirmation: 0.06, sr_proximity: 0.07 },
 };
 
 const ASSET_CLASS_ADJUSTMENTS: Record<string, Record<string, number>> = {
-  crypto:     { sentiment_flow: 0.04, volatility_suitability: 0.03, macro_context: -0.04, market_structure: -0.03 },
-  stock:      { macro_context: 0.04, market_structure: 0.03, sentiment_flow: -0.04, volatility_suitability: -0.03 },
-  commodity:  { macro_context: 0.04, momentum: 0.03, sentiment_flow: -0.04, strategy_confluence: -0.03 },
-  forex:      { macro_context: 0.03, volatility_suitability: 0.02, historical_performance: -0.03, sentiment_flow: -0.02 },
+  crypto:    { sentiment_flow: 0.04, volatility_suitability: 0.03, macro_context: -0.04, market_structure: -0.03 },
+  stock:     { macro_context: 0.04, market_structure: 0.03, sentiment_flow: -0.04, volatility_suitability: -0.03 },
+  commodity: { macro_context: 0.04, momentum: 0.03, sentiment_flow: -0.04, strategy_confluence: -0.03 },
+  forex:     { macro_context: 0.03, volatility_suitability: 0.02, historical_performance: -0.03, sentiment_flow: -0.02 },
 };
 
-// ─── OPERATOR MODE: Regimes where trading is blocked ───
-const UNCLEAR_REGIMES = new Set(['undefined', 'transitional']);
+const UNCLEAR_REGIMES = new Set(["undefined", "transitional"]);
 
-function clamp(val: number, min: number, max: number) { return Math.max(min, Math.min(max, val)); }
+const SYMBOL_SECTORS: Record<string, string> = {
+  AAPL: "tech", MSFT: "tech", NVDA: "tech", GOOGL: "tech", META: "tech",
+  AMZN: "tech", TSLA: "tech", AMD: "tech",
+  QQQ: "tech_etf", SOXX: "tech_etf", SMH: "tech_etf",
+  SPY: "broad_etf", VOO: "broad_etf", IWM: "broad_etf",
+  JPM: "finance", BAC: "finance", GS: "finance", XLF: "finance",
+  XLE: "energy", CVX: "energy", XOM: "energy",
+  GLD: "commodity", "XAU/USD": "commodity",
+  "BTC/USD": "crypto", "ETH/USD": "crypto",
+  "EUR/USD": "forex", "GBP/USD": "forex", "USD/JPY": "forex",
+};
+const MAX_SECTOR_POSITIONS = 2;
+
+const EXTENDED_UNIVERSE: Record<string, string[]> = {
+  stock: [
+    "AAPL","MSFT","NVDA","META","AMZN","TSLA","GOOGL","AMD","AVGO",
+    "PLTR","NFLX","CRM","ORCL","ADBE","QCOM","MU","INTC","ARM",
+    "JPM","GS","BAC","V","MA","PYPL",
+    "SPY","QQQ","IWM","XLK","XLF","XLE","GLD",
+  ],
+  crypto: ["BTC/USD","ETH/USD","SOL/USD","BNB/USD","XRP/USD","DOGE/USD"],
+  forex: ["EUR/USD","GBP/USD","USD/JPY","XAU/USD"],
+};
+
+const STRATEGY_PRIORS: Record<string, number> = {
+  momentum: 52, trend_following: 48, mean_reversion: 55, breakout: 45, hybrid: 50,
+};
+
+// ─── Pure helper functions (all at module level) ───
+
+function clamp(val: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, val));
+}
 
 function getWeightsForContext(regime: string, assetClass: string): Record<string, number> {
   const base = { ...(REGIME_WEIGHTS[regime] || REGIME_WEIGHTS.default) };
@@ -34,11 +73,21 @@ function getWeightsForContext(regime: string, assetClass: string): Record<string
     base[k] = (base[k] || 0) + v;
   }
   const total = Object.values(base).reduce((s, v) => s + v, 0);
-  for (const k of Object.keys(base)) base[k] /= total;
+  if (total > 0) {
+    for (const k of Object.keys(base)) base[k] /= total;
+  }
   return base;
 }
 
-// ─── Subscore Computations ───
+function getMacroRegime(feat: Record<string, unknown> | null): "bull" | "bear" | "choppy" {
+  if (!feat) return "choppy";
+  const sma20 = Number(feat.sma_20 || 0);
+  const sma50 = Number(feat.sma_50 || 0);
+  if (sma20 <= 0 || sma50 <= 0) return "choppy";
+  const spread = Math.abs(sma20 - sma50) / sma50;
+  if (spread < 0.015) return "choppy";
+  return sma20 > sma50 ? "bull" : "bear";
+}
 
 function computeMarketStructure(features: Record<string, unknown>): number {
   let score = 50;
@@ -46,7 +95,6 @@ function computeMarketStructure(features: Record<string, unknown>): number {
   const support = Number(features.support_level || 0);
   const resistance = Number(features.resistance_level || 0);
   const price = Number(features.current_price || features.sma_20 || 0);
-  
   score += clamp(trendStrength * 30, -25, 25);
   if (support > 0 && resistance > 0 && price > 0) {
     const range = resistance - support;
@@ -66,61 +114,52 @@ function computeMomentum(features: Record<string, unknown>): number {
   const rsi = Number(features.rsi_14 || 50);
   const macdHist = Number(features.macd_histogram || 0);
   const momentumScore = Number(features.momentum_score || 50);
-  
   if (rsi > 50 && rsi < 70) score += 15;
   else if (rsi > 70) score -= 10;
   else if (rsi < 30) score -= 10;
   else if (rsi >= 30 && rsi < 50) score += 5;
-  
   score += clamp(macdHist * 5, -15, 15);
   score += (momentumScore - 50) * 0.3;
   return clamp(score, 0, 100);
 }
 
 function computeVolatilitySuitability(features: Record<string, unknown>, strategyFamily: string): number {
-  const volRegime = String(features.volatility_regime || 'normal');
+  const volRegime = String(features.volatility_regime || "normal");
   const atr = Number(features.atr_14 || 0);
   const price = Number(features.current_price || features.sma_20 || 1);
   const atrPercent = price > 0 ? (atr / price) * 100 : 2;
-  
   const targetVol: Record<string, number> = {
     momentum: 2.5, breakout: 3.0, mean_reversion: 1.5, trend_following: 2.0, hybrid: 2.0,
   };
   const target = targetVol[strategyFamily] || 2.0;
-  const K = 15;
-  let score = 100 - Math.abs(atrPercent - target) * K;
-  
-  if (volRegime === 'extreme' && strategyFamily !== 'breakout') score -= 15;
-  if (volRegime === 'low' && strategyFamily === 'breakout') score -= 10;
+  let score = 100 - Math.abs(atrPercent - target) * 15;
+  if (volRegime === "extreme" && strategyFamily !== "breakout") score -= 15;
+  if (volRegime === "low" && strategyFamily === "breakout") score -= 10;
   return clamp(score, 0, 100);
 }
 
 function computeStrategyConfluence(features: Record<string, unknown>, strategyFamily: string): number {
   let score = 50;
-  const regime = String(features.market_regime || 'undefined');
-  const trendDir = String(features.trend_direction || 'sideways');
-  
+  const regime = String(features.market_regime || "undefined");
+  const trendDir = String(features.trend_direction || "sideways");
   const affinities: Record<string, string[]> = {
-    momentum: ['bullish'], breakout: ['compression', 'ranging'], mean_reversion: ['ranging'],
-    trend_following: ['bullish', 'bearish'], hybrid: ['bullish', 'ranging', 'volatile'],
+    momentum: ["bullish"], breakout: ["compression", "ranging"], mean_reversion: ["ranging"],
+    trend_following: ["bullish", "bearish"], hybrid: ["bullish", "ranging", "volatile"],
   };
   if ((affinities[strategyFamily] || []).includes(regime)) score += 25;
   else score -= 10;
-  
-  if (strategyFamily === 'momentum' && trendDir === 'up') score += 10;
-  if (strategyFamily === 'mean_reversion' && trendDir === 'sideways') score += 10;
+  if (strategyFamily === "momentum" && trendDir === "up") score += 10;
+  if (strategyFamily === "mean_reversion" && trendDir === "sideways") score += 10;
   return clamp(score, 0, 100);
 }
 
 function computeRiskReward(expectedR: number, targets: number[], entryPrice: number, stopLoss: number): number {
   const rrBase = Math.min(100, (expectedR / 3.0) * 100) * 0.70;
-  
   let targetRealism = 50;
   if (targets.length > 0) {
-    const distances = targets.map(t => Math.abs(t - entryPrice));
     const stopDist = Math.abs(entryPrice - stopLoss);
     if (stopDist > 0) {
-      const ratios = distances.map(d => d / stopDist);
+      const ratios = targets.map(t => Math.abs(t - entryPrice) / stopDist);
       const avgRatio = ratios.reduce((s, r) => s + r, 0) / ratios.length;
       targetRealism = avgRatio >= 1.5 && avgRatio <= 5 ? 80 : avgRatio > 5 ? 40 : 60;
     }
@@ -128,36 +167,29 @@ function computeRiskReward(expectedR: number, targets: number[], entryPrice: num
   return clamp(rrBase + targetRealism * 0.30, 0, 100);
 }
 
-function computeConfidenceScore(features: Record<string, unknown>, regime: string): number {
+function computeConfidenceScore(features: Record<string, unknown>): number {
   const dataQuality = Number(features.sma_200) > 0 && Number(features.rsi_14) > 0 ? 80 : 50;
-  
   const indicators = [features.rsi_14, features.macd, features.sma_20, features.atr_14];
   const validCount = indicators.filter(i => i !== null && i !== undefined).length;
   const featureConsistency = (validCount / indicators.length) * 100;
-  
   const histSample = Number(features.trend_strength || 0) > 0.3 ? 75 : 55;
   const regimeStability = Number(features.regime_confidence || 50);
-  
   return clamp(
     0.30 * dataQuality + 0.25 * featureConsistency + 0.25 * histSample + 0.20 * regimeStability,
     0, 100
   );
 }
 
-// ─── Modifiers ───
-
-function computeStrategyModifier(strategyFamily: string, regime: string, perfData: Record<string, unknown> | null): number {
-  let mod = 0;
-  if (perfData) {
-    const winRate = Number(perfData.win_rate || 0);
-    const avgR = Number(perfData.avg_r_multiple || 0);
-    if (winRate > 60 && avgR > 1.0) mod += 5;
-    else if (winRate < 40) mod -= 5;
-  }
-  return clamp(mod, -8, 8);
+function computeStrategyModifier(perfData: Record<string, unknown> | null): number {
+  if (!perfData) return 0;
+  const winRate = Number(perfData.win_rate || 0);
+  const avgR = Number(perfData.avg_r_multiple || 0);
+  if (winRate > 60 && avgR > 1.0) return 5;
+  if (winRate < 40) return -5;
+  return 0;
 }
 
-function computeRegimeModifier(regime: string, regimeConfidence: number): number {
+function computeRegimeModifier(regimeConfidence: number): number {
   if (regimeConfidence > 75) return 4;
   if (regimeConfidence > 50) return 1;
   if (regimeConfidence < 30) return -4;
@@ -173,8 +205,6 @@ function computeHistoricalModifier(perfData: Record<string, unknown> | null): nu
   if (totalTrades >= 10 && profitFactor < 0.8) return -3;
   return 0;
 }
-
-// ─── Validated Scoring Factors (backtest-proven) ───
 
 function macdMomentumDirection(features: Record<string, unknown>): number {
   const hist = Number(features.macd_histogram || 0);
@@ -201,166 +231,132 @@ function srProximityScore(features: Record<string, unknown>, direction: string):
   if (price <= 0 || support <= 0 || resistance <= 0) return 50;
   const distToResistance = (resistance - price) / price;
   const distToSupport = (price - support) / price;
-  if (direction === 'long') {
+  if (direction === "long") {
     if (distToResistance < 0.005) return 20;
     if (distToResistance < 0.015) return 35;
     if (distToSupport < 0.02) return 80;
     return 55;
-  } else {
-    if (distToSupport < 0.005) return 20;
-    if (distToSupport < 0.015) return 35;
-    if (distToResistance < 0.02) return 80;
-    return 55;
   }
+  if (distToSupport < 0.005) return 20;
+  if (distToSupport < 0.015) return 35;
+  if (distToResistance < 0.02) return 80;
+  return 55;
 }
 
-// ─── Setup Generation ───
+function computeMacdConfirmation(features: Record<string, unknown>, direction: string): number {
+  const mom = macdMomentumDirection(features);
+  if (direction === "long") return mom > 0.01 ? 80 : mom < -0.01 ? 25 : 50;
+  return mom < -0.01 ? 80 : mom > 0.01 ? 25 : 50;
+}
 
 function generateSetups(features: Record<string, unknown>, direction: string): { entry: number; sl: number; targets: number[] }[] {
   const price = Number(features.current_price || features.sma_20 || 0);
   if (price <= 0) return [];
-  
   const atr = Number(features.atr_14 || price * 0.02);
   const support = Number(features.support_level || price - atr * 2);
   const resistance = Number(features.resistance_level || price + atr * 2);
-  
-  const setups: { entry: number; sl: number; targets: number[] }[] = [];
-  
-  if (direction === 'long') {
-    setups.push({
+  if (direction === "long") {
+    return [{
       entry: price,
       sl: Math.max(support, price - atr * 1.5),
-      targets: [
-        +(price + atr * 2).toFixed(4),
-        +(price + atr * 3).toFixed(4),
-        +(resistance).toFixed(4),
-      ],
-    });
-  } else {
-    setups.push({
-      entry: price,
-      sl: Math.min(resistance, price + atr * 1.5),
-      targets: [
-        +(price - atr * 2).toFixed(4),
-        +(price - atr * 3).toFixed(4),
-        +(support).toFixed(4),
-      ],
-    });
+      targets: [+(price + atr * 2).toFixed(4), +(price + atr * 3).toFixed(4), +resistance.toFixed(4)],
+    }];
   }
-  return setups;
+  return [{
+    entry: price,
+    sl: Math.min(resistance, price + atr * 1.5),
+    targets: [+(price - atr * 2).toFixed(4), +(price - atr * 3).toFixed(4), +support.toFixed(4)],
+  }];
 }
 
 function determineDirection(features: Record<string, unknown>): string | null {
-  const trend = String(features.trend_direction || 'sideways');
+  const trend = String(features.trend_direction || "sideways");
   const rsi = Number(features.rsi_14 || 50);
   const macdHist = Number(features.macd_histogram || 0);
   const trendStrength = Number(features.trend_strength || 0);
-
-  // Too weak to trade
   if (trendStrength < 0.2) return null;
-
   let longScore = 0, shortScore = 0;
-  if (trend === 'up') longScore += 2; else if (trend === 'down') shortScore += 2;
+  if (trend === "up") longScore += 2; else if (trend === "down") shortScore += 2;
   if (rsi > 55) longScore += 1; else if (rsi < 45) shortScore += 1;
   if (macdHist > 0) longScore += 1; else if (macdHist < 0) shortScore += 1;
-
-  // Need clear conviction — margin of at least 2 votes
-  const margin = Math.abs(longScore - shortScore);
-  if (margin < 2) return null;
-
-  return longScore > shortScore ? 'long' : 'short';
+  if (Math.abs(longScore - shortScore) < 2) return null;
+  return longScore > shortScore ? "long" : "short";
 }
 
 function determineBestStrategy(features: Record<string, unknown>): string {
-  const regime = String(features.market_regime || 'undefined');
+  const regime = String(features.market_regime || "undefined");
   const map: Record<string, string> = {
-    bullish: 'momentum', bearish: 'trend_following', ranging: 'mean_reversion',
-    volatile: 'breakout', compression: 'breakout',
+    bullish: "momentum", bearish: "trend_following", ranging: "mean_reversion",
+    volatile: "breakout", compression: "breakout",
   };
-  return map[regime] || 'hybrid';
+  return map[regime] || "hybrid";
 }
-
-// ─── Macro Regime Detection ───
-
-function getMacroRegime(feat: Record<string, unknown> | null): "bull" | "bear" | "choppy" {
-  if (!feat) return "choppy";
-  const sma20 = Number(feat.sma_20 || 0);
-  const sma50 = Number(feat.sma_50 || 0);
-  if (sma20 <= 0 || sma50 <= 0) return "choppy";
-  const spread = Math.abs(sma20 - sma50) / sma50;
-  if (spread < 0.015) return "choppy";
-  return sma20 > sma50 ? "bull" : "bear";
-}
-
-// ─── Real Macro & Sentiment Data ───
 
 async function fetchFearGreedScore(): Promise<number> {
   try {
     const r = await fetch("https://api.alternative.me/fng/?limit=1", {
       signal: AbortSignal.timeout(3000),
     });
-    if (!r.ok) return 50;
+    if (!r.ok) { await r.text().catch(() => {}); return 50; }
     const d = await r.json();
-    return parseInt(d?.data?.[0]?.value ?? "50");
-  } catch { return 50; }
+    return parseInt(d?.data?.[0]?.value ?? "50") || 50;
+  } catch {
+    return 50;
+  }
 }
 
 async function fetchVIXScore(apiKey: string): Promise<number> {
+  if (!apiKey) return 50;
   try {
     const r = await fetch(
       `https://api.twelvedata.com/price?symbol=VIX&apikey=${apiKey}`,
       { signal: AbortSignal.timeout(3000) }
     );
-    if (!r.ok) return 50;
+    if (!r.ok) { await r.text().catch(() => {}); return 50; }
     const d = await r.json();
     const vix = parseFloat(d?.price ?? "20");
+    if (isNaN(vix)) return 50;
     if (vix < 12) return 85;
     if (vix < 17) return 70;
     if (vix < 25) return 50;
     if (vix < 35) return 30;
     return 15;
-  } catch { return 50; }
+  } catch {
+    return 50;
+  }
 }
 
-const SYMBOL_SECTORS: Record<string, string> = {
-  'AAPL': 'tech', 'MSFT': 'tech', 'NVDA': 'tech', 'GOOGL': 'tech', 'META': 'tech',
-  'AMZN': 'tech', 'TSLA': 'tech', 'AMD': 'tech',
-  'QQQ': 'tech_etf', 'SOXX': 'tech_etf', 'SMH': 'tech_etf',
-  'SPY': 'broad_etf', 'VOO': 'broad_etf', 'IWM': 'broad_etf',
-  'JPM': 'finance', 'BAC': 'finance', 'GS': 'finance', 'XLF': 'finance',
-  'XLE': 'energy', 'CVX': 'energy', 'XOM': 'energy',
-  'GLD': 'commodity', 'XAU/USD': 'commodity',
-  'BTC/USD': 'crypto', 'ETH/USD': 'crypto',
-  'EUR/USD': 'forex', 'GBP/USD': 'forex', 'USD/JPY': 'forex',
-};
-const MAX_SECTOR_POSITIONS = 2;
+// ─── Main Handler ───
 
-const EXTENDED_UNIVERSE: Record<string, string[]> = {
-  stock: ["AAPL","MSFT","NVDA","META","AMZN","TSLA","GOOGL","AMD","AVGO",
-          "PLTR","NFLX","CRM","ORCL","ADBE","QCOM","MU","INTC","ARM",
-          "JPM","GS","BAC","V","MA","PYPL",
-          "SPY","QQQ","IWM","XLK","XLF","XLE","GLD"],
-  crypto: ["BTC/USD","ETH/USD","SOL/USD","BNB/USD","XRP/USD","DOGE/USD"],
-  forex: ["EUR/USD","GBP/USD","USD/JPY","XAU/USD"],
-};
-
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { 
-      symbols, 
-      user_id, 
-      // OPERATOR MODE: Stricter defaults
-      min_score = 70, 
-      min_r = 1.8, 
+    // Single body parse
+    const body = await req.json().catch(() => ({}));
+    const {
+      symbols,
+      user_id,
+      min_score = 70,
+      min_r = 1.8,
       min_confidence = 60,
       max_signals = 3,
       operator_mode = false,
-    } = await req.json();
-    if (!user_id) throw new Error("user_id required");
+    } = body as {
+      symbols?: string[];
+      user_id?: string;
+      min_score?: number;
+      min_r?: number;
+      min_confidence?: number;
+      max_signals?: number;
+      operator_mode?: boolean;
+    };
+
+    if (!user_id) return jsonRes({ error: "user_id required" }, 400);
 
     const twelveKey = Deno.env.get("TWELVE_DATA_API_KEY") ?? "";
+
+    // Fetch macro sentiment — both are optional with safe fallbacks
     const [fearGreedScore, vixScore] = await Promise.all([
       fetchFearGreedScore(),
       fetchVIXScore(twelveKey),
@@ -379,12 +375,12 @@ Deno.serve(async (req) => {
         status: "invalidated",
         invalidation_reason: "Signal expired: market conditions may have changed (>24h old)",
         updated_at: new Date().toISOString(),
-      })
+      } as Record<string, unknown>)
       .eq("user_id", user_id)
       .eq("status", "active")
       .lt("created_at", expiryThreshold);
 
-    const targetSymbols = symbols && symbols.length > 0 ? symbols : [];
+    const targetSymbols: string[] = Array.isArray(symbols) && symbols.length > 0 ? symbols : [];
 
     // Fetch open positions to avoid duplicating signals
     const { data: openPositions } = await supabase
@@ -392,193 +388,220 @@ Deno.serve(async (req) => {
       .select("symbol, direction")
       .eq("user_id", user_id)
       .eq("status", "open");
+
     const openPositionMap = new Map<string, string>();
     const sectorCount: Record<string, number> = {};
-    for (const pos of (openPositions || [])) {
+    for (const pos of openPositions || []) {
       openPositionMap.set(pos.symbol, pos.direction);
-      const sector = SYMBOL_SECTORS[pos.symbol] || 'other';
+      const sector = SYMBOL_SECTORS[pos.symbol] || "other";
       sectorCount[sector] = (sectorCount[sector] || 0) + 1;
     }
 
-    // OPERATOR MODE: Check daily trade cap and cooldown
-    let tradesToday = 0;
-    let consecutiveLosses = 0;
-    let maxTradesPerDay = 3;
-    let lossCooldownCount = 2;
-    
+    // ─── OPERATOR MODE: Check daily trade cap and cooldown ───
     if (operator_mode) {
       const { data: userSettings } = await supabase
         .from("user_settings")
         .select("max_trades_per_day, loss_cooldown_count, consecutive_losses, trades_today, last_trade_date")
         .eq("user_id", user_id)
         .maybeSingle();
-      
+
       if (userSettings) {
-        maxTradesPerDay = Number(userSettings.max_trades_per_day || 3);
-        lossCooldownCount = Number(userSettings.loss_cooldown_count || 2);
-        consecutiveLosses = Number(userSettings.consecutive_losses || 0);
-        
-        const today = new Date().toISOString().split('T')[0];
-        tradesToday = userSettings.last_trade_date === today ? Number(userSettings.trades_today || 0) : 0;
-      }
+        const maxTrades = Number(userSettings.max_trades_per_day || 3);
+        const cooldownLimit = Number(userSettings.loss_cooldown_count || 2);
+        const consLosses = Number(userSettings.consecutive_losses || 0);
+        const today = new Date().toISOString().split("T")[0];
+        const trades = userSettings.last_trade_date === today ? Number(userSettings.trades_today || 0) : 0;
 
-      // Block if cooldown active
-      if (consecutiveLosses >= lossCooldownCount) {
-        return new Response(JSON.stringify({ 
-          signals: [], count: 0, rejected: 0,
-          blocked: true,
-          reason: `Loss cooldown active: ${consecutiveLosses} consecutive losses (limit: ${lossCooldownCount}). Wait for reset.`
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      // Block if daily cap reached
-      if (tradesToday >= maxTradesPerDay) {
-        return new Response(JSON.stringify({ 
-          signals: [], count: 0, rejected: 0,
-          blocked: true,
-          reason: `Daily trade cap reached: ${tradesToday}/${maxTradesPerDay}`
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (consLosses >= cooldownLimit) {
+          return jsonRes({
+            signals: [], count: 0, rejected: 0, blocked: true,
+            reason: `Loss cooldown active: ${consLosses} consecutive losses (limit: ${cooldownLimit}).`,
+          });
+        }
+        if (trades >= maxTrades) {
+          return jsonRes({
+            signals: [], count: 0, rejected: 0, blocked: true,
+            reason: `Daily trade cap reached: ${trades}/${maxTrades}`,
+          });
+        }
       }
     }
 
-    // Fetch market features — expand universe if watchlist < 10 symbols
+    // ─── Expand universe if watchlist < 10 symbols ───
     let querySymbols = targetSymbols;
     if (targetSymbols.length < 10) {
-      const allExtended = [
-        ...EXTENDED_UNIVERSE.stock,
-        ...EXTENDED_UNIVERSE.crypto,
-      ];
+      const allExtended = [...EXTENDED_UNIVERSE.stock, ...EXTENDED_UNIVERSE.crypto];
       querySymbols = [...new Set([...targetSymbols, ...allExtended])];
       console.log(`[signal-engine] Expanded universe: ${targetSymbols.length} watchlist → ${querySymbols.length} total`);
     }
 
+    // ─── Fetch market features ───
     let featuresQuery = supabase.from("market_features").select("*").eq("timeframe", "1d");
     if (querySymbols.length > 0) featuresQuery = featuresQuery.in("symbol", querySymbols);
-    const { data: allFeaturesData } = await featuresQuery;
+    const { data: allFeaturesData, error: featErr } = await featuresQuery;
+
+    if (featErr) {
+      console.error("[signal-engine] Features query error:", featErr.message);
+      return jsonRes({ signals: [], count: 0, rejected: 0, error: featErr.message });
+    }
     if (!allFeaturesData || allFeaturesData.length === 0) {
-      return new Response(JSON.stringify({ signals: [], count: 0, message: "No market features available" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return jsonRes({ signals: [], count: 0, rejected: 0, message: "No market features available. Run compute-indicators first." });
     }
 
-    // Filter out stale features (older than 26 hours — allows for overnight batch)
+    // Filter stale features (> 26h old)
     const featuresCutoff = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
-    const featuresData = allFeaturesData.filter(f =>
-      f.computed_at && f.computed_at > featuresCutoff
+    const featuresData = allFeaturesData.filter(
+      (f: Record<string, unknown>) => f.computed_at && String(f.computed_at) > featuresCutoff
     );
     const staleCount = allFeaturesData.length - featuresData.length;
     if (staleCount > 0) {
-      console.warn(`[signal-engine] Filtered ${staleCount} stale features (>26h old). ${featuresData.length} fresh remaining.`);
+      console.warn(`[signal-engine] Filtered ${staleCount} stale features. ${featuresData.length} fresh remaining.`);
     }
     if (featuresData.length === 0) {
-      return new Response(JSON.stringify({
-        signals: [], count: 0,
-        message: `No fresh market features available (${staleCount} symbols have stale data >26h). Run compute-indicators first.`,
-        stale_count: staleCount,
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return jsonRes({
+        signals: [], count: 0, rejected: 0,
+        message: `All ${staleCount} features are stale (>26h). Run compute-indicators first.`,
+      });
     }
 
-    // Fetch prices
+    // ─── Fetch prices from market_cache ───
     const featureSymbols = featuresData.map((f: Record<string, unknown>) => String(f.symbol));
-    const { data: priceData } = await supabase.from("market_cache").select("symbol, price").in("symbol", featureSymbols);
+    const { data: priceData } = await supabase
+      .from("market_cache")
+      .select("symbol, price")
+      .in("symbol", featureSymbols);
     const priceMap: Record<string, number> = {};
-    for (const p of (priceData || [])) priceMap[p.symbol] = Number(p.price);
+    for (const p of priceData || []) {
+      priceMap[p.symbol] = Number(p.price);
+    }
 
-    // Fetch macro regime indicators
-    const { data: spyFeatures } = await supabase
-      .from("market_features")
-      .select("sma_20, sma_50, trend_direction, trend_strength")
-      .eq("symbol", "SPY")
-      .eq("timeframe", "1d")
-      .maybeSingle();
+    // ─── Fetch SPY and BTC features for macro regime (with try/catch) ───
+    let spyFeat: Record<string, unknown> | null = null;
+    let btcFeat: Record<string, unknown> | null = null;
+    try {
+      const { data } = await supabase
+        .from("market_features")
+        .select("sma_20, sma_50, trend_direction, trend_strength")
+        .eq("symbol", "SPY")
+        .eq("timeframe", "1d")
+        .maybeSingle();
+      spyFeat = data as Record<string, unknown> | null;
+    } catch (e) {
+      console.warn("[signal-engine] SPY features fetch failed:", e);
+    }
+    try {
+      const { data } = await supabase
+        .from("market_features")
+        .select("sma_20, sma_50, trend_direction, trend_strength")
+        .eq("symbol", "BTC/USD")
+        .eq("timeframe", "1d")
+        .maybeSingle();
+      btcFeat = data as Record<string, unknown> | null;
+    } catch (e) {
+      console.warn("[signal-engine] BTC features fetch failed:", e);
+    }
 
-    const { data: btcFeatures } = await supabase
-      .from("market_features")
-      .select("sma_20, sma_50, trend_direction, trend_strength")
-      .eq("symbol", "BTC/USD")
-      .eq("timeframe", "1d")
-      .maybeSingle();
+    const equityMacro = getMacroRegime(spyFeat);
+    const cryptoMacro = getMacroRegime(btcFeat);
 
-    const equityMacro = getMacroRegime(spyFeatures as Record<string, unknown> | null);
-    const cryptoMacro = getMacroRegime(btcFeatures as Record<string, unknown> | null);
-
-    // Fetch strategy performance
-    const { data: perfData } = await supabase.from("strategy_performance").select("*").eq("user_id", user_id);
+    // ─── Fetch strategy performance ───
+    const { data: perfData } = await supabase
+      .from("strategy_performance")
+      .select("*")
+      .eq("user_id", user_id);
     const perfMap: Record<string, Record<string, unknown>> = {};
-    for (const p of (perfData || [])) perfMap[`${p.strategy_family}:${p.market_regime}`] = p as Record<string, unknown>;
+    for (const p of perfData || []) {
+      perfMap[`${p.strategy_family}:${p.market_regime}`] = p as Record<string, unknown>;
+    }
 
     // Fetch user scoring weights
-    const { data: userWeights } = await supabase.from("scoring_weights").select("*").eq("user_id", user_id).eq("is_active", true).limit(1);
+    const { data: userWeights } = await supabase
+      .from("scoring_weights")
+      .select("*")
+      .eq("user_id", user_id)
+      .eq("is_active", true)
+      .limit(1);
 
-    // ANTI-OVERTRADING: Fetch correlation matrix for duplicate detection
-    const { data: corrData } = await supabase.from("correlation_matrix").select("symbol_a, symbol_b, correlation");
+    // Fetch correlation matrix
+    const { data: corrData } = await supabase
+      .from("correlation_matrix")
+      .select("symbol_a, symbol_b, correlation");
     const correlationMap = new Map<string, number>();
-    for (const c of (corrData || [])) {
+    for (const c of corrData || []) {
       correlationMap.set(`${c.symbol_a}:${c.symbol_b}`, Number(c.correlation));
       correlationMap.set(`${c.symbol_b}:${c.symbol_a}`, Number(c.correlation));
     }
 
+    // ─── Score each symbol ───
     const candidates: { signal: Record<string, unknown>; finalScore: number; confidenceScore: number }[] = [];
     const rejections: { asset: string; reason: string }[] = [];
 
     for (const feat of featuresData) {
-      const symbol = String(feat.symbol);
-      const assetClass = String(feat.asset_type || 'stock');
-      const regime = String(feat.market_regime || 'undefined');
-      // Use most recent close from market_features as price fallback
-      const currentPrice = priceMap[symbol]
-        || Number(feat.current_price || 0)
-        || Number(feat.sma_20 || 0)
-        || Number(feat.close_price || 0);
+      const f = feat as Record<string, unknown>;
+      const symbol = String(f.symbol);
+      const assetClass = String(f.asset_type || "stock");
+      const regime = String(f.market_regime || "undefined");
+
+      // Price fallback chain
+      const currentPrice =
+        priceMap[symbol] ||
+        Number(f.sma_20 || 0) ||
+        Number(f.ema_12 || 0);
+
       if (currentPrice <= 0) {
         rejections.push({ asset: symbol, reason: "No price available in market_cache or features" });
         continue;
       }
 
-      // OPERATOR MODE: Block unclear regimes
+      // Operator mode: block unclear regimes
       if (operator_mode && UNCLEAR_REGIMES.has(regime)) {
         rejections.push({ asset: symbol, reason: `Unclear regime: ${regime}` });
         continue;
       }
 
-      const enriched = { ...feat, current_price: currentPrice };
+      const enriched: Record<string, unknown> = { ...f, current_price: currentPrice };
       const direction = determineDirection(enriched);
       if (!direction) {
-        rejections.push({ asset: symbol, reason: 'No clear direction conviction (trendStrength or vote margin too low)' });
+        rejections.push({ asset: symbol, reason: "No clear direction conviction" });
         continue;
       }
 
       // Macro regime filter
-      const isCrypto = ['crypto'].includes(assetClass);
+      const isCrypto = assetClass === "crypto";
       const activeMacro = isCrypto ? cryptoMacro : equityMacro;
 
       if (activeMacro === "choppy") {
-        rejections.push({ asset: symbol, reason: `Macro choppy (${isCrypto ? 'BTC' : 'SPY'} SMA20/50 spread < 1.5%)` });
+        rejections.push({ asset: symbol, reason: `Macro choppy (${isCrypto ? "BTC" : "SPY"} SMA20/50 spread < 1.5%)` });
         continue;
       }
       if (activeMacro === "bull" && direction === "short") {
-        rejections.push({ asset: symbol, reason: `Counter-trend short blocked: ${isCrypto ? 'BTC' : 'SPY'} macro is bullish` });
+        rejections.push({ asset: symbol, reason: `Counter-trend short blocked: macro is bullish` });
         continue;
       }
       if (activeMacro === "bear" && direction === "long") {
-        rejections.push({ asset: symbol, reason: `Counter-trend long blocked: ${isCrypto ? 'BTC' : 'SPY'} macro is bearish` });
+        rejections.push({ asset: symbol, reason: `Counter-trend long blocked: macro is bearish` });
         continue;
       }
 
-      // Skip if already has position
+      // Skip if already has position in same direction
       if (openPositionMap.has(symbol) && openPositionMap.get(symbol) === direction) {
         rejections.push({ asset: symbol, reason: `Already has open ${direction} position` });
         continue;
       }
 
-      // Sector cap check
-      const symbolSector = SYMBOL_SECTORS[symbol] || 'other';
+      // Sector cap
+      const symbolSector = SYMBOL_SECTORS[symbol] || "other";
       if ((sectorCount[symbolSector] || 0) >= MAX_SECTOR_POSITIONS) {
-        rejections.push({ asset: symbol, reason: `Sector cap: ${symbolSector} already has ${sectorCount[symbolSector]} positions` });
+        rejections.push({ asset: symbol, reason: `Sector cap: ${symbolSector} has ${sectorCount[symbolSector]} positions` });
         continue;
       }
 
       const strategyFamily = determineBestStrategy(enriched);
       const setups = generateSetups(enriched, direction);
-      if (setups.length === 0) continue;
+      if (setups.length === 0) {
+        rejections.push({ asset: symbol, reason: "No valid setup generated" });
+        continue;
+      }
 
       const setup = setups[0];
       const stopDist = Math.abs(setup.entry - setup.sl);
@@ -593,7 +616,13 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Compute subscores
+      // Validate stop distance (max 10%)
+      if (stopDist / currentPrice > 0.10) {
+        rejections.push({ asset: symbol, reason: `Stop distance ${((stopDist / currentPrice) * 100).toFixed(1)}% > 10%` });
+        continue;
+      }
+
+      // ─── Compute all 11 subscores ───
       const subscores: Record<string, number> = {
         market_structure: computeMarketStructure(enriched),
         momentum: computeMomentum(enriched),
@@ -602,23 +631,13 @@ Deno.serve(async (req) => {
         macro_context: vixScore,
         sentiment_flow: fearGreedScore,
         risk_reward: computeRiskReward(expectedR, setup.targets, setup.entry, setup.sl),
-        historical_performance: 50,
-        macd_confirmation: (() => {
-          const mom = macdMomentumDirection(enriched);
-          if (direction === 'long') return mom > 0.01 ? 80 : mom < -0.01 ? 25 : 50;
-          return mom < -0.01 ? 80 : mom > 0.01 ? 25 : 50;
-        })(),
+        historical_performance: STRATEGY_PRIORS[strategyFamily] || 50,
+        macd_confirmation: computeMacdConfirmation(enriched, direction),
         volume_confirmation: volumeConfirmation(enriched),
         sr_proximity: srProximityScore(enriched, direction),
       };
 
-      const STRATEGY_PRIORS: Record<string, number> = {
-        momentum: 52,
-        trend_following: 48,
-        mean_reversion: 55,
-        breakout: 45,
-        hybrid: 50,
-      };
+      // Blend historical performance with real data if available
       const perfKey = `${strategyFamily}:${regime}`;
       const perf = perfMap[perfKey] || perfMap[`${strategyFamily}:all`] || null;
       if (perf && Number(perf.total_trades || 0) >= 5) {
@@ -627,30 +646,34 @@ Deno.serve(async (req) => {
         const blendWeight = Math.min(totalTrades / 30, 1.0);
         const prior = STRATEGY_PRIORS[strategyFamily] || 50;
         subscores.historical_performance = clamp(
-          prior * (1 - blendWeight) + wr * blendWeight,
-          0, 100
+          prior * (1 - blendWeight) + wr * blendWeight, 0, 100
         );
-      } else {
-        subscores.historical_performance = STRATEGY_PRIORS[strategyFamily] || 50;
       }
 
+      // Get weights (regime + asset-class adjusted)
       const weights = getWeightsForContext(regime, assetClass);
 
+      // Override with user custom weights if set
       if (userWeights && userWeights.length > 0) {
-        const uw = userWeights[0];
-        const totalUW = Number(uw.structure_weight) + Number(uw.momentum_weight) + Number(uw.volatility_weight) + Number(uw.strategy_weight) + Number(uw.macro_weight) + Number(uw.sentiment_weight) + Number(uw.rr_weight) + Number(uw.historical_weight);
+        const uw = userWeights[0] as Record<string, unknown>;
+        const totalUW =
+          Number(uw.structure_weight || 0) + Number(uw.momentum_weight || 0) +
+          Number(uw.volatility_weight || 0) + Number(uw.strategy_weight || 0) +
+          Number(uw.macro_weight || 0) + Number(uw.sentiment_weight || 0) +
+          Number(uw.rr_weight || 0) + Number(uw.historical_weight || 0);
         if (totalUW > 0) {
-          weights.market_structure = Number(uw.structure_weight) / totalUW;
-          weights.momentum = Number(uw.momentum_weight) / totalUW;
-          weights.volatility_suitability = Number(uw.volatility_weight) / totalUW;
-          weights.strategy_confluence = Number(uw.strategy_weight) / totalUW;
-          weights.macro_context = Number(uw.macro_weight) / totalUW;
-          weights.sentiment_flow = Number(uw.sentiment_weight) / totalUW;
-          weights.risk_reward = Number(uw.rr_weight) / totalUW;
-          weights.historical_performance = Number(uw.historical_weight) / totalUW;
+          weights.market_structure = Number(uw.structure_weight || 0) / totalUW;
+          weights.momentum = Number(uw.momentum_weight || 0) / totalUW;
+          weights.volatility_suitability = Number(uw.volatility_weight || 0) / totalUW;
+          weights.strategy_confluence = Number(uw.strategy_weight || 0) / totalUW;
+          weights.macro_context = Number(uw.macro_weight || 0) / totalUW;
+          weights.sentiment_flow = Number(uw.sentiment_weight || 0) / totalUW;
+          weights.risk_reward = Number(uw.rr_weight || 0) / totalUW;
+          weights.historical_performance = Number(uw.historical_weight || 0) / totalUW;
         }
       }
 
+      // Weighted average of subscores (subscores are 0-100, weights sum to ~1)
       let baseScore = 0;
       let totalWeight = 0;
       for (const [k, w] of Object.entries(weights)) {
@@ -660,8 +683,9 @@ Deno.serve(async (req) => {
       }
       if (totalWeight > 0) baseScore = baseScore / totalWeight;
 
-      const stratMod = computeStrategyModifier(strategyFamily, regime, perf);
-      const regimeMod = computeRegimeModifier(regime, Number(feat.regime_confidence || 50));
+      // Apply modifiers
+      const stratMod = computeStrategyModifier(perf);
+      const regimeMod = computeRegimeModifier(Number(f.regime_confidence || 50));
       const histMod = computeHistoricalModifier(perf);
 
       const finalScore = clamp(baseScore + stratMod + regimeMod + histMod, 0, 100);
@@ -671,32 +695,27 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Validate stop distance
-      if (stopDist / currentPrice > 0.10) {
-        rejections.push({ asset: symbol, reason: `Stop distance ${((stopDist/currentPrice)*100).toFixed(1)}% > 10%` });
-        continue;
-      }
+      const confidenceScore = computeConfidenceScore(enriched);
 
-      const confidenceScore = computeConfidenceScore(enriched, regime);
-
-      // OPERATOR MODE: Enforce min confidence
       if (confidenceScore < min_confidence) {
         rejections.push({ asset: symbol, reason: `Confidence ${confidenceScore.toFixed(1)} < ${min_confidence}` });
         continue;
       }
 
+      // Build explanation
       const sortedSubscores = Object.entries(subscores).sort((a, b) => b[1] - a[1]);
       const explanation = {
         top_contributors: sortedSubscores.slice(0, 3).map(([k, v]) => ({ factor: k, score: +v.toFixed(1) })),
         modifiers: {
-          strategy: { value: stratMod, reason: perf ? `Based on ${Number(perf.total_trades || 0)} historical trades` : 'No historical data' },
-          regime: { value: regimeMod, reason: `Regime: ${regime}, confidence: ${Number(feat.regime_confidence || 0).toFixed(0)}%` },
-          historical: { value: histMod, reason: perf ? `PF: ${Number(perf.profit_factor || 0).toFixed(2)}` : 'Insufficient data' },
+          strategy: { value: stratMod, reason: perf ? `Based on ${Number(perf.total_trades || 0)} historical trades` : "No historical data" },
+          regime: { value: regimeMod, reason: `Regime: ${regime}, confidence: ${Number(f.regime_confidence || 0).toFixed(0)}%` },
+          historical: { value: histMod, reason: perf ? `PF: ${Number(perf.profit_factor || 0).toFixed(2)}` : "Insufficient data" },
         },
-        summary: `Signal generated for ${symbol} ${direction.toUpperCase()} based on ${regime} regime with ${strategyFamily} strategy. Top factor: ${sortedSubscores[0][0]} (${sortedSubscores[0][1].toFixed(0)}).`,
+        summary: `Signal for ${symbol} ${direction.toUpperCase()} | ${regime} regime | ${strategyFamily} strategy. Top: ${sortedSubscores[0][0]} (${sortedSubscores[0][1].toFixed(0)}).`,
       };
 
-      const signal = {
+      // Build signal object — ONLY columns that exist in the signals table
+      const signal: Record<string, unknown> = {
         user_id,
         asset: symbol,
         asset_class: assetClass,
@@ -714,25 +733,21 @@ Deno.serve(async (req) => {
         weight_profile_used: weights,
         reasoning: explanation.summary,
         explanation,
-        status: 'active',
-        macro_regime: activeMacro,
-        macro_filter_passed: true,
+        status: "active",
       };
 
       candidates.push({ signal, finalScore, confidenceScore });
     }
 
-    // OPERATOR MODE: Sort by score and take only top N
+    // Sort by score descending
     candidates.sort((a, b) => b.finalScore - a.finalScore);
 
     // ANTI-OVERTRADING: Remove correlated signals (keep highest scored)
     const selectedSymbols: string[] = [];
     const filteredCandidates: typeof candidates = [];
-    
     for (const c of candidates) {
       const symbol = String(c.signal.asset);
       let tooCorrelated = false;
-      
       for (const existing of selectedSymbols) {
         const corr = correlationMap.get(`${symbol}:${existing}`) || 0;
         if (Math.abs(corr) > 0.75) {
@@ -741,42 +756,55 @@ Deno.serve(async (req) => {
           break;
         }
       }
-      
       if (!tooCorrelated) {
         filteredCandidates.push(c);
         selectedSymbols.push(symbol);
       }
     }
 
-    // Take top max_signals
+    // Take top N
     const finalCandidates = filteredCandidates.slice(0, max_signals);
     const generatedSignals = finalCandidates.map(c => c.signal);
 
-    // Store valid signals
+    // Insert into DB
     if (generatedSignals.length > 0) {
       const { error: insertError } = await supabase.from("signals").insert(generatedSignals);
-      if (insertError) throw new Error(`Insert error: ${insertError.message}`);
+      if (insertError) {
+        console.error("[signal-engine] Insert error:", insertError.message);
+        // Return signals anyway even if insert fails
+        return jsonRes({
+          signals: generatedSignals,
+          count: generatedSignals.length,
+          rejected: rejections.length,
+          rejections: rejections.slice(0, 20),
+          insert_error: insertError.message,
+          operator_mode,
+          filters_applied: { min_score, min_r, min_confidence, max_signals },
+          macro_context: { equity: equityMacro, crypto: cryptoMacro },
+          universe_size: featuresData.length,
+          sentiment: { fear_greed: fearGreedScore, vix_score: vixScore },
+        });
+      }
     }
 
-    return new Response(
-      JSON.stringify({
-        signals: generatedSignals,
-        count: generatedSignals.length,
-        rejected: rejections.length,
-        rejections: rejections.slice(0, 20),
-        operator_mode,
-        filters_applied: { min_score, min_r, min_confidence, max_signals },
-        macro_context: { equity: equityMacro, crypto: cryptoMacro },
-        universe_size: featuresData.length,
-        watchlist_size: targetSymbols.length,
-        universe_expanded: querySymbols.length > targetSymbols.length,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    console.log(`[signal-engine] Generated ${generatedSignals.length} signals, rejected ${rejections.length}`);
+
+    return jsonRes({
+      signals: generatedSignals,
+      count: generatedSignals.length,
+      rejected: rejections.length,
+      rejections: rejections.slice(0, 20),
+      operator_mode,
+      filters_applied: { min_score, min_r, min_confidence, max_signals },
+      macro_context: { equity: equityMacro, crypto: cryptoMacro },
+      universe_size: featuresData.length,
+      watchlist_size: targetSymbols.length,
+      universe_expanded: querySymbols.length > targetSymbols.length,
+      sentiment: { fear_greed: fearGreedScore, vix_score: vixScore },
     });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[signal-engine] Fatal error:", message);
+    return jsonRes({ error: message, signals: [], count: 0, rejected: 0 }, 500);
   }
 });
