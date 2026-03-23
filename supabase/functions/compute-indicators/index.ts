@@ -162,7 +162,39 @@ serve(async (req) => {
   }
 
   try {
-    const { symbols, timeframe = '1d' } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    let { symbols, timeframe = '1d' } = body;
+    const { scheduled = false } = body;
+
+    // If called from cron or without symbols, load from all users' watchlists
+    if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
+      const db2 = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+      const { data: allSettings } = await db2
+        .from("user_settings")
+        .select("watchlist");
+
+      const allSymbols = new Set<string>([
+        // Always include these core symbols for macro regime detection
+        "SPY", "QQQ", "BTC/USD", "ETH/USD",
+        "AAPL", "MSFT", "NVDA", "TSLA", "META", "AMZN", "PLTR", "AMD", "AVGO", "NFLX"
+      ]);
+      for (const s of (allSettings || [])) {
+        if (Array.isArray(s.watchlist)) {
+          for (const sym of s.watchlist) allSymbols.add(String(sym));
+        }
+      }
+      symbols = [...allSymbols];
+      console.log(`[compute-indicators] Scheduled run: processing ${symbols.length} symbols`);
+    }
+
+    if (!symbols || symbols.length === 0) {
+      return new Response(JSON.stringify({ error: "No symbols to process" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const db = createClient(supabaseUrl, supabaseKey);

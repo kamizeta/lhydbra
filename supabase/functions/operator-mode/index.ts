@@ -225,15 +225,39 @@ Deno.serve(async (req) => {
     const remainingSlots = maxTradesPerDay - tradesToday;
     const remainingRisk = maxDailyRisk - dailyRiskUsed;
 
+    // ─── Refresh market data before generating signals ───
+    const watchlistSymbols = Array.isArray((settings as any).watchlist) && (settings as any).watchlist.length > 0
+      ? (settings as any).watchlist
+      : ["AAPL", "MSFT", "NVDA", "TSLA", "SPY", "QQQ", "BTC/USD", "ETH/USD"];
+
+    try {
+      // Step 1: Refresh market_cache with current prices
+      await fetch(`${supabaseUrl}/functions/v1/market-data-normalized`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+        body: JSON.stringify({ symbols: watchlistSymbols, timeframe: "1d" }),
+      });
+
+      // Step 2: Recompute indicators from fresh price data
+      await fetch(`${supabaseUrl}/functions/v1/compute-indicators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+        body: JSON.stringify({ symbols: watchlistSymbols, timeframe: "1d" }),
+      });
+
+      console.log(`[operator-mode] Data refreshed for ${watchlistSymbols.length} symbols`);
+    } catch (refreshErr) {
+      console.warn("[operator-mode] Data refresh failed (continuing):", refreshErr);
+    }
+
+    // Now run signal engine (data is fresh)
     const signalResponse = await fetch(`${supabaseUrl}/functions/v1/signal-engine`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
       body: JSON.stringify({
         user_id: user.id, min_score: 70, min_r: 1.8, min_confidence: 60,
         max_signals: Math.min(remainingSlots, 3), operator_mode: true,
-        symbols: Array.isArray((settings as any).watchlist) && (settings as any).watchlist.length > 0
-          ? (settings as any).watchlist
-          : [],
+        symbols: watchlistSymbols,
       }),
     });
 
