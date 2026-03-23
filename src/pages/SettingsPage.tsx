@@ -480,7 +480,7 @@ export default function SettingsPage() {
                   min={40}
                   max={80}
                   step={1}
-                  value={settings.min_confidence}
+                  value={isNaN(settings.min_confidence) ? 55 : settings.min_confidence}
                   onChange={(e) => updateField('min_confidence', Math.max(40, Math.min(80, Number(e.target.value))))}
                   className="w-full mt-1 px-3 py-1.5 bg-background border border-border rounded-md text-xs text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
                 />
