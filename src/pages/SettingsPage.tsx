@@ -367,9 +367,10 @@ export default function SettingsPage() {
               <button
                 onClick={async () => {
                   if (!user) return;
-                  await supabase.from('user_settings')
-                    .update({ watchlist: localWatchlist, updated_at: new Date().toISOString() } as any)
+                  const { error } = await supabase.from('user_settings')
+                    .update({ watchlist: localWatchlist } as any)
                     .eq('user_id', user.id);
+                  if (error) { toast.error('Error saving watchlist: ' + error.message); return; }
                   toast.success('Watchlist saved');
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-medium hover:bg-primary/90 transition-colors"
