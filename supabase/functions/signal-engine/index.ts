@@ -738,6 +738,7 @@ Deno.serve(async (req) => {
         rejections: rejections.slice(0, 20),
         operator_mode,
         filters_applied: { min_score, min_r, min_confidence, max_signals },
+        macro_context: { equity: equityMacro, crypto: cryptoMacro },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
