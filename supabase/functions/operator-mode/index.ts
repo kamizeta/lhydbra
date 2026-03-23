@@ -184,22 +184,28 @@ Deno.serve(async (req) => {
       return jsonRes({ status: "blocked", reasons: preflight, trades_today: tradesToday, consecutive_losses: consecutiveLosses, daily_risk_used: dailyRiskUsed });
     }
 
-    // ─── Fetch VIX for dynamic thresholds ───
+    // ─── Fetch VIX for dynamic thresholds (via VIXY proxy on Alpaca) ───
     let currentVIX = 20;
     try {
-      const twelveKey = Deno.env.get("TWELVE_DATA_API_KEY") ?? "";
-      if (twelveKey) {
-        const vixRes = await fetch(
-          `https://api.twelvedata.com/price?symbol=VIX&apikey=${twelveKey}`,
-          { signal: AbortSignal.timeout(3000) }
-        );
-        if (vixRes.ok) {
-          const vixData = await vixRes.json();
-          currentVIX = parseFloat(vixData?.price ?? "20");
-          if (isNaN(currentVIX) || currentVIX <= 0) currentVIX = 20;
+      const alpHdrs = {
+        "APCA-API-KEY-ID": Deno.env.get("ALPACA_API_KEY_ID") ?? "",
+        "APCA-API-SECRET-KEY": Deno.env.get("ALPACA_API_SECRET_KEY") ?? "",
+      };
+      const vixRes = await fetch(
+        "https://data.alpaca.markets/v2/stocks/VIXY/bars?timeframe=1Day&limit=2&feed=iex",
+        { headers: alpHdrs, signal: AbortSignal.timeout(4000) }
+      );
+      if (vixRes.ok) {
+        const vixData = await vixRes.json();
+        const bars = vixData?.bars || [];
+        const vixyPrice = bars.length > 0 ? parseFloat(bars[bars.length - 1].c ?? "0") : 0;
+        if (vixyPrice > 0) {
+          currentVIX = Math.max(10, Math.min(80, vixyPrice * 10));
         }
       }
-    } catch { /* use default */ }
+    } catch (e) {
+      console.warn("[operator-mode] VIX fetch failed, using default 20");
+    }
 
     const baseMinScore = Number((settings as any).min_score || 60);
     const baseMinR = Number((settings as any).min_r || 1.5);
