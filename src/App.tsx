@@ -25,6 +25,7 @@ import OpportunityRadar from "@/pages/OpportunityRadar";
 import AlgoEffectiveness from "@/pages/AlgoEffectiveness";
 import PerformancePage from "@/pages/PerformancePage";
 import ResearchPage from "@/pages/ResearchPage";
+import ReportsPage from "@/pages/ReportsPage";
 
 const queryClient = new QueryClient();
 
