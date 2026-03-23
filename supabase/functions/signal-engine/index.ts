@@ -255,17 +255,19 @@ function determineDirection(features: Record<string, unknown>): string | null {
   const rsi = Number(features.rsi_14 || 50);
   const macdHist = Number(features.macd_histogram || 0);
   const trendStrength = Number(features.trend_strength || 0);
+
+  // Too weak to trade
+  if (trendStrength < 0.2) return null;
+
   let longScore = 0, shortScore = 0;
-  if (trend === 'up') longScore += 2;
-  else if (trend === 'down') shortScore += 2;
-  else return null; // sideways = no conviction
-  if (rsi > 55) longScore += 1;
-  else if (rsi < 45) shortScore += 1;
-  if (macdHist > 0) longScore += 1;
-  else if (macdHist < 0) shortScore += 1;
-  if (trendStrength < 0.2) return null; // too weak to trade
+  if (trend === 'up') longScore += 2; else if (trend === 'down') shortScore += 2;
+  if (rsi > 55) longScore += 1; else if (rsi < 45) shortScore += 1;
+  if (macdHist > 0) longScore += 1; else if (macdHist < 0) shortScore += 1;
+
+  // Need clear conviction — margin of at least 2 votes
   const margin = Math.abs(longScore - shortScore);
-  if (margin < 2) return null; // conflicting signals
+  if (margin < 2) return null;
+
   return longScore > shortScore ? 'long' : 'short';
 }
 
