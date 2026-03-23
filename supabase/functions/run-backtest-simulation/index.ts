@@ -102,17 +102,25 @@ Deno.serve(async (req) => {
     const userRes = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
     const userId = userRes.data.user?.id;
 
-    let SYMBOLS = ["AAPL","MSFT","NVDA","TSLA","SPY","QQQ","BTC/USD","ETH/USD"];
+    const DEFAULT_SYMBOLS = [
+      "AAPL", "MSFT", "NVDA", "TSLA", "SPY", "QQQ",
+      "BTC/USD", "ETH/USD"
+    ];
+    let SYMBOLS = [...DEFAULT_SYMBOLS];
     if (userId) {
       const { data: settings } = await supabaseClient
         .from("user_settings")
         .select("watchlist")
         .eq("user_id", userId)
         .maybeSingle();
-      if (settings?.watchlist && Array.isArray(settings.watchlist) && settings.watchlist.length > 0) {
-        SYMBOLS = settings.watchlist;
+      if (Array.isArray(settings?.watchlist) && settings.watchlist.length > 0) {
+        SYMBOLS = settings.watchlist.filter((s: string) =>
+          !FOREX_SYMBOLS.includes(s)
+        );
+        if (SYMBOLS.length === 0) SYMBOLS = [...DEFAULT_SYMBOLS];
       }
     }
+    console.log(`[backtest] Processing ${SYMBOLS.length} symbols:`, SYMBOLS);
 
     // Date range: default last 180 days, supports up to 3 years
     const endDate = date_to ? new Date(date_to) : new Date();
@@ -164,11 +172,23 @@ Deno.serve(async (req) => {
             timestamp: String(b.t).split('T')[0],
           }));
         } else {
-          const url = `https://data.alpaca.markets/v2/stocks/${sym}/bars?timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000&adjustment=split`;
-          const r = await fetch(url, { headers: alpacaHeaders, signal: AbortSignal.timeout(15000) });
-          if (!r.ok) { console.warn(`${sym}: error ${r.status}`); continue; }
+          const stockUrl = `https://data.alpaca.markets/v2/stocks/bars?symbols=${encodeURIComponent(sym)}&timeframe=1Day&start=${startStr}&end=${endStr}&limit=1000&adjustment=split&feed=iex`;
+          const r = await fetch(stockUrl, {
+            headers: {
+              "APCA-API-KEY-ID": alpacaKeyId,
+              "APCA-API-SECRET-KEY": alpacaSecret,
+              "Accept": "application/json",
+            },
+            signal: AbortSignal.timeout(15000),
+          });
+          if (!r.ok) {
+            const errText = await r.text();
+            console.warn(`${sym}: stock fetch error ${r.status} - ${errText}`);
+            continue;
+          }
           const d = await r.json();
-          bars = (d.bars || []).map((b: Record<string,unknown>) => ({
+          const symBars = d.bars?.[sym] || [];
+          bars = symBars.map((b: Record<string,unknown>) => ({
             open: Number(b.o), high: Number(b.h), low: Number(b.l),
             close: Number(b.c), volume: Number(b.v),
             timestamp: String(b.t).split('T')[0],
