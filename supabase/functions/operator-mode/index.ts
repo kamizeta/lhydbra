@@ -304,6 +304,36 @@ Deno.serve(async (req) => {
     }
 
     // ─── ACTION: run ───
+
+    // ─── Sync with Alpaca before running ───
+    try {
+      await fetch(`${supabaseUrl}/functions/v1/alpaca-sync`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({ paper, user_id_override: user.id }),
+      });
+      console.log("[operator-mode] Pre-run sync completed");
+
+      // Reload fresh settings after sync
+      const freshRes = await supabase
+        .from("user_settings")
+        .select("consecutive_losses, trades_today, daily_risk_used, last_trade_date, current_capital")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (freshRes.data) {
+        const fs = freshRes.data;
+        consecutiveLosses = Number(fs.consecutive_losses ?? 0);
+        tradesToday = fs.last_trade_date === today ? Number(fs.trades_today ?? 0) : 0;
+        dailyRiskUsed = fs.last_trade_date === today ? Number(fs.daily_risk_used ?? 0) : 0;
+        currentCapital = Number(fs.current_capital ?? currentCapital);
+      }
+    } catch (syncErr) {
+      console.warn("[operator-mode] Pre-run sync failed (continuing):", syncErr);
+    }
+
     const remainingSlots = maxTradesPerDay - tradesToday;
     const remainingRisk = maxDailyRisk - dailyRiskUsed;
 
