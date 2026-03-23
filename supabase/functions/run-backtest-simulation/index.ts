@@ -5,7 +5,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYMBOLS = ["AAPL","MSFT","NVDA","TSLA","SPY","QQQ","BTC/USD","ETH/USD"];
+const SYMBOLS = [
+  // Top US stocks by volume & momentum
+  "AAPL","MSFT","NVDA","TSLA","AMZN","GOOGL","META","AMD","NFLX","COIN","PLTR","AVGO",
+  // Major ETFs
+  "SPY","QQQ",
+  // Top crypto pairs (Alpaca supported)
+  "BTC/USD","ETH/USD","SOL/USD","DOGE/USD","XRP/USD","AVAX/USD",
+];
 const FOREX_SYMBOLS = ["EUR/USD","GBP/USD","USD/JPY","XAU/USD"];
 // Forex will be added back when FCS API integration is added
 
