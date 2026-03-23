@@ -314,6 +314,60 @@ serve(async (req) => {
       console.error("Correlation update error:", corrErr);
     }
 
+    // ─── Cache OHLCV history for backtest ───
+    try {
+      const twelveKey = Deno.env.get("TWELVE_DATA_API_KEY") ?? "";
+      const processedSymbols = symbols as string[];
+      if (twelveKey && processedSymbols && processedSymbols.length > 0) {
+        for (const sym of processedSymbols.slice(0, 5)) {
+          const { data: existingBars } = await db
+            .from("ohlcv_cache")
+            .select("timestamp")
+            .eq("symbol", sym)
+            .eq("timeframe", "1d")
+            .order("timestamp", { ascending: false })
+            .limit(1);
+
+          const lastBar = existingBars?.[0]?.timestamp;
+          const daysSince = lastBar
+            ? (Date.now() - new Date(lastBar).getTime()) / 86400000
+            : 999;
+
+          if (daysSince < 1) continue;
+
+          const r = await fetch(
+            `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=1day&outputsize=365&apikey=${twelveKey}`,
+            { signal: AbortSignal.timeout(8000) }
+          );
+          if (!r.ok) continue;
+          const d = await r.json();
+          if (!d.values || !Array.isArray(d.values)) continue;
+
+          const bars = d.values.map((v: Record<string, string>) => ({
+            symbol: sym,
+            timeframe: "1d",
+            timestamp: v.datetime,
+            open: parseFloat(v.open),
+            high: parseFloat(v.high),
+            low: parseFloat(v.low),
+            close: parseFloat(v.close),
+            volume: parseFloat(v.volume || "0"),
+          }));
+
+          if (bars.length > 0) {
+            await db.from("ohlcv_cache").upsert(bars, {
+              onConflict: "symbol,timeframe,timestamp",
+              ignoreDuplicates: true,
+            });
+            console.log(`[ohlcv_cache] ${sym}: ${bars.length} bars cached`);
+          }
+          await new Promise(resolve => setTimeout(resolve, 8000));
+        }
+      }
+    } catch (ohlcvErr) {
+      console.error("OHLCV cache error:", ohlcvErr);
+    }
+
     return new Response(JSON.stringify({ features: results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
