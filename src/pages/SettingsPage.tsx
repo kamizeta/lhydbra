@@ -439,6 +439,55 @@ export default function SettingsPage() {
             </button>
           </div>
 
+          {/* Signal Filters */}
+          <div className="terminal-border rounded-lg p-5 space-y-4">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Target className="h-4 w-4 text-primary" />
+              Signal Filters
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Minimum thresholds for signal generation and operator mode execution.
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-[10px] text-muted-foreground font-mono uppercase">Min Score (40–85)</label>
+                <input
+                  type="number"
+                  min={40}
+                  max={85}
+                  step={1}
+                  value={(settings as any).min_score ?? 60}
+                  onChange={(e) => setSettings(prev => ({ ...prev, min_score: Math.max(40, Math.min(85, Number(e.target.value))) } as any))}
+                  className="w-full mt-1 px-3 py-1.5 bg-background border border-border rounded-md text-xs text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground font-mono uppercase">Min R Multiple (1.0–3.0)</label>
+                <input
+                  type="number"
+                  min={1.0}
+                  max={3.0}
+                  step={0.1}
+                  value={(settings as any).min_r ?? 1.5}
+                  onChange={(e) => setSettings(prev => ({ ...prev, min_r: Math.max(1.0, Math.min(3.0, Number(e.target.value))) } as any))}
+                  className="w-full mt-1 px-3 py-1.5 bg-background border border-border rounded-md text-xs text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground font-mono uppercase">Min Confidence (40–80)</label>
+                <input
+                  type="number"
+                  min={40}
+                  max={80}
+                  step={1}
+                  value={(settings as any).min_confidence ?? 55}
+                  onChange={(e) => setSettings(prev => ({ ...prev, min_confidence: Math.max(40, Math.min(80, Number(e.target.value))) } as any))}
+                  className="w-full mt-1 px-3 py-1.5 bg-background border border-border rounded-md text-xs text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Capital */}
             <div className="terminal-border rounded-lg p-5 space-y-4">
