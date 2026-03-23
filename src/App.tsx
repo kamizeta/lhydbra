@@ -63,6 +63,7 @@ function ProtectedRoutes() {
         <Route path="/advanced/risk" element={<RiskManagement />} />
         
         <Route path="/advanced/radar" element={<OpportunityRadar />} />
+        <Route path="/advanced/reports" element={<ReportsPage />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

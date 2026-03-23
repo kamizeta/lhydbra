@@ -49,6 +49,7 @@ export default function AppLayout() {
     { to: "/advanced/market", icon: BarChart3, label: t.nav.market },
     
     { to: "/advanced/risk", icon: Shield, label: "Risk" },
+    { to: "/advanced/reports", icon: FileSpreadsheet, label: "Reports" },
   ];
 
   const renderNavItem = (item: typeof coreNavItems[0], dimmed = false) => (
