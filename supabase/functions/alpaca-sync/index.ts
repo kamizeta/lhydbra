@@ -192,6 +192,50 @@ serve(async (req) => {
                 symbol: sym,
                 detail: `Breakeven stop set @ ${entry.toFixed(4)} (was ${currentSL.toFixed(4)}, reached ${currentR.toFixed(1)}R)`,
               });
+
+              // ─── Also update the actual Alpaca order ───
+              try {
+                const alpHdrs = {
+                  "APCA-API-KEY-ID": Deno.env.get("ALPACA_API_KEY_ID") ?? "",
+                  "APCA-API-SECRET-KEY": Deno.env.get("ALPACA_API_SECRET_KEY") ?? "",
+                  "Content-Type": "application/json",
+                };
+                const ordersRes = await fetch(
+                  `${baseUrl}/v2/orders?status=open&limit=100`,
+                  { headers: alpHdrs, signal: AbortSignal.timeout(5000) }
+                );
+                if (ordersRes.ok) {
+                  const orders = await ordersRes.json();
+                  const cleanSym = String(local.symbol).replace("/", "");
+                  const symbolOrders = (orders as any[]).filter(o =>
+                    o.symbol === cleanSym &&
+                    (o.type === "stop" || o.type === "stop_limit" ||
+                     (o.order_class === "bracket" && o.status === "held"))
+                  );
+                  for (const ord of symbolOrders) {
+                    try {
+                      const patchRes = await fetch(
+                        `${baseUrl}/v2/orders/${ord.id}`,
+                        {
+                          method: "PATCH",
+                          headers: alpHdrs,
+                          body: JSON.stringify({ stop_price: entry.toFixed(4) }),
+                        }
+                      );
+                      if (patchRes.ok) {
+                        console.log(`[alpaca-sync] ✓ Breakeven stop updated in Alpaca: ${local.symbol} @ ${entry.toFixed(4)}`);
+                      } else {
+                        const errText = await patchRes.text();
+                        console.warn(`[alpaca-sync] Alpaca stop patch failed: ${errText}`);
+                      }
+                    } catch (patchErr) {
+                      console.warn(`[alpaca-sync] Order patch error:`, patchErr);
+                    }
+                  }
+                }
+              } catch (alpacaBeErr) {
+                console.warn("[alpaca-sync] Alpaca breakeven update error:", alpacaBeErr);
+              }
             } catch (beErr) {
               console.error("Breakeven stop update error:", beErr);
             }
