@@ -280,6 +280,18 @@ function determineBestStrategy(features: Record<string, unknown>): string {
   return map[regime] || 'hybrid';
 }
 
+// ─── Macro Regime Detection ───
+
+function getMacroRegime(feat: Record<string, unknown> | null): "bull" | "bear" | "choppy" {
+  if (!feat) return "choppy";
+  const sma20 = Number(feat.sma_20 || 0);
+  const sma50 = Number(feat.sma_50 || 0);
+  if (sma20 <= 0 || sma50 <= 0) return "choppy";
+  const spread = Math.abs(sma20 - sma50) / sma50;
+  if (spread < 0.015) return "choppy";
+  return sma20 > sma50 ? "bull" : "bear";
+}
+
 // ─── Real Macro & Sentiment Data ───
 
 async function fetchFearGreedScore(): Promise<number> {
