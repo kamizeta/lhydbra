@@ -89,7 +89,7 @@ export default function AppLayout() {
         collapsed ? "md:w-16" : "md:w-52"
       )}>
         <div className="flex h-14 md:h-16 items-center gap-2 border-b border-border px-3">
-          <img src={lhydbraLogo} alt="LHYDBRA" className="h-8 w-8 md:h-10 md:w-10 shrink-0" />
+          <img src={lhydbraLogo} alt="LHYDBRA" className="h-16 w-16 md:h-20 md:w-20 shrink-0" />
           {(!collapsed || mobileOpen) && (
             <div className="flex flex-col flex-1">
               <span className="text-sm font-bold text-foreground tracking-[0.15em]">LHYDBRA</span>
