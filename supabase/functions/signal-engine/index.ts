@@ -530,6 +530,13 @@ Deno.serve(async (req) => {
         sentiment_flow: fearGreedScore,
         risk_reward: computeRiskReward(expectedR, setup.targets, setup.entry, setup.sl),
         historical_performance: 50,
+        macd_confirmation: (() => {
+          const mom = macdMomentumDirection(enriched);
+          if (direction === 'long') return mom > 0.01 ? 80 : mom < -0.01 ? 25 : 50;
+          return mom < -0.01 ? 80 : mom > 0.01 ? 25 : 50;
+        })(),
+        volume_confirmation: volumeConfirmation(enriched),
+        sr_proximity: srProximityScore(enriched, direction),
       };
 
       const STRATEGY_PRIORS: Record<string, number> = {
