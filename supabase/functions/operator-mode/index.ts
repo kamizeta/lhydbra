@@ -360,7 +360,7 @@ Deno.serve(async (req) => {
         try {
           const orderRes = await fetch(`${supabaseUrl}/functions/v1/alpaca-trade`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": authHeader },
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
             body: JSON.stringify({
               action: "place_order", paper,
               signal_id: String(trade.id || ""),
