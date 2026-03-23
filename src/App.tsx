@@ -23,6 +23,8 @@ import PortfolioAllocation from "@/pages/PortfolioAllocation";
 import RiskManagement from "@/pages/RiskManagement";
 import OpportunityRadar from "@/pages/OpportunityRadar";
 import AlgoEffectiveness from "@/pages/AlgoEffectiveness";
+import PerformancePage from "@/pages/PerformancePage";
+import ResearchPage from "@/pages/ResearchPage";
 
 const queryClient = new QueryClient();
 
