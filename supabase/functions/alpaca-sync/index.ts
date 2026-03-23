@@ -25,10 +25,66 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Auth
+    const body = await req.json().catch(() => ({}));
+    const { scheduled = false, paper = true, user_id_override } = body;
+
+    // ─── Scheduled mode: iterate all users with open positions ───
+    if (scheduled) {
+      const adminSupabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
+      const { data: usersWithPositions } = await adminSupabase
+        .from("positions")
+        .select("user_id")
+        .eq("status", "open");
+
+      const uniqueUsers = [...new Set((usersWithPositions || []).map(p => p.user_id))];
+      const results: { user_id: string; ok: boolean }[] = [];
+
+      for (const uid of uniqueUsers) {
+        try {
+          const resp = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alpaca-sync`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({ paper: true, user_id_override: uid }),
+          });
+          results.push({ user_id: uid, ok: resp.ok });
+        } catch {
+          results.push({ user_id: uid, ok: false });
+        }
+      }
+
+      return jsonRes({ scheduled: true, processed: uniqueUsers.length, results });
+    }
+
+    // ─── Auth ───
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return jsonRes({ error: "Unauthorized" }, 401);
+    }
+
+    let userId: string;
+
+    // Service-role call with user_id_override
+    if (user_id_override && authHeader === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`) {
+      userId = user_id_override;
+    } else {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+      if (userError || !user) {
+        return jsonRes({ error: "Unauthorized" }, 401);
+      }
+      userId = user.id;
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -36,15 +92,6 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return jsonRes({ error: "Unauthorized" }, 401);
-    }
-    const userId = user.id;
-
-    const body = await req.json();
-    const { paper = true } = body;
     const baseUrl = paper ? ALPACA_PAPER_URL : ALPACA_LIVE_URL;
     const headers = alpacaHeaders();
 
