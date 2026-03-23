@@ -469,18 +469,21 @@ Deno.serve(async (req) => {
       const adjustedRisk = effectiveRisk * symMult;
       const cappedRisk = Math.min(adjustedRisk, maxDailyRisk * 0.5);
       const riskDollars = liveCapital * (cappedRisk / 100);
-      let quantity = stopDist > 0 ? Math.floor(riskDollars / stopDist) : 0;
-      if (quantity <= 0) {
-        return { ...sig, quantity: 0, skip: true, skip_reason: `Inviable sizing: stop_dist=${stopDist.toFixed(4)}, risk_dollars=${riskDollars.toFixed(2)}` };
-      }
 
-      const maxSingleAsset = Number(settings.max_single_asset || 25);
-      const positionValue = quantity * entryPrice;
-      const positionPct = (positionValue / liveCapital) * 100;
-      if (positionPct > maxSingleAsset) quantity = Math.floor((liveCapital * maxSingleAsset / 100) / entryPrice);
+      const isFractional = ['crypto'].includes(String(sig.asset_class || 'stock'));
+      const quantity = calcPositionSize({
+        capital: liveCapital,
+        riskPct: cappedRisk,
+        entryPrice,
+        stopLoss,
+        maxSingleAssetPct: Number(settings.max_single_asset || 25),
+        maxLeverage: Number(settings.max_leverage || 2.0),
+        isFractional,
+      });
 
       if (quantity <= 0) {
-        return { ...sig, quantity: 0, skip: true, skip_reason: `Concentration cap zeroed quantity` };
+        return { ...sig, quantity: 0, skip: true,
+          skip_reason: `Sizing returned 0: entry=${entryPrice}, sl=${stopLoss}, risk=${cappedRisk.toFixed(2)}%` };
       }
 
       const targets = (sig.targets as number[]) || [];
