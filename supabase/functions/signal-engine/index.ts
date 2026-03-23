@@ -284,12 +284,25 @@ function determineDirection(features: Record<string, unknown>): string | null {
 }
 
 function determineBestStrategy(features: Record<string, unknown>): string {
-  const regime = String(features.market_regime || "undefined");
+  const regime = String(features.market_regime || 'undefined');
   const map: Record<string, string> = {
-    bullish: "momentum", bearish: "trend_following", ranging: "mean_reversion",
-    volatile: "breakout", compression: "breakout",
+    // Bullish regimes
+    bullish: 'momentum',
+    trending_bullish: 'momentum',
+    overbought: 'mean_reversion',
+    bull_market: 'momentum',
+    // Bearish regimes
+    bearish: 'trend_following',
+    bear_market: 'trend_following',
+    trending_bearish: 'trend_following',
+    oversold: 'mean_reversion',
+    // Neutral/other
+    ranging: 'mean_reversion',
+    volatile: 'breakout',
+    compression: 'breakout',
+    elevated: 'breakout',
   };
-  return map[regime] || "hybrid";
+  return map[regime] || 'hybrid';
 }
 
 async function fetchFearGreedScore(): Promise<number> {
