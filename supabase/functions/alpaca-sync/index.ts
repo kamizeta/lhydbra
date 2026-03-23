@@ -305,6 +305,44 @@ serve(async (req) => {
           console.error("trade_journal write error:", journalErr);
         }
 
+        // ─── Write signal outcome ───
+        try {
+          const { data: originalSignal } = await supabase
+            .from("signals")
+            .select("id, opportunity_score, confidence_score, direction, strategy_family, market_regime, score_breakdown, weight_profile_used")
+            .eq("user_id", userId)
+            .eq("asset", local.symbol)
+            .in("status", ["approved", "active", "completed"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (originalSignal) {
+            await supabase.from("signal_outcomes").insert({
+              user_id: userId,
+              signal_id: originalSignal.id,
+              symbol: local.symbol,
+              predicted_score: originalSignal.opportunity_score,
+              predicted_direction: originalSignal.direction,
+              actual_pnl: pnl,
+              actual_r_multiple: rMultiple ?? 0,
+              outcome: pnl > 0 ? "win" : "loss",
+              strategy_family: originalSignal.strategy_family,
+              market_regime: originalSignal.market_regime,
+              score_breakdown: originalSignal.score_breakdown,
+              weight_profile_used: originalSignal.weight_profile_used,
+              resolved_at: new Date().toISOString(),
+            });
+
+            await supabase.from("signals").update({
+              status: "completed",
+              updated_at: new Date().toISOString(),
+            }).eq("id", originalSignal.id);
+          }
+        } catch (outcomeErr) {
+          console.error("signal_outcomes write error:", outcomeErr);
+        }
+
         changes.push({
           action: "closed",
           symbol: local.symbol,
