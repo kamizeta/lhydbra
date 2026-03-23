@@ -45,13 +45,21 @@ serve(async (req) => {
 
       for (const uid of uniqueUsers) {
         try {
+          // Fetch user's paper preference
+          const { data: userPref } = await adminSupabase
+            .from("user_settings")
+            .select("paper_trading")
+            .eq("user_id", uid)
+            .maybeSingle();
+          const userPaper = (userPref as any)?.paper_trading !== false; // default to paper
+
           const resp = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/alpaca-sync`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
             },
-            body: JSON.stringify({ paper: true, user_id_override: uid }),
+            body: JSON.stringify({ paper: userPaper, user_id_override: uid }),
           });
           results.push({ user_id: uid, ok: resp.ok });
         } catch {
