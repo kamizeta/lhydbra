@@ -468,7 +468,7 @@ export default function SettingsPage() {
                   min={1.0}
                   max={3.0}
                   step={0.1}
-                  value={settings.min_r}
+                  value={isNaN(settings.min_r) ? 1.5 : settings.min_r}
                   onChange={(e) => updateField('min_r', Math.max(1.0, Math.min(3.0, Number(e.target.value))))}
                   className="w-full mt-1 px-3 py-1.5 bg-background border border-border rounded-md text-xs text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
                 />
