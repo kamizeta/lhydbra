@@ -500,7 +500,6 @@ Deno.serve(async (req) => {
       }
 
       // ─── Auto-trigger adaptive scoring if enough outcomes exist ───
-      let totalOutcomes = 0;
       try {
         const { count } = await supabase
           .from("signal_outcomes")
