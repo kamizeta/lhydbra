@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const {
-      min_score = 65,
+      min_score = 72,
       min_r = 1.5,
       initial_capital = 10000,
       risk_pct = 1,
