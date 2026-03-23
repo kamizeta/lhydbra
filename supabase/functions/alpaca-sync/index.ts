@@ -272,6 +272,39 @@ serve(async (req) => {
           console.warn("[FeedbackLoop] Non-blocking error:", feedbackErr);
         }
 
+        // ─── Write to trade_journal ───
+        try {
+          const entryP = Number(local.avg_entry);
+          const stopP = Number((local as any).stop_loss || 0);
+          const rMultipleJ = entryP > 0 && stopP > 0 && filledPrice > 0
+            ? (local.direction === "long"
+                ? (filledPrice - entryP) / Math.abs(entryP - stopP)
+                : (entryP - filledPrice) / Math.abs(entryP - stopP))
+            : null;
+
+          await supabase.from("trade_journal").insert({
+            user_id: userId,
+            symbol: local.symbol,
+            asset_type: (local as any).asset_type || "stock",
+            direction: local.direction,
+            entry_price: entryP,
+            exit_price: filledPrice,
+            quantity: Number(local.quantity),
+            pnl: pnl,
+            r_multiple: rMultipleJ,
+            strategy_family: (local as any).strategy_family || (local as any).strategy || "unknown",
+            market_regime: (local as any).regime_at_entry || "unknown",
+            opportunity_score: null,
+            position_id: local.id,
+            entered_at: (local as any).opened_at || (local as any).created_at,
+            exited_at: closingOrder.filled_at || new Date().toISOString(),
+            exit_reasoning: pnl > 0 ? "take_profit" : "stop_loss",
+            entry_reasoning: `Auto-closed via alpaca-sync. PnL: ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}`,
+          });
+        } catch (journalErr) {
+          console.error("trade_journal write error:", journalErr);
+        }
+
         changes.push({
           action: "closed",
           symbol: local.symbol,
