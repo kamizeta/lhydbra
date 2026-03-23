@@ -174,6 +174,46 @@ function computeHistoricalModifier(perfData: Record<string, unknown> | null): nu
   return 0;
 }
 
+// ─── Validated Scoring Factors (backtest-proven) ───
+
+function macdMomentumDirection(features: Record<string, unknown>): number {
+  const hist = Number(features.macd_histogram || 0);
+  const histPrev = Number(features.macd_histogram_prev || hist * 0.9);
+  return hist - histPrev;
+}
+
+function volumeConfirmation(features: Record<string, unknown>): number {
+  const volume = Number(features.volume || 0);
+  const volumeSma20 = Number(features.volume_sma_20 || volume);
+  if (volumeSma20 <= 0) return 50;
+  const ratio = volume / volumeSma20;
+  if (ratio > 1.5) return 85;
+  if (ratio > 1.2) return 70;
+  if (ratio > 0.8) return 50;
+  if (ratio > 0.5) return 35;
+  return 20;
+}
+
+function srProximityScore(features: Record<string, unknown>, direction: string): number {
+  const price = Number(features.current_price || features.sma_20 || 0);
+  const support = Number(features.support_level || 0);
+  const resistance = Number(features.resistance_level || 0);
+  if (price <= 0 || support <= 0 || resistance <= 0) return 50;
+  const distToResistance = (resistance - price) / price;
+  const distToSupport = (price - support) / price;
+  if (direction === 'long') {
+    if (distToResistance < 0.005) return 20;
+    if (distToResistance < 0.015) return 35;
+    if (distToSupport < 0.02) return 80;
+    return 55;
+  } else {
+    if (distToSupport < 0.005) return 20;
+    if (distToSupport < 0.015) return 35;
+    if (distToResistance < 0.02) return 80;
+    return 55;
+  }
+}
+
 // ─── Setup Generation ───
 
 function generateSetups(features: Record<string, unknown>, direction: string): { entry: number; sl: number; targets: number[] }[] {
