@@ -85,6 +85,28 @@ function srProximity(bars: {high:number;low:number;close:number}[], direction: s
   return proximityScore;
 }
 
+function calcRegime(bars: {close:number}[]): "bull" | "bear" | "choppy" {
+  if (bars.length < 50) return "choppy";
+  const closes = bars.map(b => b.close);
+  const price = closes[closes.length - 1];
+  const sma20val = sma(closes, 20) || price;
+  const sma50val = sma(closes, 50) || price;
+  const spread = Math.abs(sma20val - sma50val) / sma50val;
+  if (spread < 0.015) return "choppy";
+  if (price > sma50val && sma20val > sma50val) return "bull";
+  if (price < sma50val && sma20val < sma50val) return "bear";
+  return "choppy";
+}
+
+function getMacroRegime(
+  spyBars: {close:number}[],
+  btcBars: {close:number}[]
+): { equityRegime: "bull" | "bear" | "choppy"; cryptoRegime: "bull" | "bear" | "choppy" } {
+  return { equityRegime: calcRegime(spyBars), cryptoRegime: calcRegime(btcBars) };
+}
+
+const CRYPTO_SYMBOLS = ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD"];
+
 function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:number}[]): {
   score: number; direction: string | null; entry: number; sl: number; tp: number; r: number;
   macd_momentum: number; volume_ratio: number; sr_score: number;
