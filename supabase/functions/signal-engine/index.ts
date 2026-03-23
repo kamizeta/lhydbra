@@ -486,7 +486,7 @@ Deno.serve(async (req) => {
       const enriched = { ...feat, current_price: currentPrice };
       const direction = determineDirection(enriched);
       if (!direction) {
-        rejections.push({ asset: symbol, reason: 'Insufficient directional conviction (sideways or conflicting signals)' });
+        rejections.push({ asset: symbol, reason: 'No clear direction conviction (trendStrength or vote margin too low)' });
         continue;
       }
 
