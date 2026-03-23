@@ -335,6 +335,9 @@ Deno.serve(async (req) => {
                 pnl_dollars: +pnlDollars.toFixed(2),
                 outcome,
                 capital_after: +totalCapital.toFixed(2),
+                macd_momentum: tradeMacd,
+                volume_ratio: tradeVolRatio,
+                sr_score: tradeSrScore,
               };
               symTrades.push(trade);
               allTrades.push(trade);

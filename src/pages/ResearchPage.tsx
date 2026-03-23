@@ -70,7 +70,7 @@ export default function ResearchPage() {
 
   // ─── Sim 6M state ───
   const [simConfig, setSimConfig] = useState({
-    min_score: 65,
+    min_score: 72,
     min_r: 1.5,
     risk_pct: 1,
     initial_capital: 10000,
