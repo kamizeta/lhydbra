@@ -209,7 +209,7 @@ serve(async (req) => {
         .eq('symbol', symbol)
         .eq('timeframe', timeframe)
         .order('timestamp', { ascending: true })
-        .limit(200);
+        .limit(250);
 
       if (!bars || bars.length < 20) {
         results[symbol] = { error: 'insufficient_data', bars_found: bars?.length || 0 };
@@ -224,7 +224,11 @@ serve(async (req) => {
       // Compute all indicators
       const sma20 = sma(closes, 20);
       const sma50 = sma(closes, 50);
-      const sma200 = sma(closes, 200);
+      const sma200 = closes.length >= 200
+        ? sma(closes, 200)
+        : closes.length >= 100
+          ? sma(closes, Math.floor(closes.length * 0.8))
+          : null;
       const ema12 = ema(closes, 12);
       const ema26 = ema(closes, 26);
       const rsi14 = rsi(closes, 14);
