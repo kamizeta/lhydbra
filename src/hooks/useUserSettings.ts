@@ -79,6 +79,9 @@ function parseSettings(data: Record<string, unknown>): UserSettings {
     trades_today: Number(data.trades_today ?? 0),
     last_trade_date: data.last_trade_date ? String(data.last_trade_date) : null,
     daily_risk_used: Number(data.daily_risk_used ?? 0),
+    min_score: Number(data.min_score ?? 60),
+    min_r: Number(data.min_r ?? 1.5),
+    min_confidence: Number(data.min_confidence ?? 55),
   };
 }
 
