@@ -183,7 +183,7 @@ export default function ResearchPage() {
 
   const downloadExcel = async () => {
     if (!simResults) return;
-    const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs');
+    const XLSX = (await import('https://cdn.sheetjs.com/xlsx-0.20.0/package/xlsx.mjs' as any)) as any;
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([simResults.summary]), 'Summary');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(simResults.by_symbol), 'By Symbol');
