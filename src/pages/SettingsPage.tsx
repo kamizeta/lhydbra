@@ -456,8 +456,8 @@ export default function SettingsPage() {
                   min={40}
                   max={85}
                   step={1}
-                  value={(settings as any).min_score ?? 60}
-                  onChange={(e) => setSettings(prev => ({ ...prev, min_score: Math.max(40, Math.min(85, Number(e.target.value))) } as any))}
+                  value={settings.min_score}
+                  onChange={(e) => updateField('min_score', Math.max(40, Math.min(85, Number(e.target.value))))}
                   className="w-full mt-1 px-3 py-1.5 bg-background border border-border rounded-md text-xs text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
                 />
               </div>
