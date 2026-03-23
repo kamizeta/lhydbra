@@ -346,7 +346,7 @@ Deno.serve(async (req) => {
       const targets = (sig.targets as number[]) || [];
       const takeProfit = targets.length > 1 ? targets[1] : targets.length > 0 ? targets[0] : entryPrice + stopDist * 2;
 
-      return { ...sig, quantity, risk_pct: effectiveRisk, risk_dollars: riskDollars, position_value: quantity * entryPrice, take_profit: takeProfit };
+      return { ...sig, quantity, risk_pct: cappedRisk, risk_dollars: riskDollars, position_value: quantity * entryPrice, take_profit: takeProfit, symbol_multiplier: symMult, adjusted_risk_pct: cappedRisk.toFixed(2) };
     });
 
     // ─── Execute based on automation level ───
