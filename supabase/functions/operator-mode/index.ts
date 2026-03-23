@@ -184,6 +184,29 @@ Deno.serve(async (req) => {
       return jsonRes({ status: "blocked", reasons: preflight, trades_today: tradesToday, consecutive_losses: consecutiveLosses, daily_risk_used: dailyRiskUsed });
     }
 
+    // ─── Fetch VIX for dynamic thresholds ───
+    let currentVIX = 20;
+    try {
+      const twelveKey = Deno.env.get("TWELVE_DATA_API_KEY") ?? "";
+      if (twelveKey) {
+        const vixRes = await fetch(
+          `https://api.twelvedata.com/price?symbol=VIX&apikey=${twelveKey}`,
+          { signal: AbortSignal.timeout(3000) }
+        );
+        if (vixRes.ok) {
+          const vixData = await vixRes.json();
+          currentVIX = parseFloat(vixData?.price ?? "20");
+          if (isNaN(currentVIX) || currentVIX <= 0) currentVIX = 20;
+        }
+      }
+    } catch { /* use default */ }
+
+    const baseMinScore = Number((settings as any).min_score || 60);
+    const baseMinR = Number((settings as any).min_r || 1.5);
+    const baseMinConfidence = Number((settings as any).min_confidence || 55);
+    const thresholds = getDynamicThresholds(currentVIX, baseMinScore, baseMinR, baseMinConfidence);
+    console.log(`[operator-mode] VIX: ${currentVIX} → thresholds: score≥${thresholds.min_score}, R≥${thresholds.min_r}, conf≥${thresholds.min_confidence} (${thresholds.adjustment_reason})`);
+
     // ─── ACTION: status ───
     if (action === "status") {
       const { data: openPositions } = await supabase
