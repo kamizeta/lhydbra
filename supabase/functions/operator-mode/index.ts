@@ -305,61 +305,37 @@ Deno.serve(async (req) => {
 
     // ─── ACTION: run ───
 
-    // ─── Sync with Alpaca before running ───
-    try {
-      await fetch(`${supabaseUrl}/functions/v1/alpaca-sync`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${serviceKey}`,
-        },
-        body: JSON.stringify({ paper, user_id_override: user.id }),
-      });
-      console.log("[operator-mode] Pre-run sync completed");
-
-      // Reload fresh settings after sync
-      const freshRes = await supabase
-        .from("user_settings")
-        .select("consecutive_losses, trades_today, daily_risk_used, last_trade_date, current_capital")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (freshRes.data) {
-        const fs = freshRes.data;
-        consecutiveLosses = Number(fs.consecutive_losses ?? 0);
-        tradesToday = fs.last_trade_date === today ? Number(fs.trades_today ?? 0) : 0;
-        dailyRiskUsed = fs.last_trade_date === today ? Number(fs.daily_risk_used ?? 0) : 0;
-        currentCapital = Number(fs.current_capital ?? currentCapital);
-      }
-    } catch (syncErr) {
-      console.warn("[operator-mode] Pre-run sync failed (continuing):", syncErr);
-    }
-
-    const remainingSlots = maxTradesPerDay - tradesToday;
-    const remainingRisk = maxDailyRisk - dailyRiskUsed;
-
-    // ─── Refresh market data before generating signals ───
+    // ─── Fire-and-forget: sync and data refresh run in background ───
+    // Don't await — let signals run immediately with existing data
+    // The cron handles sync automatically every 15 min
     const watchlistSymbols = Array.isArray((settings as any).watchlist) && (settings as any).watchlist.length > 0
       ? (settings as any).watchlist
       : ["AAPL", "MSFT", "NVDA", "TSLA", "SPY", "QQQ", "BTC/USD", "ETH/USD"];
 
     try {
-      // Step 1: Refresh market_cache with current prices
-      await fetch(`${supabaseUrl}/functions/v1/market-data-normalized`, {
+      // Non-blocking sync — just trigger, don't wait
+      fetch(`${supabaseUrl}/functions/v1/alpaca-sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+        body: JSON.stringify({ paper, user_id_override: user.id }),
+      }).catch(e => console.warn("Background sync failed:", e));
+
+      // Non-blocking data refresh
+      fetch(`${supabaseUrl}/functions/v1/market-data-normalized`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
         body: JSON.stringify({ symbols: watchlistSymbols, timeframe: "1d" }),
-      });
+      }).catch(e => console.warn("Background market-data failed:", e));
 
-      // Step 2: Recompute indicators from fresh price data
-      await fetch(`${supabaseUrl}/functions/v1/compute-indicators`, {
+      fetch(`${supabaseUrl}/functions/v1/compute-indicators`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
         body: JSON.stringify({ symbols: watchlistSymbols, timeframe: "1d" }),
-      });
+      }).catch(e => console.warn("Background compute failed:", e));
 
-      console.log(`[operator-mode] Data refreshed for ${watchlistSymbols.length} symbols`);
-    } catch (refreshErr) {
-      console.warn("[operator-mode] Data refresh failed (continuing):", refreshErr);
+      console.log("[operator-mode] Background refresh triggered (non-blocking)");
+    } catch (e) {
+      console.warn("[operator-mode] Background trigger error:", e);
     }
 
     // Now run signal engine with VIX-adjusted thresholds
