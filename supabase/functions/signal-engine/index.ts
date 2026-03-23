@@ -521,8 +521,15 @@ Deno.serve(async (req) => {
       const symbol = String(feat.symbol);
       const assetClass = String(feat.asset_type || 'stock');
       const regime = String(feat.market_regime || 'undefined');
-      const currentPrice = priceMap[symbol] || Number(feat.sma_20 || 0);
-      if (currentPrice <= 0) continue;
+      // Use most recent close from market_features as price fallback
+      const currentPrice = priceMap[symbol]
+        || Number(feat.current_price || 0)
+        || Number(feat.sma_20 || 0)
+        || Number(feat.close_price || 0);
+      if (currentPrice <= 0) {
+        rejections.push({ asset: symbol, reason: "No price available in market_cache or features" });
+        continue;
+      }
 
       // OPERATOR MODE: Block unclear regimes
       if (operator_mode && UNCLEAR_REGIMES.has(regime)) {
