@@ -323,6 +323,15 @@ const SYMBOL_SECTORS: Record<string, string> = {
 };
 const MAX_SECTOR_POSITIONS = 2;
 
+const EXTENDED_UNIVERSE: Record<string, string[]> = {
+  stock: ["AAPL","MSFT","NVDA","META","AMZN","TSLA","GOOGL","AMD","AVGO",
+          "PLTR","NFLX","CRM","ORCL","ADBE","QCOM","MU","INTC","ARM",
+          "JPM","GS","BAC","V","MA","PYPL",
+          "SPY","QQQ","IWM","XLK","XLF","XLE","GLD"],
+  crypto: ["BTC/USD","ETH/USD","SOL/USD","BNB/USD","XRP/USD","DOGE/USD"],
+  forex: ["EUR/USD","GBP/USD","USD/JPY","XAU/USD"],
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
