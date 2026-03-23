@@ -6,6 +6,34 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function getDynamicThresholds(vix: number, baseMinScore: number, baseMinR: number, baseMinConfidence: number) {
+  let scoreAdj = 0, rAdj = 0, confAdj = 0;
+  if (vix < 15) {
+    scoreAdj = +5; rAdj = +0.2; confAdj = +5;
+  } else if (vix <= 20) {
+    scoreAdj = 0; rAdj = 0; confAdj = 0;
+  } else if (vix <= 25) {
+    scoreAdj = -5; rAdj = -0.1; confAdj = -3;
+  } else if (vix <= 30) {
+    scoreAdj = -8; rAdj = -0.2; confAdj = -5;
+  } else if (vix <= 40) {
+    scoreAdj = -12; rAdj = -0.3; confAdj = -8;
+  } else {
+    scoreAdj = -15; rAdj = -0.3; confAdj = -10;
+  }
+  return {
+    min_score: Math.max(45, Math.min(85, baseMinScore + scoreAdj)),
+    min_r: Math.max(1.2, Math.min(3.0, baseMinR + rAdj)),
+    min_confidence: Math.max(40, Math.min(80, baseMinConfidence + confAdj)),
+    vix,
+    adjustment_reason: vix < 15 ? "calm_market" :
+                       vix <= 20 ? "normal" :
+                       vix <= 25 ? "elevated_volatility" :
+                       vix <= 30 ? "high_volatility" :
+                       vix <= 40 ? "extreme_volatility" : "crisis",
+  };
+}
+
 function isUSMarketOpen(): boolean {
   const now = new Date();
   const day = now.getUTCDay();
