@@ -591,6 +591,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
         continue;
       }
 
+      // ─── Internal regime vs direction consistency ───
+      const BULLISH_REGIMES = new Set([
+        'bullish', 'trending_bullish', 'overbought', 'bull_market'
+      ]);
+      const BEARISH_REGIMES = new Set([
+        'bearish', 'bear_market', 'oversold', 'trending_bearish'
+      ]);
+      if (operator_mode) {
+        if (BULLISH_REGIMES.has(regime) && direction === 'short') {
+          rejections.push({
+            asset: symbol,
+            reason: `Regime/direction conflict: ${regime} regime with short direction`
+          });
+          continue;
+        }
+        if (BEARISH_REGIMES.has(regime) && direction === 'long') {
+          rejections.push({
+            asset: symbol,
+            reason: `Regime/direction conflict: ${regime} regime with long direction`
+          });
+          continue;
+        }
+      }
+
       // Skip if already has position in same direction
       if (openPositionMap.has(symbol) && openPositionMap.get(symbol) === direction) {
         rejections.push({ asset: symbol, reason: `Already has open ${direction} position` });
