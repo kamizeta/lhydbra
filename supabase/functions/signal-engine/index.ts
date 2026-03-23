@@ -7,12 +7,12 @@ const corsHeaders = {
 
 // ─── Weight Profiles by Regime ───
 const REGIME_WEIGHTS: Record<string, Record<string, number>> = {
-  bullish:        { market_structure: 0.22, momentum: 0.15, volatility_suitability: 0.08, strategy_confluence: 0.18, macro_context: 0.08, sentiment_flow: 0.10, risk_reward: 0.10, historical_performance: 0.09 },
-  bearish:        { market_structure: 0.22, momentum: 0.14, volatility_suitability: 0.10, strategy_confluence: 0.18, macro_context: 0.10, sentiment_flow: 0.08, risk_reward: 0.12, historical_performance: 0.06 },
-  ranging:        { market_structure: 0.18, momentum: 0.08, volatility_suitability: 0.12, strategy_confluence: 0.20, macro_context: 0.10, sentiment_flow: 0.10, risk_reward: 0.14, historical_performance: 0.08 },
-  volatile:       { market_structure: 0.16, momentum: 0.10, volatility_suitability: 0.16, strategy_confluence: 0.16, macro_context: 0.08, sentiment_flow: 0.12, risk_reward: 0.14, historical_performance: 0.08 },
-  compression:    { market_structure: 0.20, momentum: 0.10, volatility_suitability: 0.14, strategy_confluence: 0.20, macro_context: 0.08, sentiment_flow: 0.08, risk_reward: 0.12, historical_performance: 0.08 },
-  default:        { market_structure: 0.20, momentum: 0.12, volatility_suitability: 0.10, strategy_confluence: 0.18, macro_context: 0.08, sentiment_flow: 0.10, risk_reward: 0.12, historical_performance: 0.10 },
+  bullish:        { market_structure: 0.18, momentum: 0.12, volatility_suitability: 0.06, strategy_confluence: 0.14, macro_context: 0.07, sentiment_flow: 0.08, risk_reward: 0.09, historical_performance: 0.07, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.06 },
+  bearish:        { market_structure: 0.18, momentum: 0.11, volatility_suitability: 0.08, strategy_confluence: 0.14, macro_context: 0.09, sentiment_flow: 0.06, risk_reward: 0.10, historical_performance: 0.05, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.06 },
+  ranging:        { market_structure: 0.14, momentum: 0.06, volatility_suitability: 0.10, strategy_confluence: 0.16, macro_context: 0.08, sentiment_flow: 0.08, risk_reward: 0.12, historical_performance: 0.06, macd_confirmation: 0.06, volume_confirmation: 0.06, sr_proximity: 0.08 },
+  volatile:       { market_structure: 0.12, momentum: 0.08, volatility_suitability: 0.13, strategy_confluence: 0.13, macro_context: 0.06, sentiment_flow: 0.10, risk_reward: 0.12, historical_performance: 0.06, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.07 },
+  compression:    { market_structure: 0.16, momentum: 0.08, volatility_suitability: 0.11, strategy_confluence: 0.16, macro_context: 0.07, sentiment_flow: 0.06, risk_reward: 0.10, historical_performance: 0.06, macd_confirmation: 0.07, volume_confirmation: 0.06, sr_proximity: 0.07 },
+  default:        { market_structure: 0.16, momentum: 0.09, volatility_suitability: 0.08, strategy_confluence: 0.15, macro_context: 0.07, sentiment_flow: 0.08, risk_reward: 0.10, historical_performance: 0.08, macd_confirmation: 0.06, volume_confirmation: 0.06, sr_proximity: 0.07 },
 };
 
 const ASSET_CLASS_ADJUSTMENTS: Record<string, Record<string, number>> = {
