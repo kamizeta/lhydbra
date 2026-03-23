@@ -10,7 +10,7 @@ import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-import { Send } from 'lucide-react';
+
 
 type Tab = 'risk' | 'scoring' | 'profile' | 'binance' | 'notifications' | 'alerts';
 
