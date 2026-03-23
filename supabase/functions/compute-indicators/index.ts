@@ -237,6 +237,18 @@ serve(async (req) => {
       const sr = findSupportResistance(highs, lows, closes);
       const momentumScore = rsi14 ? Math.max(0, Math.min(100, rsi14)) : 50;
 
+      // Volume indicators
+      const volumes = bars.map((b: any) => Number(b.volume || 0));
+      const currentVolume = volumes.length > 0 ? volumes[volumes.length - 1] : 0;
+      let volumeSma20: number | null = null;
+      if (volumes.length >= 20) {
+        const recent20 = volumes.slice(-20);
+        volumeSma20 = recent20.reduce((a: number, b: number) => a + b, 0) / 20;
+      }
+      const volumeRatio = volumeSma20 && volumeSma20 > 0
+        ? currentVolume / volumeSma20
+        : 1.0;
+
       const features = {
         symbol,
         timeframe,
@@ -261,6 +273,9 @@ serve(async (req) => {
         resistance_level: sr.resistance,
         market_regime: regime.regime,
         regime_confidence: regime.confidence,
+        volume: currentVolume,
+        volume_sma_20: volumeSma20,
+        volume_ratio: volumeRatio,
         computed_at: new Date().toISOString(),
       };
 
