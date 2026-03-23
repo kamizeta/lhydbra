@@ -96,18 +96,24 @@ export default function SettingsPage() {
     loadProfile();
   }, [user]);
 
-  // Load Binance keys
+  // Load Binance keys & alert settings
   useEffect(() => {
     if (!user) return;
     const loadBinance = async () => {
       const { data } = await supabase
         .from('user_settings')
-        .select('binance_api_key, binance_api_secret')
+        .select('binance_api_key, binance_api_secret, notify_email, notify_telegram_chat_id, notify_on_trade_executed, notify_on_stop_loss, notify_on_take_profit, notify_on_cooldown')
         .eq('user_id', user.id)
         .maybeSingle();
       if (data) {
         setBinanceKey((data as any).binance_api_key || '');
         setBinanceSecret((data as any).binance_api_secret || '');
+        setNotifyEmail((data as any).notify_email || '');
+        setNotifyTelegramChatId((data as any).notify_telegram_chat_id || '');
+        setNotifyOnTradeExecuted((data as any).notify_on_trade_executed ?? true);
+        setNotifyOnStopLoss((data as any).notify_on_stop_loss ?? true);
+        setNotifyOnTakeProfit((data as any).notify_on_take_profit ?? true);
+        setNotifyOnCooldown((data as any).notify_on_cooldown ?? true);
       }
     };
     loadBinance();
