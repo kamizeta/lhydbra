@@ -475,7 +475,7 @@ Deno.serve(async (req) => {
     const avgMonthlyPnl = globalPnl / months;
 
     return new Response(JSON.stringify({
-      config: { date_from: startStr, date_to: endStr, min_score, min_r, risk_pct, initial_capital, max_concurrent_trades, symbols: SYMBOLS },
+      config: { date_from: startStr, date_to: endStr, min_score, min_r, risk_pct, initial_capital, max_concurrent_trades, symbols: SYMBOLS, macro_filter: "Equity trades follow SPY SMA50 trend. Crypto trades follow BTC SMA50 trend. Choppy markets (SMA20/SMA50 spread < 1.5%) are skipped entirely." },
       summary: {
         initial_capital,
         final_capital: +totalCapital.toFixed(2),
