@@ -450,6 +450,18 @@ Deno.serve(async (req) => {
       } catch (reportErr) {
         console.error("Daily report save error:", reportErr);
       }
+
+      // ─── Send notification for trades executed ───
+      const tradesExecuted = execResults.filter(r => r.success).length;
+      if (tradesExecuted > 0) {
+        try {
+          await fetch(`${supabaseUrl}/functions/v1/send-notification`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+            body: JSON.stringify({ user_id: user.id, event: "trade_executed", data: { trades: executableTrades.map((t: Record<string, unknown>) => ({ symbol: t.asset, direction: t.direction, score: Number(t.opportunity_score).toFixed(0), r: Number(t.expected_r_multiple).toFixed(1) })), capital: liveCapital } }),
+          });
+        } catch {}
+      }
     }
 
     return jsonRes({

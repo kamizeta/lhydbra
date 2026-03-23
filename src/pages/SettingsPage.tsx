@@ -944,6 +944,103 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* External Alerts Tab */}
+      {activeTab === 'alerts' && (
+        <div className="max-w-lg space-y-6">
+          <div className="flex justify-end">
+            <button
+              onClick={async () => {
+                if (!user) return;
+                setSaving(true);
+                const { error } = await supabase.from('user_settings').upsert({
+                  user_id: user.id,
+                  notify_email: notifyEmail || null,
+                  notify_telegram_chat_id: notifyTelegramChatId || null,
+                  notify_on_trade_executed: notifyOnTradeExecuted,
+                  notify_on_stop_loss: notifyOnStopLoss,
+                  notify_on_take_profit: notifyOnTakeProfit,
+                  notify_on_cooldown: notifyOnCooldown,
+                  updated_at: new Date().toISOString(),
+                } as any, { onConflict: 'user_id' });
+                if (error) toast.error('Error saving alert settings');
+                else toast.success('Alert settings saved ✓');
+                setSaving(false);
+              }}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? 'Saving...' : 'Save Alerts'}
+            </button>
+          </div>
+
+          <div className="terminal-border rounded-lg p-5 space-y-5">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Send className="h-4 w-4 text-primary" />
+              External Alerts (Telegram / Email)
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Recibe notificaciones externas cuando se ejecutan trades, se activan stop loss/take profit o se activa cooldown.
+            </p>
+
+            <div>
+              <label className="text-xs text-muted-foreground font-mono uppercase">Email</label>
+              <input
+                type="email"
+                value={notifyEmail}
+                onChange={(e) => setNotifyEmail(e.target.value)}
+                placeholder="alerts@example.com"
+                className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Requiere Resend API Key configurado en el backend</p>
+            </div>
+
+            <div>
+              <label className="text-xs text-muted-foreground font-mono uppercase">Telegram Chat ID</label>
+              <input
+                type="text"
+                value={notifyTelegramChatId}
+                onChange={(e) => setNotifyTelegramChatId(e.target.value)}
+                placeholder="123456789"
+                className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Envía un mensaje a <span className="text-primary">@userinfobot</span> en Telegram para obtener tu Chat ID
+              </p>
+            </div>
+
+            <div className="border-t border-border pt-4 space-y-3">
+              <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Eventos</p>
+              {([
+                { label: '🤖 Trade Ejecutado', desc: 'Cuando el operador ejecuta trades automáticos', checked: notifyOnTradeExecuted, onChange: setNotifyOnTradeExecuted },
+                { label: '🔴 Stop Loss', desc: 'Cuando se activa un stop loss', checked: notifyOnStopLoss, onChange: setNotifyOnStopLoss },
+                { label: '🟢 Take Profit', desc: 'Cuando se alcanza un take profit', checked: notifyOnTakeProfit, onChange: setNotifyOnTakeProfit },
+                { label: '⚠️ Cooldown', desc: 'Cuando se activa el cooldown por pérdidas consecutivas', checked: notifyOnCooldown, onChange: setNotifyOnCooldown },
+              ]).map(({ label, desc, checked, onChange }) => (
+                <div key={label} className={cn(
+                  "flex items-center justify-between p-3 rounded-md border transition-colors",
+                  checked ? "border-border bg-background" : "border-border/50 bg-muted/30 opacity-60"
+                )}>
+                  <div>
+                    <span className="text-sm font-medium text-foreground">{label}</span>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => onChange(e.target.checked)}
+                      className="rounded border-border"
+                    />
+                    <span className="text-[10px] text-muted-foreground font-mono">ON</span>
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

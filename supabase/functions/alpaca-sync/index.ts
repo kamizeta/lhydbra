@@ -343,6 +343,16 @@ serve(async (req) => {
           console.error("signal_outcomes write error:", outcomeErr);
         }
 
+        // ─── Send notification for closed position ───
+        try {
+          const notifEvent = pnl > 0 ? "take_profit_hit" : "stop_loss_hit";
+          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-notification`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+            body: JSON.stringify({ user_id: userId, event: notifEvent, data: { symbol: local.symbol, pnl, r_multiple: rMultiple, strategy: (local as any).strategy_family || local.strategy } }),
+          });
+        } catch {}
+
         changes.push({
           action: "closed",
           symbol: local.symbol,
