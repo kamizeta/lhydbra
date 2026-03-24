@@ -92,7 +92,7 @@ function atr(highs: number[], lows: number[], closes: number[], period = 14): nu
 function bollingerBands(closes: number[], period = 20, mult = 2): { upper: number; lower: number } | null {
   const mid = sma(closes, period);
   if (mid === null) return null;
-  const slice = closes.slice(0, period);
+  const slice = closes.slice(-period);
   const variance = slice.reduce((sum, v) => sum + Math.pow(v - mid, 2), 0) / period;
   const std = Math.sqrt(variance);
   return { upper: mid + mult * std, lower: mid - mult * std };
