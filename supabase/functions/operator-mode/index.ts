@@ -420,7 +420,8 @@ Deno.serve(async (req) => {
     const hasEquitySignals = signals.some((s: Record<string, unknown>) =>
       ['stock', 'etf'].includes(String(s.asset_class || 'stock'))
     );
-    if (hasEquitySignals && !isUSMarketOpen()) {
+    const marketOpen = await isUSMarketOpen(paper);
+    if (hasEquitySignals && !marketOpen) {
       return jsonRes({
         status: "blocked",
         reasons: ["🔴 MARKET CLOSED: US equity execution blocked outside NYSE hours (14:30–21:00 UTC Mon–Fri)"],
