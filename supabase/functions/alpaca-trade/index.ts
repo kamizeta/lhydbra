@@ -45,13 +45,23 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, de
 
 // ─── Poll order until filled or terminal ───
 async function pollOrderStatus(baseUrl: string, orderId: string, headers: Record<string, string>, maxAttempts = 10): Promise<Record<string, unknown>> {
+  const url = `${baseUrl}/v2/orders/${orderId}`;
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise(r => setTimeout(r, 1000));
-    const res = await fetch(`${baseUrl}/v2/orders/${orderId}`, { headers });
-    if (!res.ok) continue;
+    const res = await fetch(url, { headers });
+    if (res.status === 401 || res.status === 403) {
+      console.error(`[alpaca-trade] Auth error during poll: ${res.status}`);
+      return { status: 'auth_error', id: orderId, code: res.status };
+    }
+    if (res.status === 404) {
+      return { status: 'order_not_found', id: orderId };
+    }
+    if (!res.ok) {
+      console.error(`[alpaca-trade] Poll attempt ${i + 1} failed: ${res.status}`);
+      continue;
+    }
     const order = await res.json();
-    const status = String(order.status);
-    if (['filled', 'canceled', 'expired', 'rejected', 'stopped'].includes(status)) {
+    if (['filled', 'canceled', 'expired', 'rejected'].includes(order.status)) {
       return order;
     }
   }
