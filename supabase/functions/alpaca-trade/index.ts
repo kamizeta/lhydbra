@@ -265,6 +265,17 @@ serve(async (req) => {
         fillConfirmed = String(finalOrder.status) === 'filled';
       }
 
+      // Audit log
+      await supabase.from("audit_log").insert({
+        user_id: userId,
+        action: "trade_executed",
+        entity: "order",
+        entity_id: String(finalOrder.id),
+        new_values: { symbol, qty, side, status: finalOrder.status, filled_avg_price: finalOrder.filled_avg_price },
+      } as Record<string, unknown>).then(({ error: auditErr }) => {
+        if (auditErr) console.error("[audit_log] insert error:", auditErr.message);
+      });
+
       return jsonRes({
         success: fillConfirmed,
         order: {
@@ -331,6 +342,17 @@ serve(async (req) => {
       } catch (syncErr) {
         console.error("Local position sync failed (Alpaca close succeeded):", syncErr);
       }
+
+      // Audit log
+      await supabase.from("audit_log").insert({
+        user_id: userId,
+        action: "position_closed",
+        entity: "order",
+        entity_id: String(data.id),
+        new_values: { symbol, qty: qty || "full", status: data.status, filled_avg_price: data.filled_avg_price },
+      } as Record<string, unknown>).then(({ error: auditErr }) => {
+        if (auditErr) console.error("[audit_log] insert error:", auditErr.message);
+      });
 
       return jsonRes({ success: true, order: data });
     }

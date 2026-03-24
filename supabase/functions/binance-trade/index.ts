@@ -130,6 +130,17 @@ serve(async (req) => {
         });
       }
 
+      // Audit log
+      await adminClient.from("audit_log").insert({
+        user_id: user.id,
+        action: "trade_executed",
+        entity: "order",
+        entity_id: String(data.orderId || data.clientOrderId || ""),
+        new_values: { symbol, quantity, side, type, status: data.status },
+      }).then(({ error: auditErr }: { error: { message: string } | null }) => {
+        if (auditErr) console.error("[audit_log] insert error:", auditErr.message);
+      });
+
       return new Response(JSON.stringify({ success: true, order: data }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
