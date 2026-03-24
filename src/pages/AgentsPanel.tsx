@@ -55,11 +55,11 @@ export default function AgentsPanel() {
   useEffect(() => { if (runningAgent && !selectedAgent) setSelectedAgent(runningAgent); }, [runningAgent, selectedAgent]);
   useEffect(() => { resumeLatestRun(); }, [resumeLatestRun]);
 
-  const [positions, setPositions] = useState<any[]>([]);
-  const [closedTrades, setClosedTrades] = useState<any[]>([]);
-  const [marketFeatures, setMarketFeatures] = useState<any[]>([]);
-  const [opportunityScores, setOpportunityScores] = useState<any[]>([]);
-  const [strategyPerformance, setStrategyPerformance] = useState<any[]>([]);
+  const [positions, setPositions] = useState<Tables<'positions'>[]>([]);
+  const [closedTrades, setClosedTrades] = useState<Tables<'trade_journal'>[]>([]);
+  const [marketFeatures, setMarketFeatures] = useState<Tables<'market_features'>[]>([]);
+  const [opportunityScores, setOpportunityScores] = useState<Tables<'signals'>[]>([]);
+  const [strategyPerformance, setStrategyPerformance] = useState<Tables<'strategy_performance'>[]>([]);
 
   // History state
   const [sessions, setSessions] = useState<Session[]>([]);
