@@ -1656,6 +1656,27 @@ export type Database = {
         }
         Relationships: []
       }
+      symbol_sectors: {
+        Row: {
+          created_at: string | null
+          is_active: boolean | null
+          sector: string
+          symbol: string
+        }
+        Insert: {
+          created_at?: string | null
+          is_active?: boolean | null
+          sector: string
+          symbol: string
+        }
+        Update: {
+          created_at?: string | null
+          is_active?: boolean | null
+          sector?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
       trade_journal: {
         Row: {
           asset_type: string

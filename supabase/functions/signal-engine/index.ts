@@ -32,17 +32,7 @@ const ASSET_CLASS_ADJUSTMENTS: Record<string, Record<string, number>> = {
 
 const UNCLEAR_REGIMES = new Set(["undefined", "transitional", "unknown", "neutral"]);
 
-const SYMBOL_SECTORS: Record<string, string> = {
-  AAPL: "tech", MSFT: "tech", NVDA: "tech", GOOGL: "tech", META: "tech",
-  AMZN: "tech", TSLA: "tech", AMD: "tech",
-  QQQ: "tech_etf", SOXX: "tech_etf", SMH: "tech_etf",
-  SPY: "broad_etf", VOO: "broad_etf", IWM: "broad_etf",
-  JPM: "finance", BAC: "finance", GS: "finance", XLF: "finance",
-  XLE: "energy", CVX: "energy", XOM: "energy",
-  GLD: "commodity", "XAU/USD": "commodity",
-  "BTC/USD": "crypto", "ETH/USD": "crypto",
-  "EUR/USD": "forex", "GBP/USD": "forex", "USD/JPY": "forex",
-};
+// SYMBOL_SECTORS loaded from DB at runtime (symbol_sectors table)
 const MAX_SECTOR_POSITIONS = 2;
 
 const EXTENDED_UNIVERSE: Record<string, string[]> = {
@@ -421,6 +411,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // ─── Load symbol sectors from DB ───
+    const { data: sectorData } = await supabase
+      .from('symbol_sectors')
+      .select('symbol, sector')
+      .eq('is_active', true);
+    const SYMBOL_SECTORS: Record<string, string> = Object.fromEntries(
+      (sectorData ?? []).map((r: { symbol: string; sector: string }) => [r.symbol, r.sector])
     );
 
     // ─── Expire stale signals (older than 24h) ───
