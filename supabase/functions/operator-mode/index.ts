@@ -118,8 +118,11 @@ Deno.serve(async (req) => {
 
     let user: { id: string } | null = null;
     if (user_id_override) {
-      // Called from scheduled dispatcher with service role key
-      user = { id: user_id_override };
+      const isServiceRole = authHeader === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
+      if (!isServiceRole) {
+        return jsonRes({ error: "Forbidden: user_id_override requires service role" }, 403);
+      }
+      user = { id: user_id_override } as typeof user;
     } else {
       const userSupabase = createClient(supabaseUrl, anonKey, {
         global: { headers: { Authorization: authHeader } },
@@ -337,6 +340,10 @@ Deno.serve(async (req) => {
     } catch (e) {
       console.warn("[operator-mode] Background trigger error:", e);
     }
+
+    // Calculate remaining capacity before signal generation
+    const remainingSlots = Math.max(0, maxTradesPerDay - tradesToday);
+    const remainingRisk = Math.max(0, maxDailyRisk - dailyRiskUsed);
 
     // Now run signal engine with VIX-adjusted thresholds
     const signalResponse = await fetch(`${supabaseUrl}/functions/v1/signal-engine`, {
