@@ -470,7 +470,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // Filter stale features (> 26h old)
-    const featuresCutoff = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
+    const featuresCutoff = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const featuresData = allFeaturesData.filter(
       (f: Record<string, unknown>) => f.computed_at && String(f.computed_at) > featuresCutoff
     );

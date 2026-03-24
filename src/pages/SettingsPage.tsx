@@ -606,6 +606,7 @@ export default function SettingsPage() {
                     await Promise.all([
                       supabase.from('positions').delete().eq('user_id', user.id),
                       supabase.from('trade_signals').delete().eq('user_id', user.id),
+                      supabase.from('signals').delete().eq('user_id', user.id),
                     ]);
                     toast.success('Todo reseteado ✓');
                   }}
