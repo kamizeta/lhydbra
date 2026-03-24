@@ -204,20 +204,26 @@ export default function SettingsPage() {
 
   const saveBinance = async () => {
     if (!user) return;
+    if (!binanceKey || !binanceSecret) {
+      toast.error('Both API Key and Secret are required');
+      return;
+    }
     setSaving(true);
-    const { error } = await supabase
-      .from('user_settings')
-      .upsert({
-        user_id: user.id,
-        binance_api_key: binanceKey,
-        binance_api_secret: binanceSecret,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' });
+    try {
+      const { data, error } = await supabase.functions.invoke('save-api-keys', {
+        body: { binance_api_key: binanceKey, binance_api_secret: binanceSecret },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
 
-    if (error) {
-      toast.error('Error saving Binance keys');
-    } else {
-      toast.success('Binance API keys saved ✓');
+      setMaskedKey(data.masked_key);
+      setMaskedSecret(data.masked_secret);
+      setBinanceConfigured(true);
+      setBinanceKey('');
+      setBinanceSecret('');
+      toast.success('Binance API keys stored securely ✓');
+    } catch (e: any) {
+      toast.error(`Error saving keys: ${e.message}`);
     }
     setSaving(false);
   };
