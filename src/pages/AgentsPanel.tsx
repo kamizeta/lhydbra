@@ -7,6 +7,7 @@ import { useAgentStore, type AgentType } from "@/hooks/useAgentStore";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import StatusBadge from "@/components/shared/StatusBadge";
 import AgentsHelpButton from "@/components/AgentsHelpButton";
 import { cn } from "@/lib/utils";
@@ -55,11 +56,11 @@ export default function AgentsPanel() {
   useEffect(() => { if (runningAgent && !selectedAgent) setSelectedAgent(runningAgent); }, [runningAgent, selectedAgent]);
   useEffect(() => { resumeLatestRun(); }, [resumeLatestRun]);
 
-  const [positions, setPositions] = useState<any[]>([]);
-  const [closedTrades, setClosedTrades] = useState<any[]>([]);
-  const [marketFeatures, setMarketFeatures] = useState<any[]>([]);
-  const [opportunityScores, setOpportunityScores] = useState<any[]>([]);
-  const [strategyPerformance, setStrategyPerformance] = useState<any[]>([]);
+  const [positions, setPositions] = useState<Tables<'positions'>[]>([]);
+  const [closedTrades, setClosedTrades] = useState<Tables<'trade_journal'>[]>([]);
+  const [marketFeatures, setMarketFeatures] = useState<Tables<'market_features'>[]>([]);
+  const [opportunityScores, setOpportunityScores] = useState<Tables<'signals'>[]>([]);
+  const [strategyPerformance, setStrategyPerformance] = useState<Tables<'strategy_performance'>[]>([]);
 
   // History state
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -72,7 +73,7 @@ export default function AgentsPanel() {
     supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'open').then(({ data }) => { if (data) setPositions(data); });
     supabase.from('trade_journal').select('*').eq('user_id', user.id).order('exited_at', { ascending: false }).limit(100).then(({ data }) => { if (data) setClosedTrades(data); });
     supabase.from('market_features').select('*').eq('timeframe', '1d').then(({ data }) => { if (data) setMarketFeatures(data); });
-    supabase.from('signals').select('*').eq('user_id', user.id).eq('status', 'active').order('opportunity_score', { ascending: false }).limit(20).then(({ data }) => { if (data) setOpportunityScores(data as any[]); });
+    supabase.from('signals').select('*').eq('user_id', user.id).eq('status', 'active').order('opportunity_score', { ascending: false }).limit(20).then(({ data }) => { if (data) setOpportunityScores(data); });
     supabase.from('strategy_performance').select('*').eq('user_id', user.id).then(({ data }) => { if (data) setStrategyPerformance(data); });
   }, [user]);
 
@@ -94,7 +95,7 @@ export default function AgentsPanel() {
   useEffect(() => { if (viewMode === 'history') loadHistory(); }, [viewMode, user]);
 
   const deleteSession = async (sessionId: string) => {
-    await supabase.from('agent_analyses').delete().eq('session_id', sessionId) as any;
+    await supabase.from('agent_analyses').delete().eq('session_id', sessionId);
     setSessions(prev => prev.filter(s => s.session_id !== sessionId));
   };
 

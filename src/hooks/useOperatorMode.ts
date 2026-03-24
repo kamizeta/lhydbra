@@ -71,8 +71,9 @@ export function useOperatorMode() {
     setLoading(true);
     setError(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("No session");
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData?.session) throw new Error('No active session');
+      const session = sessionData.session;
 
       const { data, error: fnError } = await supabase.functions.invoke('operator-mode', {
         body: { action: 'status' },
