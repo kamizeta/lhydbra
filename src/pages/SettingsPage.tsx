@@ -61,6 +61,9 @@ export default function SettingsPage() {
   // Binance state
   const [binanceKey, setBinanceKey] = useState('');
   const [binanceSecret, setBinanceSecret] = useState('');
+  const [maskedKey, setMaskedKey] = useState('');
+  const [maskedSecret, setMaskedSecret] = useState('');
+  const [binanceConfigured, setBinanceConfigured] = useState(false);
 
   // Scoring weights state
   const [weights, setWeights] = useState<ScoringWeights>(defaultWeights);

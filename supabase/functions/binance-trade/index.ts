@@ -26,6 +26,8 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -44,15 +46,19 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Get user's Binance API keys
-    const { data: settings } = await supabase
-      .from("user_settings")
-      .select("binance_api_key, binance_api_secret")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // Retrieve keys from vault using service role
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    const apiKey = (settings as any)?.binance_api_key;
-    const apiSecret = (settings as any)?.binance_api_secret;
+    const secretNameKey = `binance_key_${user.id}`;
+    const secretNameSecret = `binance_secret_${user.id}`;
+
+    const [keyResult, secretResult] = await Promise.all([
+      adminClient.rpc("read_secret", { secret_name: secretNameKey }),
+      adminClient.rpc("read_secret", { secret_name: secretNameSecret }),
+    ]);
+
+    const apiKey = keyResult.data;
+    const apiSecret = secretResult.data;
 
     if (!apiKey || !apiSecret) {
       return new Response(JSON.stringify({ error: "Binance API keys not configured. Go to Settings → Binance API." }), {
