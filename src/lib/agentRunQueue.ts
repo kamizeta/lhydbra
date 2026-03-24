@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import type { AgentResult, AgentType } from "@/hooks/useAgentStore";
 
 export const AGENT_ORDER: AgentType[] = [
@@ -77,11 +78,18 @@ export async function enqueueAgentRun(requestedAgents: AgentType[], language: st
 }
 
 export async function triggerAgentRunProcessing(runId?: string) {
-  const invokePromise = supabase.functions.invoke("process-agent-runs", {
+  const { error } = await supabase.functions.invoke("process-agent-runs", {
     body: runId ? { runId } : {},
   });
 
-  invokePromise.catch(() => undefined);
+  if (error) {
+    console.error("[AgentRunQueue] Failed to invoke agent run:", error.message);
+    toast({
+      title: "Agent execution failed",
+      description: error.message ?? "Unknown error",
+      variant: "destructive",
+    });
+  }
 }
 
 export async function fetchAgentRunSnapshot(runId: string): Promise<AgentRunSnapshot> {
