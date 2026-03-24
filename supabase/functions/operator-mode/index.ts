@@ -70,25 +70,32 @@ async function isUSMarketOpen(paper: boolean): Promise<boolean> {
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) {
-      console.warn("[operator-mode] Alpaca clock check failed, using UTC fallback");
-      return utcFallbackMarketOpen();
+      console.warn("[operator-mode] Alpaca clock failed, using NY fallback");
+      return nyFallbackMarketOpen();
     }
     const clock = await res.json();
     return clock.is_open === true;
   } catch (e) {
-    console.warn("[operator-mode] Alpaca clock error, using UTC fallback:", e);
-    return utcFallbackMarketOpen();
+    console.warn("[operator-mode] Alpaca clock error, using NY fallback:", e);
+    return nyFallbackMarketOpen();
   }
 }
 
-// Fallback if Alpaca clock is unreachable
-function utcFallbackMarketOpen(): boolean {
+function nyFallbackMarketOpen(): boolean {
   const now = new Date();
-  const day = now.getUTCDay();
-  if (day === 0 || day === 6) return false;
-  const utcMins = now.getUTCHours() * 60 + now.getUTCMinutes();
-  // EDT (UTC-4): 13:30-20:00 UTC | EST (UTC-5): 14:30-21:00 UTC
-  return utcMins >= 810 && utcMins < 1200;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour12: false,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(now);
+  const weekday = parts.find(p => p.type === "weekday")?.value;
+  const hour = Number(parts.find(p => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find(p => p.type === "minute")?.value ?? "0");
+  if (weekday === "Sat" || weekday === "Sun") return false;
+  const mins = hour * 60 + minute;
+  return mins >= 570 && mins < 960; // 9:30am–4:00pm New York time
 }
 
 Deno.serve(async (req) => {
