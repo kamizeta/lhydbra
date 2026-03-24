@@ -351,12 +351,15 @@ async function fetchVIXScore(alpacaKeyId: string, alpacaSecret: string): Promise
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const isServiceRole = authHeader === `Bearer ${serviceKey}`;
+
   try {
     // Single body parse
     const body = await req.json().catch(() => ({}));
     const {
       symbols,
-      user_id,
       min_score = 70,
       min_r = 1.8,
       min_confidence = 60,
@@ -364,7 +367,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       operator_mode = false,
     } = body as {
       symbols?: string[];
-      user_id?: string;
       min_score?: number;
       min_r?: number;
       min_confidence?: number;
@@ -372,7 +374,34 @@ Deno.serve(async (req: Request): Promise<Response> => {
       operator_mode?: boolean;
     };
 
-    if (!user_id) return jsonRes({ error: "user_id required" }, 400);
+    let user_id = body.user_id as string | undefined;
+
+    if (isServiceRole && user_id) {
+      // Trusted call from operator-mode — use user_id from body
+    } else {
+      // Regular call — derive user_id from JWT
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        anonKey,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: { user: authUser }, error: authError } = await userClient.auth.getUser();
+      if (authError || !authUser) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      user_id = authUser.id;
+    }
+
+    if (!user_id) {
+      return new Response(JSON.stringify({ error: "user_id required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const alpacaKeyId = Deno.env.get("ALPACA_API_KEY_ID") ?? "";
     const alpacaSecret = Deno.env.get("ALPACA_API_SECRET_KEY") ?? "";
