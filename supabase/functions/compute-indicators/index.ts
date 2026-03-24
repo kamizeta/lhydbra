@@ -82,7 +82,7 @@ function atr(highs: number[], lows: number[], closes: number[], period = 14): nu
     trs.push(tr);
   }
   if (trs.length < period) return null;
-  let atrVal = trs.slice(-period).reduce((a, b) => a + b, 0) / period;
+  let atrVal = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
   for (let i = period; i < trs.length; i++) {
     atrVal = (atrVal * (period - 1) + trs[i]) / period;
   }
