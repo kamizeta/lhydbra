@@ -445,9 +445,7 @@ Deno.serve(async (req) => {
         ? lastBar.close - pos.entry
         : pos.entry - lastBar.close;
       const stopDist = Math.abs(pos.entry - pos.sl);
-      const riskDollars = capitalPerSlot * (risk_pct / 100);
-      const qty = stopDist > 0 ? riskDollars / stopDist : 0;
-      const pnlDollars = rawPnl * qty;
+      const pnlDollars = rawPnl * pos.qty;
       totalCapital += pnlDollars;
 
       allTrades.push({
