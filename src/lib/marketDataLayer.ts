@@ -71,17 +71,22 @@ export async function fetchNormalizedQuotes(symbols: string[]): Promise<Record<s
   const existing = inflightRequests.get(key);
   if (existing) return existing;
 
+  // Safety valve: prevent unbounded growth from leaked entries
+  if (inflightRequests.size > 100) {
+    inflightRequests.clear();
+  }
+
   const promise = (async () => {
     const { data, error } = await supabase.functions.invoke('market-data-normalized', {
       body: { action: 'quotes', symbols },
     });
     if (error) throw new Error(`Normalized quotes error: ${error.message}`);
     return (data || {}) as Record<string, NormalizedQuote>;
-  })();
+  })().finally(() => {
+    inflightRequests.delete(key);
+  });
 
   inflightRequests.set(key, promise);
-  promise.finally(() => inflightRequests.delete(key));
-
   return promise;
 }
 
