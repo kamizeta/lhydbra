@@ -95,7 +95,7 @@ export default function AgentsPanel() {
   useEffect(() => { if (viewMode === 'history') loadHistory(); }, [viewMode, user]);
 
   const deleteSession = async (sessionId: string) => {
-    await supabase.from('agent_analyses').delete().eq('session_id', sessionId) as any;
+    await supabase.from('agent_analyses').delete().eq('session_id', sessionId);
     setSessions(prev => prev.filter(s => s.session_id !== sessionId));
   };
 

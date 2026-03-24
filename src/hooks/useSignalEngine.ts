@@ -52,7 +52,7 @@ export function useSignals(status?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data || []) as unknown as Signal[];
+      return (data as Signal[]) ?? [];
     },
     enabled: !!user,
     staleTime: 30_000,
