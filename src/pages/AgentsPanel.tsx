@@ -73,7 +73,7 @@ export default function AgentsPanel() {
     supabase.from('positions').select('*').eq('user_id', user.id).eq('status', 'open').then(({ data }) => { if (data) setPositions(data); });
     supabase.from('trade_journal').select('*').eq('user_id', user.id).order('exited_at', { ascending: false }).limit(100).then(({ data }) => { if (data) setClosedTrades(data); });
     supabase.from('market_features').select('*').eq('timeframe', '1d').then(({ data }) => { if (data) setMarketFeatures(data); });
-    supabase.from('signals').select('*').eq('user_id', user.id).eq('status', 'active').order('opportunity_score', { ascending: false }).limit(20).then(({ data }) => { if (data) setOpportunityScores(data as any[]); });
+    supabase.from('signals').select('*').eq('user_id', user.id).eq('status', 'active').order('opportunity_score', { ascending: false }).limit(20).then(({ data }) => { if (data) setOpportunityScores(data); });
     supabase.from('strategy_performance').select('*').eq('user_id', user.id).then(({ data }) => { if (data) setStrategyPerformance(data); });
   }, [user]);
 
