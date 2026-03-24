@@ -593,6 +593,7 @@ export default function SettingsPage() {
                   onClick={async () => {
                     if (!user || !confirm('¿Eliminar todas las señales de trade?')) return;
                     await supabase.from('trade_signals').delete().eq('user_id', user.id);
+                    await supabase.from('signals').delete().eq('user_id', user.id);
                     toast.success('Señales eliminadas ✓');
                   }}
                   className="flex items-center gap-2 px-3 py-2 bg-destructive/10 text-destructive border border-destructive/30 rounded-md text-xs font-medium hover:bg-destructive/20 transition-colors"
