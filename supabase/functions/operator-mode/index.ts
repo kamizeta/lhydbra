@@ -499,6 +499,7 @@ Deno.serve(async (req) => {
               side: trade.direction === "long" ? "buy" : "sell",
               type: "market", time_in_force: "day", order_class: "bracket",
               take_profit: trade.take_profit, stop_loss: trade.stop_loss,
+              user_id_override: user.id,
             }),
           });
           const orderResult = await orderRes.json();

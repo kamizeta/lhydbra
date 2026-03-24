@@ -278,7 +278,7 @@ serve(async (req) => {
           const { data: localPos } = await supabase
             .from("positions")
             .select("id, direction, quantity, avg_entry")
-            .eq("user_id", user.id)
+            .eq("user_id", userId)
             .eq("symbol", symbol)
             .eq("status", "open")
             .maybeSingle();
