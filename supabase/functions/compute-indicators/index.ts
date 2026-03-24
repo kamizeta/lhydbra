@@ -203,13 +203,14 @@ serve(async (req) => {
 
     for (const symbol of (symbols as string[])) {
       // Get OHLCV data from cache
-      const { data: bars } = await db
+      const { data: barsDesc } = await db
         .from('ohlcv_cache')
         .select('open, high, low, close, volume, timestamp')
         .eq('symbol', symbol)
         .eq('timeframe', timeframe)
-        .order('timestamp', { ascending: true })
+        .order('timestamp', { ascending: false })
         .limit(250);
+      const bars = barsDesc ? [...barsDesc].reverse() : [];
 
       if (!bars || bars.length < 20) {
         results[symbol] = { error: 'insufficient_data', bars_found: bars?.length || 0 };
@@ -304,9 +305,10 @@ serve(async (req) => {
       results[symbol] = features;
 
       // Persist to market_features (fire-and-forget)
-      db.from('market_features').upsert(features, { onConflict: 'symbol,timeframe' }).then(({ error }) => {
-        if (error) console.error(`Features upsert ${symbol}:`, error.message);
-      });
+      const { error: upsertError } = await db
+        .from('market_features')
+        .upsert(features, { onConflict: 'symbol,timeframe' });
+      if (upsertError) console.error('[compute-indicators] upsert error:', upsertError.message);
     }
 
     // ─── Update correlation matrix ───
