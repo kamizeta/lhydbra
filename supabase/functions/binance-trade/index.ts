@@ -80,6 +80,7 @@ serve(async (req) => {
 
       const response = await fetch(`${BINANCE_API_URL}/api/v3/account?${queryString}&signature=${signature}`, {
         headers: { "X-MBX-APIKEY": apiKey },
+        signal: AbortSignal.timeout(8000),
       });
       const data = await response.json();
 
@@ -118,6 +119,7 @@ serve(async (req) => {
       const response = await fetch(`${BINANCE_API_URL}/api/v3/order?${params}&signature=${signature}`, {
         method: "POST",
         headers: { "X-MBX-APIKEY": apiKey },
+        signal: AbortSignal.timeout(8000),
       });
       const data = await response.json();
 
