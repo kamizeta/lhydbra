@@ -102,6 +102,11 @@ export default function DiagnosticPage() {
         {tests.map(t => (
           <DiagPanel key={t.key} label={t.label} result={results[t.key] ?? null} loading={!!loading[t.key]} onRun={() => run(t.key, t.fn)} />
         ))}
+        <OperatorRunPanel
+          result={results["operatorRun"] ?? null}
+          loading={!!loading["operatorRun"]}
+          onRun={() => run("operatorRun", () => supabase.functions.invoke("operator-mode", { body: { action: "run", paper: true } }))}
+        />
       </div>
     </div>
   );
