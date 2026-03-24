@@ -352,10 +352,7 @@ Deno.serve(async (req) => {
             : pos.entry - exitPrice;
           const rActual = outcome === "take_profit" ? 2.0 : -1.0;
 
-          const slotCapital = Math.min(capitalPerSlot, totalCapital / max_concurrent_trades);
-          const riskDollars = slotCapital * (risk_pct / 100);
-          const qty = stopDist > 0 ? riskDollars / stopDist : 0;
-          const pnlDollars = rawPnl * qty;
+          const pnlDollars = rawPnl * pos.qty;
           totalCapital += pnlDollars;
 
           allTrades.push({
