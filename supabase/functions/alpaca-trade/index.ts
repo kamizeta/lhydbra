@@ -343,6 +343,17 @@ serve(async (req) => {
         console.error("Local position sync failed (Alpaca close succeeded):", syncErr);
       }
 
+      // Audit log
+      await supabase.from("audit_log").insert({
+        user_id: userId,
+        action: "position_closed",
+        entity: "order",
+        entity_id: String(data.id),
+        new_values: { symbol, qty: qty || "full", status: data.status, filled_avg_price: data.filled_avg_price },
+      } as Record<string, unknown>).then(({ error: auditErr }) => {
+        if (auditErr) console.error("[audit_log] insert error:", auditErr.message);
+      });
+
       return jsonRes({ success: true, order: data });
     }
 
