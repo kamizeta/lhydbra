@@ -323,6 +323,7 @@ Deno.serve(async (req) => {
       entry: number; sl: number; tp: number; direction: string;
       entryDate: string; score: number; regime: string;
       macd_momentum: number; volume_ratio: number; sr_score: number;
+      qty: number;
     }> = {};
 
     for (const date of allDates) {
