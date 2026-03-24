@@ -59,7 +59,7 @@ export default function Dashboard() {
   }>>([]);
   const [dataFreshness, setDataFreshness] = useState<{ fresh: boolean; symbol_count: number } | null>(null);
 
-  useEffect(() => {
+  useEffect(() => { const loadDashboard = async () => {
     if (!user) return;
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
