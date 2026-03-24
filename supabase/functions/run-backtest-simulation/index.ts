@@ -425,11 +425,16 @@ Deno.serve(async (req) => {
 
       candidates.sort((a, b) => b.score - a.score);
       for (const c of candidates.slice(0, availableSlots)) {
+        const entryStopDist = Math.abs(c.entry - c.sl);
+        const entrySlotCapital = Math.min(capitalPerSlot, totalCapital / max_concurrent_trades);
+        const entryRiskDollars = entrySlotCapital * (risk_pct / 100);
+        const entryQty = entryStopDist > 0 ? entryRiskDollars / entryStopDist : 0;
         openPositions[c.sym] = {
           entry: c.entry, sl: c.sl, tp: c.tp, direction: c.direction,
           entryDate: date, score: c.score, regime: c.regime,
           macd_momentum: c.macd_momentum, volume_ratio: c.volume_ratio,
           sr_score: c.sr_score,
+          qty: entryQty,
         };
       }
     }
