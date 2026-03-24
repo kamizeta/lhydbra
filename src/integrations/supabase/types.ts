@@ -1958,6 +1958,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_secret: {
+        Args: { new_name: string; new_secret: string }
+        Returns: string
+      }
+      delete_secret: { Args: { secret_id: string }; Returns: undefined }
       increment_trade_counters: {
         Args: {
           p_max_risk: number
@@ -1972,6 +1977,7 @@ export type Database = {
           new_trades_today: number
         }[]
       }
+      read_secret: { Args: { secret_name: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
