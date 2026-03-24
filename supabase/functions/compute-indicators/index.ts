@@ -11,7 +11,7 @@ const corsHeaders = {
 
 function sma(values: number[], period: number): number | null {
   if (values.length < period) return null;
-  const slice = values.slice(0, period);
+  const slice = values.slice(-period);
   return slice.reduce((a, b) => a + b, 0) / period;
 }
 
@@ -82,7 +82,7 @@ function atr(highs: number[], lows: number[], closes: number[], period = 14): nu
     trs.push(tr);
   }
   if (trs.length < period) return null;
-  let atrVal = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  let atrVal = trs.slice(-period).reduce((a, b) => a + b, 0) / period;
   for (let i = period; i < trs.length; i++) {
     atrVal = (atrVal * (period - 1) + trs[i]) / period;
   }
@@ -92,7 +92,7 @@ function atr(highs: number[], lows: number[], closes: number[], period = 14): nu
 function bollingerBands(closes: number[], period = 20, mult = 2): { upper: number; lower: number } | null {
   const mid = sma(closes, period);
   if (mid === null) return null;
-  const slice = closes.slice(0, period);
+  const slice = closes.slice(-period);
   const variance = slice.reduce((sum, v) => sum + Math.pow(v - mid, 2), 0) / period;
   const std = Math.sqrt(variance);
   return { upper: mid + mult * std, lower: mid - mult * std };
@@ -256,7 +256,20 @@ serve(async (req) => {
       const features = {
         symbol,
         timeframe,
-        asset_type: symbol.includes('/') ? (symbol.includes('XA') ? 'commodity' : 'forex') : 'stock',
+        asset_type: (() => {
+          const COMMODITIES = ['XAU/USD','XAG/USD','WTI/USD','OIL/USD','BRENT/USD'];
+          const FOREX = ['EUR/USD','GBP/USD','USD/JPY','USD/CAD','USD/CHF',
+            'AUD/USD','NZD/USD','USD/MXN','USD/BRL','USD/KRW'];
+          const CRYPTO = ['BTC/USD','ETH/USD','SOL/USD','XRP/USD','BNB/USD',
+            'DOGE/USD','ADA/USD','AVAX/USD','MATIC/USD','LINK/USD'];
+          const ETFS = ['SPY','QQQ','IWM','GLD','SLV','USO','TLT','VXX','VIXY',
+            'XLK','XLF','XLE','XLV','XLI','XLP','XLC','XLU','XLB','XLRE'];
+          if (COMMODITIES.includes(symbol)) return 'commodity';
+          if (FOREX.includes(symbol)) return 'forex';
+          if (CRYPTO.includes(symbol)) return 'crypto';
+          if (ETFS.includes(symbol)) return 'etf';
+          return 'stock';
+        })(),
         sma_20: sma20,
         sma_50: sma50,
         sma_200: sma200,
