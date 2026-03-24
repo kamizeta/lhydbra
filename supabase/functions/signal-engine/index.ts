@@ -413,6 +413,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // ─── Rate limit: max 10 calls per minute per user ───
+    const rateLimitKey = `signal-engine:${user_id}:${Math.floor(Date.now() / 60000)}`;
+    const { data: rateData } = await supabase
+      .from('rate_limit_log')
+      .select('count')
+      .eq('key', rateLimitKey)
+      .maybeSingle();
+    const currentCount = (rateData as { count: number } | null)?.count ?? 0;
+    if (currentCount >= 10) {
+      return jsonRes({ error: "Rate limit exceeded. Try again in a minute." }, 429);
+    }
+    await supabase.from('rate_limit_log').upsert({
+      key: rateLimitKey,
+      count: currentCount + 1,
+      expires_at: new Date(Date.now() + 60000).toISOString(),
+    } as Record<string, unknown>);
+
     // ─── Load symbol sectors from DB ───
     const { data: sectorData } = await supabase
       .from('symbol_sectors')
