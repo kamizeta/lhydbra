@@ -11,7 +11,7 @@ const corsHeaders = {
 
 function sma(values: number[], period: number): number | null {
   if (values.length < period) return null;
-  const slice = values.slice(0, period);
+  const slice = values.slice(-period);
   return slice.reduce((a, b) => a + b, 0) / period;
 }
 
