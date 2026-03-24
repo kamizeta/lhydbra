@@ -57,15 +57,37 @@ function calcPositionSize(params: {
   return Math.floor(idealSize);
 }
 
-function isUSMarketOpen(): boolean {
+async function isUSMarketOpen(paper: boolean): Promise<boolean> {
+  try {
+    const alpacaBase = paper
+      ? "https://paper-api.alpaca.markets"
+      : "https://api.alpaca.markets";
+    const res = await fetch(`${alpacaBase}/v2/clock`, {
+      headers: {
+        "APCA-API-KEY-ID": Deno.env.get("ALPACA_API_KEY_ID") ?? "",
+        "APCA-API-SECRET-KEY": Deno.env.get("ALPACA_API_SECRET_KEY") ?? "",
+      },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) {
+      console.warn("[operator-mode] Alpaca clock check failed, using UTC fallback");
+      return utcFallbackMarketOpen();
+    }
+    const clock = await res.json();
+    return clock.is_open === true;
+  } catch (e) {
+    console.warn("[operator-mode] Alpaca clock error, using UTC fallback:", e);
+    return utcFallbackMarketOpen();
+  }
+}
+
+// Fallback if Alpaca clock is unreachable
+function utcFallbackMarketOpen(): boolean {
   const now = new Date();
   const day = now.getUTCDay();
   if (day === 0 || day === 6) return false;
   const utcMins = now.getUTCHours() * 60 + now.getUTCMinutes();
-  // NYSE 9:30am-4pm ET
-  // EDT (UTC-4, Mar-Nov): 13:30-20:00 UTC = 810-1200
-  // EST (UTC-5, Nov-Mar): 14:30-21:00 UTC = 870-1260
-  // Use 810-1200 to cover both — avoids blocking EDT open
+  // EDT (UTC-4): 13:30-20:00 UTC | EST (UTC-5): 14:30-21:00 UTC
   return utcMins >= 810 && utcMins < 1200;
 }
 
