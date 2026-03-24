@@ -96,7 +96,7 @@ export default function Dashboard() {
       toast.error('Error loading dashboard. Please refresh.');
     }
     fetchStatus();
-  }, [user, fetchStatus]);
+  }; loadDashboard(); }, [user, fetchStatus]);
 
   useEffect(() => {
     if (!user) return;
