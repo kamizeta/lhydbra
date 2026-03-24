@@ -873,7 +873,7 @@ export default function SettingsPage() {
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : 'Save API Keys'}
+              {saving ? 'Saving...' : binanceConfigured ? 'Update API Keys' : 'Save API Keys'}
             </button>
           </div>
 
@@ -891,34 +891,56 @@ export default function SettingsPage() {
                 ⚠️ IMPORTANTE: Usa permisos de solo "Spot Trading" y activa la lista blanca de IP para mayor seguridad. Nunca actives permisos de retiro.
               </p>
             </div>
+            <div className="bg-primary/5 border border-primary/20 rounded-md p-3">
+              <p className="text-[10px] text-muted-foreground font-mono">
+                🔐 Las claves se almacenan de forma segura en el vault del servidor. Nunca se guardan en texto plano.
+              </p>
+            </div>
+
+            {binanceConfigured && (
+              <div className="rounded-md bg-accent/50 p-3 space-y-1">
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  🟢 API Key: <span className="text-foreground">{maskedKey}</span>
+                </p>
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  🟢 API Secret: <span className="text-foreground">{maskedSecret}</span>
+                </p>
+              </div>
+            )}
 
             <div>
-              <label className="text-xs text-muted-foreground font-mono uppercase">API Key</label>
+              <label className="text-xs text-muted-foreground font-mono uppercase">
+                {binanceConfigured ? 'New API Key (leave empty to keep current)' : 'API Key'}
+              </label>
               <input
                 type="text"
                 value={binanceKey}
                 onChange={(e) => setBinanceKey(e.target.value)}
-                placeholder="Tu API Key de Binance"
+                placeholder={binanceConfigured ? 'Enter new API Key to update' : 'Tu API Key de Binance'}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="text-xs text-muted-foreground font-mono uppercase">API Secret</label>
+              <label className="text-xs text-muted-foreground font-mono uppercase">
+                {binanceConfigured ? 'New API Secret (leave empty to keep current)' : 'API Secret'}
+              </label>
               <input
                 type="password"
                 value={binanceSecret}
                 onChange={(e) => setBinanceSecret(e.target.value)}
-                placeholder="Tu API Secret de Binance"
+                placeholder={binanceConfigured ? 'Enter new API Secret to update' : 'Tu API Secret de Binance'}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
             </div>
 
-            <div className="rounded-md bg-accent/50 p-3">
-              <p className="text-[10px] text-muted-foreground font-mono">
-                Estado: {binanceKey ? '🟢 API Key configurada' : '🔴 No configurada'}
-              </p>
-            </div>
+            {!binanceConfigured && (
+              <div className="rounded-md bg-accent/50 p-3">
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  Estado: 🔴 No configurada
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
