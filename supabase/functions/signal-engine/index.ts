@@ -481,7 +481,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (featuresData.length === 0) {
       return jsonRes({
         signals: [], count: 0, rejected: 0,
-        message: `All ${staleCount} features are stale (>26h). Run compute-indicators first.`,
+        message: `All ${staleCount} features are stale (>4h). Run compute-indicators first.`,
       });
     }
 
