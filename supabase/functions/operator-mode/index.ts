@@ -223,7 +223,7 @@ Deno.serve(async (req) => {
         const bars = vixData?.bars || [];
         const vixyPrice = bars.length > 0 ? parseFloat(bars[bars.length - 1].c ?? "0") : 0;
         if (vixyPrice > 0) {
-          currentVIX = Math.max(10, Math.min(80, vixyPrice * 10));
+          currentVIX = Math.max(10, Math.min(80, vixyPrice * 2));
         }
       }
     } catch (e) {

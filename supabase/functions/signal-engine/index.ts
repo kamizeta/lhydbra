@@ -335,7 +335,7 @@ async function fetchVIXScore(alpacaKeyId: string, alpacaSecret: string): Promise
     const bars = d?.bars || [];
     const vixy = bars.length > 0 ? parseFloat(bars[bars.length - 1].c ?? "0") : 0;
     if (vixy <= 0) return 50;
-    const vixEquiv = vixy * 10;
+    const vixEquiv = vixy * 2;
     if (vixEquiv < 12) return 85;
     if (vixEquiv < 17) return 70;
     if (vixEquiv < 25) return 50;
