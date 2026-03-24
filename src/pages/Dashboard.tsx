@@ -65,25 +65,36 @@ export default function Dashboard() {
     const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
     const monthAgo = new Date(now.getTime() - 30 * 86400000).toISOString();
 
-    Promise.all([
-      supabase.from('positions').select('id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false }),
-      supabase.from('positions').select('pnl').eq('user_id', user.id).eq('status', 'closed'),
-      supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id).gte('entered_at', weekAgo),
-      supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id).gte('entered_at', monthAgo),
-      supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id),
-    ]).then(([posRes, closedRes, weekRes, monthRes, allRes]) => {
-      setPositions((posRes.data || []) as Position[]);
-      setClosedPnl((closedRes.data || []).reduce((s, p) => s + (p.pnl || 0), 0));
-      setWeeklyPnl((weekRes.data || []).reduce((s, t) => s + (t.pnl || 0), 0));
-      setMonthlyPnl((monthRes.data || []).reduce((s, t) => s + (t.pnl || 0), 0));
-      const all = (allRes.data || []) as { pnl: number | null; r_multiple: number | null }[];
+    try {
+      const [posRes, closedRes, weekRes, monthRes, allRes] = await Promise.all([
+        supabase.from('positions').select('id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false }),
+        supabase.from('positions').select('pnl').eq('user_id', user.id).eq('status', 'closed'),
+        supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id).gte('entered_at', weekAgo),
+        supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id).gte('entered_at', monthAgo),
+        supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id),
+      ]);
+
+      if (posRes.error) console.error('positions error:', posRes.error);
+      if (closedRes.error) console.error('closed trades error:', closedRes.error);
+      if (weekRes.error) console.error('weekly journal error:', weekRes.error);
+      if (monthRes.error) console.error('monthly journal error:', monthRes.error);
+      if (allRes.error) console.error('all journal error:', allRes.error);
+
+      setPositions((posRes.data ?? []) as Position[]);
+      setClosedPnl((closedRes.data ?? []).reduce((s, p) => s + (p.pnl || 0), 0));
+      setWeeklyPnl((weekRes.data ?? []).reduce((s, t) => s + (t.pnl || 0), 0));
+      setMonthlyPnl((monthRes.data ?? []).reduce((s, t) => s + (t.pnl || 0), 0));
+      const all = (allRes.data ?? []) as { pnl: number | null; r_multiple: number | null }[];
       const wins = all.filter(t => (t.pnl || 0) > 0).length;
       const rTrades = all.filter(t => t.r_multiple != null);
       setJournalStats({
         total: all.length, wins,
         avgR: rTrades.length > 0 ? rTrades.reduce((s, t) => s + (t.r_multiple || 0), 0) / rTrades.length : 0,
       });
-    });
+    } catch (err) {
+      console.error('Dashboard load failed:', err);
+      toast.error('Error loading dashboard. Please refresh.');
+    }
     fetchStatus();
   }, [user, fetchStatus]);
 
