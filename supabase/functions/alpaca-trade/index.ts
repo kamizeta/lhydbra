@@ -144,6 +144,20 @@ serve(async (req) => {
         return jsonRes({ error: "Missing required: symbol, qty, side" }, 400);
       }
 
+      const parsedQty = parseFloat(qty);
+      if (isNaN(parsedQty) || parsedQty <= 0) {
+        return jsonRes({ error: "qty must be a positive number" }, 400);
+      }
+      if (parsedQty > 10000) {
+        return jsonRes({ error: "qty exceeds maximum allowed per order" }, 400);
+      }
+      if (!["buy", "sell"].includes(String(side).toLowerCase())) {
+        return jsonRes({ error: "side must be 'buy' or 'sell'" }, 400);
+      }
+      if (!/^[A-Z]{1,5}$/.test(String(symbol).toUpperCase())) {
+        return jsonRes({ error: "Invalid symbol format" }, 400);
+      }
+
       // Pre-trade validation: check account buying power
       const acctRes = await fetchWithRetry(`${baseUrl}/v2/account`, { headers });
       if (acctRes.ok) {
