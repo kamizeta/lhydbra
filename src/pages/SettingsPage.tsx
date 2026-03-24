@@ -61,6 +61,9 @@ export default function SettingsPage() {
   // Binance state
   const [binanceKey, setBinanceKey] = useState('');
   const [binanceSecret, setBinanceSecret] = useState('');
+  const [maskedKey, setMaskedKey] = useState('');
+  const [maskedSecret, setMaskedSecret] = useState('');
+  const [binanceConfigured, setBinanceConfigured] = useState(false);
 
   // Scoring weights state
   const [weights, setWeights] = useState<ScoringWeights>(defaultWeights);
@@ -104,18 +107,22 @@ export default function SettingsPage() {
     loadProfile();
   }, [user]);
 
-  // Load Binance keys & alert settings
+  // Load Binance vault status & alert settings
   useEffect(() => {
     if (!user) return;
     const loadBinance = async () => {
       const { data } = await supabase
         .from('user_settings')
-        .select('binance_api_key, binance_api_secret, notify_email, notify_telegram_chat_id, notify_on_trade_executed, notify_on_stop_loss, notify_on_take_profit, notify_on_cooldown')
+        .select('binance_key_id, binance_secret_id, notify_email, notify_telegram_chat_id, notify_on_trade_executed, notify_on_stop_loss, notify_on_take_profit, notify_on_cooldown')
         .eq('user_id', user.id)
         .maybeSingle();
       if (data) {
-        setBinanceKey((data as any).binance_api_key || '');
-        setBinanceSecret((data as any).binance_api_secret || '');
+        const hasKeys = !!(data as any).binance_key_id && !!(data as any).binance_secret_id;
+        setBinanceConfigured(hasKeys);
+        if (hasKeys) {
+          setMaskedKey('••••••••••••');
+          setMaskedSecret('••••••••••••');
+        }
         setNotifyEmail((data as any).notify_email || '');
         setNotifyTelegramChatId((data as any).notify_telegram_chat_id || '');
         setNotifyOnTradeExecuted((data as any).notify_on_trade_executed ?? true);
@@ -197,20 +204,26 @@ export default function SettingsPage() {
 
   const saveBinance = async () => {
     if (!user) return;
+    if (!binanceKey || !binanceSecret) {
+      toast.error('Both API Key and Secret are required');
+      return;
+    }
     setSaving(true);
-    const { error } = await supabase
-      .from('user_settings')
-      .upsert({
-        user_id: user.id,
-        binance_api_key: binanceKey,
-        binance_api_secret: binanceSecret,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' });
+    try {
+      const { data, error } = await supabase.functions.invoke('save-api-keys', {
+        body: { binance_api_key: binanceKey, binance_api_secret: binanceSecret },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
 
-    if (error) {
-      toast.error('Error saving Binance keys');
-    } else {
-      toast.success('Binance API keys saved ✓');
+      setMaskedKey(data.masked_key);
+      setMaskedSecret(data.masked_secret);
+      setBinanceConfigured(true);
+      setBinanceKey('');
+      setBinanceSecret('');
+      toast.success('Binance API keys stored securely ✓');
+    } catch (e: any) {
+      toast.error(`Error saving keys: ${e.message}`);
     }
     setSaving(false);
   };
@@ -860,7 +873,7 @@ export default function SettingsPage() {
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : 'Save API Keys'}
+              {saving ? 'Saving...' : binanceConfigured ? 'Update API Keys' : 'Save API Keys'}
             </button>
           </div>
 
@@ -878,34 +891,56 @@ export default function SettingsPage() {
                 ⚠️ IMPORTANTE: Usa permisos de solo "Spot Trading" y activa la lista blanca de IP para mayor seguridad. Nunca actives permisos de retiro.
               </p>
             </div>
+            <div className="bg-primary/5 border border-primary/20 rounded-md p-3">
+              <p className="text-[10px] text-muted-foreground font-mono">
+                🔐 Las claves se almacenan de forma segura en el vault del servidor. Nunca se guardan en texto plano.
+              </p>
+            </div>
+
+            {binanceConfigured && (
+              <div className="rounded-md bg-accent/50 p-3 space-y-1">
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  🟢 API Key: <span className="text-foreground">{maskedKey}</span>
+                </p>
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  🟢 API Secret: <span className="text-foreground">{maskedSecret}</span>
+                </p>
+              </div>
+            )}
 
             <div>
-              <label className="text-xs text-muted-foreground font-mono uppercase">API Key</label>
+              <label className="text-xs text-muted-foreground font-mono uppercase">
+                {binanceConfigured ? 'New API Key (leave empty to keep current)' : 'API Key'}
+              </label>
               <input
                 type="text"
                 value={binanceKey}
                 onChange={(e) => setBinanceKey(e.target.value)}
-                placeholder="Tu API Key de Binance"
+                placeholder={binanceConfigured ? 'Enter new API Key to update' : 'Tu API Key de Binance'}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="text-xs text-muted-foreground font-mono uppercase">API Secret</label>
+              <label className="text-xs text-muted-foreground font-mono uppercase">
+                {binanceConfigured ? 'New API Secret (leave empty to keep current)' : 'API Secret'}
+              </label>
               <input
                 type="password"
                 value={binanceSecret}
                 onChange={(e) => setBinanceSecret(e.target.value)}
-                placeholder="Tu API Secret de Binance"
+                placeholder={binanceConfigured ? 'Enter new API Secret to update' : 'Tu API Secret de Binance'}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
             </div>
 
-            <div className="rounded-md bg-accent/50 p-3">
-              <p className="text-[10px] text-muted-foreground font-mono">
-                Estado: {binanceKey ? '🟢 API Key configurada' : '🔴 No configurada'}
-              </p>
-            </div>
+            {!binanceConfigured && (
+              <div className="rounded-md bg-accent/50 p-3">
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  Estado: 🔴 No configurada
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
