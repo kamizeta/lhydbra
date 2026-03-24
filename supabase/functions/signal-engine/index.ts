@@ -413,6 +413,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // ─── Load symbol sectors from DB ───
+    const { data: sectorData } = await supabase
+      .from('symbol_sectors')
+      .select('symbol, sector')
+      .eq('is_active', true);
+    const SYMBOL_SECTORS: Record<string, string> = Object.fromEntries(
+      (sectorData ?? []).map((r: { symbol: string; sector: string }) => [r.symbol, r.sector])
+    );
+
     // ─── Expire stale signals (older than 24h) ───
     const expiryThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     await supabase
