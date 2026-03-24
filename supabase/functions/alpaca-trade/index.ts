@@ -74,13 +74,23 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return jsonRes({ error: "Unauthorized" }, 401);
-    }
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const isServiceRole = authHeader === `Bearer ${serviceKey}`;
 
     const body = await req.json();
-    const { action, paper = true } = body;
+    const { action, paper = true, user_id_override } = body;
+
+    let userId: string;
+    if (isServiceRole && user_id_override) {
+      // Trusted call from operator-mode
+      userId = user_id_override;
+    } else {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        return jsonRes({ error: "Unauthorized" }, 401);
+      }
+      userId = user.id;
+    }
     const baseUrl = paper ? ALPACA_PAPER_URL : ALPACA_LIVE_URL;
     const headers = alpacaHeaders();
 
@@ -268,7 +278,7 @@ serve(async (req) => {
           const { data: localPos } = await supabase
             .from("positions")
             .select("id, direction, quantity, avg_entry")
-            .eq("user_id", user.id)
+            .eq("user_id", userId)
             .eq("symbol", symbol)
             .eq("status", "open")
             .maybeSingle();
