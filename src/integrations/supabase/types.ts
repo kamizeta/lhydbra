@@ -1128,6 +1128,24 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_log: {
+        Row: {
+          count: number | null
+          expires_at: string | null
+          key: string
+        }
+        Insert: {
+          count?: number | null
+          expires_at?: string | null
+          key: string
+        }
+        Update: {
+          count?: number | null
+          expires_at?: string | null
+          key?: string
+        }
+        Relationships: []
+      }
       regime_changes: {
         Row: {
           asset_type: string
