@@ -338,6 +338,10 @@ Deno.serve(async (req) => {
       console.warn("[operator-mode] Background trigger error:", e);
     }
 
+    // Calculate remaining capacity before signal generation
+    const remainingSlots = Math.max(0, maxTradesPerDay - tradesToday);
+    const remainingRisk = Math.max(0, maxDailyRisk - dailyRiskUsed);
+
     // Now run signal engine with VIX-adjusted thresholds
     const signalResponse = await fetch(`${supabaseUrl}/functions/v1/signal-engine`, {
       method: "POST",
