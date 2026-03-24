@@ -173,13 +173,29 @@ Deno.serve(async (req) => {
       riskPerTrade = Math.max(riskPerTrade * 0.5, 0.25);
     }
 
+    // ─── Weekly risk guard ───
+    const maxWeeklyRisk = Number((settings as any).max_weekly_risk || 10);
+    const weekStart = new Date();
+    weekStart.setUTCHours(0, 0, 0, 0);
+    weekStart.setUTCDate(weekStart.getUTCDate() - ((weekStart.getUTCDay() + 6) % 7));
+    const { data: weekTrades } = await supabase
+      .from("trade_journal")
+      .select("pnl")
+      .eq("user_id", user.id)
+      .gte("entered_at", weekStart.toISOString());
+    const weeklyLossPct = currentCapital > 0
+      ? ((weekTrades || [])
+          .filter(t => (t.pnl || 0) < 0)
+          .reduce((s, t) => s + Math.abs(t.pnl || 0), 0) / currentCapital) * 100
+      : 0;
+
     // ─── Pre-flight checks ───
     const preflight: string[] = [];
     if (consecutiveLosses >= lossCooldownCount) preflight.push(`🔴 COOLDOWN: ${consecutiveLosses} losses (limit: ${lossCooldownCount})`);
     if (tradesToday >= maxTradesPerDay) preflight.push(`🔴 DAILY CAP: ${tradesToday}/${maxTradesPerDay} trades`);
     if (dailyRiskUsed >= maxDailyRisk) preflight.push(`🔴 RISK EXHAUSTED: ${dailyRiskUsed.toFixed(1)}%/${maxDailyRisk}%`);
     if (drawdownPct > maxDrawdown) preflight.push(`🔴 MAX DRAWDOWN: ${drawdownPct.toFixed(1)}% (limit: ${maxDrawdown}%)`);
-
+    if (weeklyLossPct >= maxWeeklyRisk) preflight.push(`🔴 WEEKLY RISK: ${weeklyLossPct.toFixed(1)}% loss this week (limit: ${maxWeeklyRisk}%)`);
     // Intraday circuit breaker: check unrealized loss on open positions
     if (action !== "status") {
       const { data: cbPositions } = await supabase
