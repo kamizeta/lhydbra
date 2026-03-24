@@ -263,10 +263,20 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
             body: orderBody,
           });
 
-          if (error || data?.error) {
-            toast.error(`Alpaca: ${data?.error || error?.message}`);
+          if (error) {
+            throw new Error(error.message || 'Broker connection failed');
+          }
+          if (data?.error) {
+            throw new Error(data.error);
+          }
+          if (data?.pending === true) {
+            toast.warning('Order submitted but fill not confirmed yet. Position was not created locally. It will appear after the next sync.');
             setSaving(false);
+            onClose();
             return;
+          }
+          if (data?.success !== true) {
+            throw new Error('Order was not confirmed by broker. Position not created.');
           }
           toast.success(`Orden enviada a Alpaca ${alpacaPaper ? '(Paper)' : '(Live)'}: ${data?.order?.status}`);
         } catch (err) {
