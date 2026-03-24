@@ -469,8 +469,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return jsonRes({ signals: [], count: 0, rejected: 0, message: "No market features available. Run compute-indicators first." });
     }
 
-    // Filter stale features (> 26h old)
-    const featuresCutoff = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
+    // Filter stale features (> 4h old)
+    const featuresCutoff = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
     const featuresData = allFeaturesData.filter(
       (f: Record<string, unknown>) => f.computed_at && String(f.computed_at) > featuresCutoff
     );
@@ -481,7 +481,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (featuresData.length === 0) {
       return jsonRes({
         signals: [], count: 0, rejected: 0,
-        message: `All ${staleCount} features are stale (>26h). Run compute-indicators first.`,
+        message: `All ${staleCount} features are stale (>4h). Run compute-indicators first.`,
       });
     }
 
