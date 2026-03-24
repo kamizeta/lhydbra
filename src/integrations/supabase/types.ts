@@ -1060,7 +1060,7 @@ export type Database = {
             foreignKeyName: "positions_signal_id_fkey"
             columns: ["signal_id"]
             isOneToOne: false
-            referencedRelation: "trade_signals"
+            referencedRelation: "signals"
             referencedColumns: ["id"]
           },
         ]
@@ -1323,7 +1323,7 @@ export type Database = {
             foreignKeyName: "signal_outcomes_signal_id_fkey"
             columns: ["signal_id"]
             isOneToOne: false
-            referencedRelation: "trade_signals"
+            referencedRelation: "signals"
             referencedColumns: ["id"]
           },
         ]
@@ -1741,7 +1741,7 @@ export type Database = {
             foreignKeyName: "trade_journal_signal_id_fkey"
             columns: ["signal_id"]
             isOneToOne: false
-            referencedRelation: "trade_signals"
+            referencedRelation: "signals"
             referencedColumns: ["id"]
           },
         ]
