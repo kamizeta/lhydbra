@@ -305,9 +305,10 @@ serve(async (req) => {
       results[symbol] = features;
 
       // Persist to market_features (fire-and-forget)
-      db.from('market_features').upsert(features, { onConflict: 'symbol,timeframe' }).then(({ error }) => {
-        if (error) console.error(`Features upsert ${symbol}:`, error.message);
-      });
+      const { error: upsertError } = await db
+        .from('market_features')
+        .upsert(features, { onConflict: 'symbol,timeframe' });
+      if (upsertError) console.error('[compute-indicators] upsert error:', upsertError.message);
     }
 
     // ─── Update correlation matrix ───
