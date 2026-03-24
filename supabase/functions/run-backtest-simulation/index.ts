@@ -323,6 +323,7 @@ Deno.serve(async (req) => {
       entry: number; sl: number; tp: number; direction: string;
       entryDate: string; score: number; regime: string;
       macd_momentum: number; volume_ratio: number; sr_score: number;
+      qty: number;
     }> = {};
 
     for (const date of allDates) {
@@ -351,10 +352,7 @@ Deno.serve(async (req) => {
             : pos.entry - exitPrice;
           const rActual = outcome === "take_profit" ? 2.0 : -1.0;
 
-          const slotCapital = Math.min(capitalPerSlot, totalCapital / max_concurrent_trades);
-          const riskDollars = slotCapital * (risk_pct / 100);
-          const qty = stopDist > 0 ? riskDollars / stopDist : 0;
-          const pnlDollars = rawPnl * qty;
+          const pnlDollars = rawPnl * pos.qty;
           totalCapital += pnlDollars;
 
           allTrades.push({
@@ -424,11 +422,16 @@ Deno.serve(async (req) => {
 
       candidates.sort((a, b) => b.score - a.score);
       for (const c of candidates.slice(0, availableSlots)) {
+        const entryStopDist = Math.abs(c.entry - c.sl);
+        const entrySlotCapital = Math.min(capitalPerSlot, totalCapital / max_concurrent_trades);
+        const entryRiskDollars = entrySlotCapital * (risk_pct / 100);
+        const entryQty = entryStopDist > 0 ? entryRiskDollars / entryStopDist : 0;
         openPositions[c.sym] = {
           entry: c.entry, sl: c.sl, tp: c.tp, direction: c.direction,
           entryDate: date, score: c.score, regime: c.regime,
           macd_momentum: c.macd_momentum, volume_ratio: c.volume_ratio,
           sr_score: c.sr_score,
+          qty: entryQty,
         };
       }
     }
@@ -442,9 +445,7 @@ Deno.serve(async (req) => {
         ? lastBar.close - pos.entry
         : pos.entry - lastBar.close;
       const stopDist = Math.abs(pos.entry - pos.sl);
-      const riskDollars = capitalPerSlot * (risk_pct / 100);
-      const qty = stopDist > 0 ? riskDollars / stopDist : 0;
-      const pnlDollars = rawPnl * qty;
+      const pnlDollars = rawPnl * pos.qty;
       totalCapital += pnlDollars;
 
       allTrades.push({
