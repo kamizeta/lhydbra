@@ -182,7 +182,13 @@ Deno.serve(async (req) => {
     const settings = settingsRes.data;
     if (!settings) return jsonRes({ error: "User settings not found. Configure your account first." }, 400);
 
+    if (goalRes.error) {
+      console.error('[operator-mode] goal_profiles fetch error:', goalRes.error.message);
+    }
     const goal = goalRes.data;
+    console.log('[operator-mode] goal fetched:', JSON.stringify(goal));
+    console.log('[operator-mode] automation_level:', goal?.automation_level);
+    console.log('[operator-mode] is_active:', goal?.is_active);
     const today = new Date().toISOString().split("T")[0];
     const maxTradesPerDay = Number(settings.max_trades_per_day || 3);
     const lossCooldownCount = Number(settings.loss_cooldown_count || 2);
