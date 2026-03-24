@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -163,6 +163,12 @@ function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const origin = req.headers.get("origin") ?? "";
+  const allowed = Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173";
+  if (origin && origin !== allowed) {
+    return new Response("Forbidden", { status: 403 });
+  }
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const {

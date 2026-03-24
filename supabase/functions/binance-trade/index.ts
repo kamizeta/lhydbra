@@ -11,7 +11,7 @@ async function hmacSha256(secret: string, message: string): Promise<string> {
 }
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -19,6 +19,12 @@ const BINANCE_API_URL = "https://api.binance.com";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const origin = req.headers.get("origin") ?? "";
+  const allowed = Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173";
+  if (origin && origin !== allowed) {
+    return new Response("Forbidden", { status: 403 });
+  }
 
   try {
     const authHeader = req.headers.get("Authorization");
