@@ -256,7 +256,20 @@ serve(async (req) => {
       const features = {
         symbol,
         timeframe,
-        asset_type: symbol.includes('/') ? (symbol.includes('XA') ? 'commodity' : 'forex') : 'stock',
+        asset_type: (() => {
+          const COMMODITIES = ['XAU/USD','XAG/USD','WTI/USD','OIL/USD','BRENT/USD'];
+          const FOREX = ['EUR/USD','GBP/USD','USD/JPY','USD/CAD','USD/CHF',
+            'AUD/USD','NZD/USD','USD/MXN','USD/BRL','USD/KRW'];
+          const CRYPTO = ['BTC/USD','ETH/USD','SOL/USD','XRP/USD','BNB/USD',
+            'DOGE/USD','ADA/USD','AVAX/USD','MATIC/USD','LINK/USD'];
+          const ETFS = ['SPY','QQQ','IWM','GLD','SLV','USO','TLT','VXX','VIXY',
+            'XLK','XLF','XLE','XLV','XLI','XLP','XLC','XLU','XLB','XLRE'];
+          if (COMMODITIES.includes(symbol)) return 'commodity';
+          if (FOREX.includes(symbol)) return 'forex';
+          if (CRYPTO.includes(symbol)) return 'crypto';
+          if (ETFS.includes(symbol)) return 'etf';
+          return 'stock';
+        })(),
         sma_20: sma20,
         sma_50: sma50,
         sma_200: sma200,
