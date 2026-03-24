@@ -31,6 +31,46 @@ function DiagPanel({ label, result, loading, onRun }: { label: string; result: T
   );
 }
 
+function OperatorRunPanel({ result, loading, onRun }: { result: TestResult | null; loading: boolean; onRun: () => void }) {
+  const data = result?.data;
+  const status = data?.status;
+  const hasError = result?.error || data?.error;
+
+  const borderClass = hasError || status === "blocked"
+    ? "border-destructive"
+    : status === "ready_for_approval"
+    ? "border-yellow-500"
+    : "border-profit";
+
+  let summary = "";
+  if (result) {
+    if (hasError) summary = `🔴 Error: ${result.error || data?.error}`;
+    else if (status === "executed") summary = `✅ Trades executed: ${data?.trades?.length ?? 0}`;
+    else if (status === "no_opportunities") summary = "⚠️ No opportunities found";
+    else if (status === "ready_for_approval") summary = "🟡 Signals ready but auto-execute is off";
+    else if (status === "blocked") summary = `🔴 Blocked: ${(data?.reasons ?? []).join(", ")}`;
+    else summary = `Status: ${status ?? "unknown"}`;
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Button onClick={onRun} disabled={loading} variant="outline" size="sm" className="font-mono text-xs w-full">
+        {loading ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : null}
+        Run Operator (action: run)
+      </Button>
+      {result && (
+        <div className={cn("border rounded-md p-3 overflow-auto max-h-96 bg-card", borderClass)}>
+          <p className="text-[10px] font-mono text-muted-foreground mb-1">{result.ms}ms</p>
+          <p className="text-xs font-mono font-semibold text-foreground mb-2">{summary}</p>
+          <pre className="text-[11px] font-mono text-foreground whitespace-pre-wrap break-all">
+            {JSON.stringify(data ?? result.error, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DiagnosticPage() {
   const { user } = useAuth();
   const [results, setResults] = useState<Record<string, TestResult | null>>({});
@@ -62,6 +102,11 @@ export default function DiagnosticPage() {
         {tests.map(t => (
           <DiagPanel key={t.key} label={t.label} result={results[t.key] ?? null} loading={!!loading[t.key]} onRun={() => run(t.key, t.fn)} />
         ))}
+        <OperatorRunPanel
+          result={results["operatorRun"] ?? null}
+          loading={!!loading["operatorRun"]}
+          onRun={() => run("operatorRun", () => supabase.functions.invoke("operator-mode", { body: { action: "run", paper: true } }))}
+        />
       </div>
     </div>
   );

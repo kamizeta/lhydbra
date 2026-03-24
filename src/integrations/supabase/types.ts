@@ -1827,6 +1827,7 @@ export type Database = {
       user_settings: {
         Row: {
           auto_execute: boolean
+          automation_level: string | null
           binance_api_key: string | null
           binance_api_secret: string | null
           consecutive_losses: number
@@ -1868,6 +1869,7 @@ export type Database = {
         }
         Insert: {
           auto_execute?: boolean
+          automation_level?: string | null
           binance_api_key?: string | null
           binance_api_secret?: string | null
           consecutive_losses?: number
@@ -1909,6 +1911,7 @@ export type Database = {
         }
         Update: {
           auto_execute?: boolean
+          automation_level?: string | null
           binance_api_key?: string | null
           binance_api_secret?: string | null
           consecutive_losses?: number
