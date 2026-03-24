@@ -62,7 +62,11 @@ function isUSMarketOpen(): boolean {
   const day = now.getUTCDay();
   if (day === 0 || day === 6) return false;
   const utcMins = now.getUTCHours() * 60 + now.getUTCMinutes();
-  return utcMins >= 870 && utcMins < 1260; // 14:30–21:00 UTC = NYSE hours
+  // NYSE 9:30am-4pm ET
+  // EDT (UTC-4, Mar-Nov): 13:30-20:00 UTC = 810-1200
+  // EST (UTC-5, Nov-Mar): 14:30-21:00 UTC = 870-1260
+  // Use 810-1200 to cover both — avoids blocking EDT open
+  return utcMins >= 810 && utcMins < 1200;
 }
 
 Deno.serve(async (req) => {
