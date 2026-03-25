@@ -17,3 +17,54 @@ verify_jwt = false
 
 [functions.run-backtest-simulation]
 verify_jwt = false
+
+[functions.market-data-normalized]
+verify_jwt = false
+
+[functions.compute-indicators]
+verify_jwt = false
+
+[functions.operator-mode]
+verify_jwt = false
+
+[functions.data-intelligence]
+verify_jwt = false
+
+[functions.opportunity-score]
+verify_jwt = false
+
+[functions.adaptive-scoring]
+verify_jwt = false
+
+[functions.portfolio-optimizer]
+verify_jwt = false
+
+[functions.performance-coach]
+verify_jwt = false
+
+[functions.alpaca-trade]
+verify_jwt = false
+
+[functions.binance-trade]
+verify_jwt = false
+
+[functions.alpaca-sync]
+verify_jwt = false
+
+[functions.save-api-keys]
+verify_jwt = false
+
+[functions.send-notification]
+verify_jwt = false
+
+[functions.parse-trade-signals]
+verify_jwt = false
+
+[functions.strategy-backtest]
+verify_jwt = false
+
+[functions.signal-engine-backtest]
+verify_jwt = false
+
+[functions.market-data-hybrid]
+verify_jwt = false
