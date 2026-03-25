@@ -88,8 +88,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  }
-
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
