@@ -28,6 +28,8 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     const apiKey = Deno.env.get("TWELVE_DATA_API_KEY");
     if (!apiKey) {

@@ -86,6 +86,8 @@ const NEUTRAL_REGIMES = new Set(['volatile', 'ranging', 'compression', 'undefine
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {

@@ -193,6 +193,8 @@ async function fetchHistoricalOHLCV(symbol: string, timeframe: string, apiKey: s
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     const { symbols, timeframe = '1d', force = false } = await req.json();
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
