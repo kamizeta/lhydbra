@@ -30,8 +30,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  }
-
   try {
     const apiKey = Deno.env.get("TWELVE_DATA_API_KEY");
     if (!apiKey) {

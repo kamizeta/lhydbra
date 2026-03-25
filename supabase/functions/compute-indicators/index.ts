@@ -161,7 +161,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-
   try {
     const body = await req.json().catch(() => ({}));
     let { symbols, timeframe = '1d' } = body;

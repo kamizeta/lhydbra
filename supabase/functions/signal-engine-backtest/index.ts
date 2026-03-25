@@ -90,7 +90,6 @@ function scoreSignal(bars: { open: number; high: number; low: number; close: num
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  }
   try {
     const { symbol, lookback_days = 180, min_score = 65, min_r = 1.5 } = await req.json();
     if (!symbol) throw new Error("symbol required");

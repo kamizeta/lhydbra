@@ -124,8 +124,6 @@ function getCorrelation(symbol: string, portfolio: string[], corrMap: Map<string
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  }
-
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {

@@ -248,8 +248,6 @@ function computeMetrics(trades: BacktestTrade[]) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  }
-
   try {
     const { user_id, strategy_id, variant_id, symbol, strategy_family, parameters, timeframe } = await req.json();
 

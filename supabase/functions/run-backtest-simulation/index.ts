@@ -164,7 +164,6 @@ function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  }
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const {

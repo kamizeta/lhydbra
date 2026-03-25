@@ -22,8 +22,6 @@ const SCORE_KEYS = [
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  }
-
   try {
     const { user_id, window_days } = await req.json();
     if (!user_id) throw new Error("user_id required");

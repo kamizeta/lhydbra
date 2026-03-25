@@ -424,8 +424,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  }
-
   try {
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");

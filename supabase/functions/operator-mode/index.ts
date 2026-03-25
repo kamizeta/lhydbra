@@ -772,9 +772,3 @@ Deno.serve(async (req) => {
   }
 });
 
-function jsonRes(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}

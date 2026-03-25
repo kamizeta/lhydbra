@@ -313,8 +313,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  }
-
   try {
     const { cryptoSymbols, stockSymbols, etfSymbols, commoditySymbols, forexSymbols } = await req.json();
 
