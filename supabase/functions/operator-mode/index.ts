@@ -113,6 +113,12 @@ Deno.serve(async (req) => {
 
     // ─── Scheduled run: iterate all full_operator users ───
     if (scheduled) {
+      // Require service role key for scheduled/automated calls
+      const authHeader = req.headers.get("Authorization");
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      if (authHeader !== `Bearer ${serviceKey}`) {
+        return jsonRes({ error: "Forbidden: service role key required for scheduled runs" }, 403);
+      }
       const adminSupabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
