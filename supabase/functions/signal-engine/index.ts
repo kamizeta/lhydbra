@@ -341,11 +341,6 @@ async function fetchVIXScore(alpacaKeyId: string, alpacaSecret: string): Promise
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const origin = req.headers.get("origin") ?? "";
-  const allowed = Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173";
-  if (origin && origin !== allowed) {
-    return new Response("Forbidden", { status: 403 });
-  }
 
   const authHeader = req.headers.get("Authorization") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";

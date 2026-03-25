@@ -161,11 +161,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const origin = req.headers.get("origin") ?? "";
-  const allowed = Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173";
-  if (origin && origin !== allowed) {
-    return new Response("Forbidden", { status: 403 });
-  }
 
   try {
     const body = await req.json().catch(() => ({}));
