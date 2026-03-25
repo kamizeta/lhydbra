@@ -6,7 +6,109 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function jsonRes(data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function getDynamicThresholds(vix: number, baseMinScore: number, baseMinR: number, baseMinConfidence: number) {
+  let scoreAdj = 0, rAdj = 0, confAdj = 0;
+  if (vix < 15) {
+    scoreAdj = +5; rAdj = +0.2; confAdj = +5;
+  } else if (vix <= 20) {
+    scoreAdj = 0; rAdj = 0; confAdj = 0;
+  } else if (vix <= 25) {
+    scoreAdj = -5; rAdj = -0.1; confAdj = -3;
+  } else if (vix <= 30) {
+    scoreAdj = -8; rAdj = -0.2; confAdj = -5;
+  } else if (vix <= 40) {
+    scoreAdj = -12; rAdj = -0.3; confAdj = -8;
+  } else {
+    scoreAdj = -15; rAdj = -0.3; confAdj = -10;
+  }
+  return {
+    min_score: Math.max(45, Math.min(85, baseMinScore + scoreAdj)),
+    min_r: Math.max(1.2, Math.min(3.0, baseMinR + rAdj)),
+    min_confidence: Math.max(40, Math.min(80, baseMinConfidence + confAdj)),
+    vix,
+    adjustment_reason: vix < 15 ? "calm_market" :
+                       vix <= 20 ? "normal" :
+                       vix <= 25 ? "elevated_volatility" :
+                       vix <= 30 ? "high_volatility" :
+                       vix <= 40 ? "extreme_volatility" : "crisis",
+  };
+}
+
+function calcPositionSize(params: {
+  capital: number;
+  riskPct: number;
+  entryPrice: number;
+  stopLoss: number;
+  maxSingleAssetPct: number;
+  maxLeverage: number;
+  isFractional: boolean;
+}): number {
+  if (params.capital <= 0 || params.entryPrice <= 0) return 0;
+  const riskPerUnit = Math.abs(params.entryPrice - params.stopLoss);
+  if (riskPerUnit <= 0) return 0;
+  const dollarRisk = params.capital * (params.riskPct / 100);
+  const riskBasedSize = dollarRisk / riskPerUnit;
+  const maxAssetValue = params.capital * params.maxSingleAssetPct / 100;
+  const concentrationCap = maxAssetValue / params.entryPrice;
+  const maxExposure = params.capital * params.maxLeverage;
+  const leverageCap = maxExposure / params.entryPrice;
+  const idealSize = Math.max(0, Math.min(riskBasedSize, concentrationCap, leverageCap));
+  if (params.isFractional) return parseFloat(idealSize.toFixed(6));
+  return Math.floor(idealSize);
+}
+
+async function isUSMarketOpen(paper: boolean): Promise<boolean> {
   try {
+    const alpacaBase = paper
+      ? "https://paper-api.alpaca.markets"
+      : "https://api.alpaca.markets";
+    const res = await fetch(`${alpacaBase}/v2/clock`, {
+      headers: {
+        "APCA-API-KEY-ID": Deno.env.get("ALPACA_API_KEY_ID") ?? "",
+        "APCA-API-SECRET-KEY": Deno.env.get("ALPACA_API_SECRET_KEY") ?? "",
+      },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) {
+      console.warn("[operator-mode] Alpaca clock failed, using NY fallback");
+      return nyFallbackMarketOpen();
+    }
+    const clock = await res.json();
+    return clock.is_open === true;
+  } catch (e) {
+    console.warn("[operator-mode] Alpaca clock error, using NY fallback:", e);
+    return nyFallbackMarketOpen();
+  }
+}
+
+function nyFallbackMarketOpen(): boolean {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour12: false,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(now);
+  const weekday = parts.find(p => p.type === "weekday")?.value;
+  const hour = Number(parts.find(p => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find(p => p.type === "minute")?.value ?? "0");
+  if (weekday === "Sat" || weekday === "Sun") return false;
+  const mins = hour * 60 + minute;
+  return mins >= 570 && mins < 960;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+
     const body = await req.json().catch(() => ({}));
     const { scheduled = false } = body;
 
