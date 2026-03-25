@@ -422,8 +422,6 @@ async function processRun(admin: ReturnType<typeof createClient>, apiKey: string
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
-  }
-
   try {
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
