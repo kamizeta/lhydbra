@@ -71,8 +71,6 @@ async function pollOrderStatus(baseUrl: string, orderId: string, headers: Record
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  }
-
   try {
     // Auth check - fixed: use getUser instead of getClaims
     const authHeader = req.headers.get("Authorization");

@@ -311,8 +311,6 @@ async function fetchTwelveDataBatch(symbols: string[], apiKey: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
-  }
-
   try {
     const { cryptoSymbols, stockSymbols, etfSymbols, commoditySymbols, forexSymbols } = await req.json();
 

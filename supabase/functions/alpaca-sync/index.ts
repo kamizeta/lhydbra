@@ -24,8 +24,6 @@ function alpacaHeaders() {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  }
-
   try {
     const body = await req.json().catch(() => ({}));
     const { scheduled = false, paper = true, user_id_override } = body;
