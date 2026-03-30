@@ -166,28 +166,26 @@ serve(async (req) => {
     let { symbols, timeframe = '1d' } = body;
     const { scheduled = false } = body;
 
-    // If called from cron or without symbols, load from all users' watchlists
+    // If called from cron or without symbols, load ALL symbols from market_cache
     if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
       const db2 = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
-      const { data: allSettings } = await db2
-        .from("user_settings")
-        .select("watchlist");
-
+      // Get all symbols that have price data in market_cache
+      const { data: cachedSymbols } = await db2
+        .from("market_cache")
+        .select("symbol");
+      
       const allSymbols = new Set<string>([
-        // Always include these core symbols for macro regime detection
+        // Always include core symbols for macro regime detection
         "SPY", "QQQ", "BTC/USD", "ETH/USD",
-        "AAPL", "MSFT", "NVDA", "TSLA", "META", "AMZN", "PLTR", "AMD", "AVGO", "NFLX"
       ]);
-      for (const s of (allSettings || [])) {
-        if (Array.isArray(s.watchlist)) {
-          for (const sym of s.watchlist) allSymbols.add(String(sym));
-        }
+      for (const row of (cachedSymbols || [])) {
+        allSymbols.add(String(row.symbol));
       }
       symbols = [...allSymbols];
-      console.log(`[compute-indicators] Scheduled run: processing ${symbols.length} symbols`);
+      console.log(`[compute-indicators] Full universe run: processing ${symbols.length} symbols from market_cache`);
     }
 
     if (!symbols || symbols.length === 0) {
