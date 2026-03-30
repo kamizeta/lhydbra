@@ -485,12 +485,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // ─── Expand universe if watchlist < 10 symbols ───
+    // ─── Expand universe: use ALL symbols with fresh features in DB ───
     let querySymbols = targetSymbols;
     if (targetSymbols.length < 10) {
-      const allExtended = [...EXTENDED_UNIVERSE.stock, ...EXTENDED_UNIVERSE.crypto];
-      querySymbols = [...new Set([...targetSymbols, ...allExtended])];
-      console.log(`[signal-engine] Expanded universe: ${targetSymbols.length} watchlist → ${querySymbols.length} total`);
+      // Fetch all distinct symbols that have features computed
+      const { data: allFeatureSymbols } = await supabase
+        .from("market_features")
+        .select("symbol")
+        .eq("timeframe", "1d");
+      const dbSymbols = (allFeatureSymbols || []).map((r: { symbol: string }) => r.symbol);
+      querySymbols = [...new Set([...targetSymbols, ...dbSymbols])];
+      console.log(`[signal-engine] Expanded universe: ${targetSymbols.length} watchlist → ${querySymbols.length} total (all DB features)`);
     }
 
     // ─── Fetch market features ───
