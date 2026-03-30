@@ -35,16 +35,7 @@ const UNCLEAR_REGIMES = new Set(["undefined", "transitional", "unknown", "neutra
 // SYMBOL_SECTORS loaded from DB at runtime (symbol_sectors table)
 const MAX_SECTOR_POSITIONS = 2;
 
-const EXTENDED_UNIVERSE: Record<string, string[]> = {
-  stock: [
-    "AAPL","MSFT","NVDA","META","AMZN","TSLA","GOOGL","AMD","AVGO",
-    "PLTR","NFLX","CRM","ORCL","ADBE","QCOM","MU","INTC","ARM",
-    "JPM","GS","BAC","V","MA","PYPL",
-    "SPY","QQQ","IWM","XLK","XLF","XLE","GLD",
-  ],
-  crypto: ["BTC/USD","ETH/USD","SOL/USD","BNB/USD","XRP/USD","DOGE/USD"],
-  forex: ["EUR/USD","GBP/USD","USD/JPY","XAU/USD"],
-};
+// EXTENDED_UNIVERSE removed — now dynamically loads ALL symbols from market_features
 
 const STRATEGY_PRIORS: Record<string, number> = {
   momentum: 52, trend_following: 48, mean_reversion: 55, breakout: 45, hybrid: 50,
@@ -494,12 +485,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // ─── Expand universe if watchlist < 10 symbols ───
+    // ─── Expand universe: use ALL symbols with fresh features in DB ───
     let querySymbols = targetSymbols;
     if (targetSymbols.length < 10) {
-      const allExtended = [...EXTENDED_UNIVERSE.stock, ...EXTENDED_UNIVERSE.crypto];
-      querySymbols = [...new Set([...targetSymbols, ...allExtended])];
-      console.log(`[signal-engine] Expanded universe: ${targetSymbols.length} watchlist → ${querySymbols.length} total`);
+      // Fetch all distinct symbols that have features computed
+      const { data: allFeatureSymbols } = await supabase
+        .from("market_features")
+        .select("symbol")
+        .eq("timeframe", "1d");
+      const dbSymbols = (allFeatureSymbols || []).map((r: { symbol: string }) => r.symbol);
+      querySymbols = [...new Set([...targetSymbols, ...dbSymbols])];
+      console.log(`[signal-engine] Expanded universe: ${targetSymbols.length} watchlist → ${querySymbols.length} total (all DB features)`);
     }
 
     // ─── Fetch market features ───
