@@ -203,6 +203,12 @@ serve(async (req) => {
         ? `lhy-${String(signal_id).slice(0, 8)}`
         : `lhy-${crypto.randomUUID().slice(0, 12)}`;
 
+      // Round price to 2 decimals to avoid Alpaca sub-penny rejection
+      const round2 = (v: unknown) => {
+        const n = Number(v);
+        return isNaN(n) ? v : String(Math.round(n * 100) / 100);
+      };
+
       const orderBody: Record<string, unknown> = {
         client_order_id: idempotencyId,
         symbol,
@@ -213,17 +219,17 @@ serve(async (req) => {
       };
 
       if (type === "limit" || type === "stop_limit") {
-        orderBody.limit_price = String(limit_price);
+        orderBody.limit_price = round2(limit_price);
       }
       if (type === "stop" || type === "stop_limit") {
-        orderBody.stop_price = String(stop_price);
+        orderBody.stop_price = round2(stop_price);
       }
 
       // Bracket order (OCO with SL/TP)
       if (order_class === "bracket" || (take_profit && stop_loss)) {
         orderBody.order_class = "bracket";
-        orderBody.take_profit = { limit_price: String(take_profit) };
-        orderBody.stop_loss = { stop_price: String(stop_loss) };
+        orderBody.take_profit = { limit_price: round2(take_profit) };
+        orderBody.stop_loss = { stop_price: round2(stop_loss) };
       }
 
       console.log("Alpaca order payload:", JSON.stringify(orderBody));
