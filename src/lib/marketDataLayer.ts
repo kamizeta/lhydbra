@@ -81,7 +81,9 @@ export async function fetchNormalizedQuotes(symbols: string[]): Promise<Record<s
       body: { action: 'quotes', symbols },
     });
     if (error) throw new Error(`Normalized quotes error: ${error.message}`);
-    return (data || {}) as Record<string, NormalizedQuote>;
+    // Edge function returns { quotes: {...}, fetched, requested }
+    const quotes = data?.quotes || data || {};
+    return quotes as Record<string, NormalizedQuote>;
   })().finally(() => {
     inflightRequests.delete(key);
   });
