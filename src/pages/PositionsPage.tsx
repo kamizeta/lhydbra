@@ -77,7 +77,7 @@ export default function PositionsPage() {
     let totalCapital = 0;
     for (const pos of positions) {
       const result = getPnL(pos);
-      totalCapital += pos.quantity * pos.avg_entry;
+      totalCapital += Math.abs(pos.quantity) * pos.avg_entry;
       if (result) total += result.pnl;
     }
     return { totalPnL: total, totalPnLPercent: totalCapital > 0 ? (total / totalCapital) * 100 : 0 };
@@ -370,7 +370,7 @@ export default function PositionsPage() {
               <div className="grid grid-cols-5 gap-2 text-[10px] font-mono">
                 <div>
                   <span className="text-muted-foreground">Qty</span>
-                  <div className="text-foreground">{pos.quantity}</div>
+                  <div className="text-foreground">{Math.abs(pos.quantity)}</div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Entry</span>
@@ -473,7 +473,7 @@ export default function PositionsPage() {
               <tr><td colSpan={12} className="p-6 text-center text-muted-foreground text-xs font-mono">No open positions</td></tr>
             ) : sortedPositions.map((pos) => {
               const pnlData = getPnL(pos);
-              const capitalUsed = pos.quantity * pos.avg_entry;
+              const capitalUsed = Math.abs(pos.quantity) * pos.avg_entry;
               const { hitSl, hitTp } = checkSlTpHit(pos, pnlData?.currentPrice);
               const isEditing = editingSlTp?.id === pos.id;
 
@@ -503,7 +503,7 @@ export default function PositionsPage() {
                       {' '}{pos.direction.toUpperCase()}
                     </StatusBadge>
                   </td>
-                  <td className="text-right p-2 font-mono text-xs text-foreground">{pos.quantity.toFixed(2)}</td>
+                  <td className="text-right p-2 font-mono text-xs text-foreground">{Math.abs(pos.quantity).toFixed(2)}</td>
                   <td className="text-right p-2 font-mono text-xs text-foreground">${pos.avg_entry.toFixed(2)}</td>
                   <td className="text-right p-2 font-mono text-xs text-muted-foreground">${capitalUsed.toFixed(2)}</td>
                   <td className="text-right p-2 font-mono text-xs">

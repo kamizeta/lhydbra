@@ -171,14 +171,14 @@ export default function PortfolioEngine() {
 
   // Portfolio metrics
   const capital = settings.current_capital;
-  const totalExposure = positions.reduce((s, p) => s + p.quantity * p.avg_entry, 0);
+  const totalExposure = positions.reduce((s, p) => s + Math.abs(p.quantity) * p.avg_entry, 0);
   const exposurePct = capital > 0 ? (totalExposure / capital) * 100 : 0;
   
   const byType: Record<string, number> = {};
   const byDirection: Record<string, number> = { long: 0, short: 0 };
   const byStrategy: Record<string, number> = {};
   positions.forEach(p => {
-    const val = p.quantity * p.avg_entry;
+    const val = Math.abs(p.quantity) * p.avg_entry;
     byType[p.asset_type] = (byType[p.asset_type] || 0) + val;
     byDirection[p.direction] = (byDirection[p.direction] || 0) + val;
     const sf = p.strategy_family || p.strategy || 'other';
