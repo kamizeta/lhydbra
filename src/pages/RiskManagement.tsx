@@ -52,7 +52,7 @@ export default function RiskManagement() {
   const exposureByType: Record<string, number> = {};
   let totalExposureValue = 0;
   positions.forEach(p => {
-    const value = p.quantity * p.avg_entry;
+    const value = Math.abs(p.quantity) * p.avg_entry;
     totalExposureValue += value;
     exposureByType[p.asset_type] = (exposureByType[p.asset_type] || 0) + value;
   });
@@ -62,7 +62,7 @@ export default function RiskManagement() {
   positions.forEach(p => {
     if (p.stop_loss) {
       const riskPerUnit = Math.abs(p.avg_entry - p.stop_loss);
-      totalRiskDollars += riskPerUnit * p.quantity;
+      totalRiskDollars += riskPerUnit * Math.abs(p.quantity);
     }
   });
   const dailyRiskUsed = totalCapital > 0 ? (totalRiskDollars / totalCapital) * 100 : 0;
@@ -110,9 +110,10 @@ export default function RiskManagement() {
     const sl = p.stop_loss ? Number(p.stop_loss) : 0;
     const tp = p.take_profit ? Number(p.take_profit) : 0;
     const riskPerUnit = entry > 0 && sl > 0 ? Math.abs(entry - sl) : 0;
-    const riskDollars = riskPerUnit * p.quantity;
+    const qty = Math.abs(p.quantity);
+    const riskDollars = riskPerUnit * qty;
     const riskPct = accountSize > 0 ? (riskDollars / accountSize) * 100 : 0;
-    const exposureValue = p.quantity * entry;
+    const exposureValue = qty * entry;
     const exposurePct = accountSize > 0 ? (exposureValue / accountSize) * 100 : 0;
     const rewardPerUnit = tp > 0 ? Math.abs(tp - entry) : 0;
     const rr = riskPerUnit > 0 && rewardPerUnit > 0 ? rewardPerUnit / riskPerUnit : 0;
@@ -120,7 +121,7 @@ export default function RiskManagement() {
     const idealSize = riskPerUnit > 0 ? dollarRiskPerTrade / riskPerUnit : 0;
     const idealSizeDisplay = isFractional ? parseFloat(idealSize.toFixed(6)) : Math.floor(idealSize);
     const isSLMissing = !p.stop_loss;
-    const isOversized = p.quantity > idealSize * 1.1; // >10% over ideal
+    const isOversized = qty > idealSize * 1.1; // >10% over ideal
 
     return {
       ...p,
@@ -299,7 +300,7 @@ export default function RiskManagement() {
                         </span>
                       </div>
                     </td>
-                    <td className="text-right py-2 font-mono text-foreground">{p.isFractional ? p.quantity : Math.floor(p.quantity)}</td>
+                    <td className="text-right py-2 font-mono text-foreground">{p.isFractional ? Math.abs(p.quantity) : Math.floor(Math.abs(p.quantity))}</td>
                     <td className="text-right py-2 font-mono text-foreground">{formatCurrency(p.entry)}</td>
                     <td className="text-right py-2 font-mono">
                       {p.isSLMissing ? (

@@ -85,7 +85,7 @@ export default function ControlCenter() {
     if (positions.length >= settings.max_positions) a.push(`Max positions reached (${positions.length}/${settings.max_positions})`);
     const noSL = positions.filter(p => !p.stop_loss);
     if (noSL.length > 0 && settings.stop_loss_required) a.push(`${noSL.length} position(s) without stop loss!`);
-    const exposure = positions.reduce((s, p) => s + p.quantity * p.avg_entry, 0);
+    const exposure = positions.reduce((s, p) => s + Math.abs(p.quantity) * p.avg_entry, 0);
     const expPct = settings.current_capital > 0 ? (exposure / settings.current_capital) * 100 : 0;
     if (expPct > 100) a.push(`Exposure at ${expPct.toFixed(0)}% — exceeds capital`);
     const drawdown = settings.initial_capital > 0 ? ((settings.initial_capital - settings.current_capital) / settings.initial_capital) * 100 : 0;
@@ -94,7 +94,7 @@ export default function ControlCenter() {
   }, [positions, settings]);
 
   const winRate = journalStats.totalTrades > 0 ? (journalStats.wins / journalStats.totalTrades) * 100 : 0;
-  const exposure = positions.reduce((s, p) => s + p.quantity * p.avg_entry, 0);
+  const exposure = positions.reduce((s, p) => s + Math.abs(p.quantity) * p.avg_entry, 0);
   const expPct = settings.current_capital > 0 ? (exposure / settings.current_capital) * 100 : 0;
 
   if (loading) {
