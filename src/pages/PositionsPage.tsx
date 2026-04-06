@@ -67,8 +67,9 @@ export default function PositionsPage() {
     const lookup = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
     if (!lookup) return null;
     const currentPrice = lookup.price;
+    const qty = Math.abs(pos.quantity);
     const diff = pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice;
-    return { pnl: diff * pos.quantity, pnlPercent: (diff / pos.avg_entry) * 100, currentPrice, isMock: lookup.isMock };
+    return { pnl: diff * qty, pnlPercent: (diff / pos.avg_entry) * 100, currentPrice, isMock: lookup.isMock };
   };
 
   const { totalPnL, totalPnLPercent } = useMemo(() => {
