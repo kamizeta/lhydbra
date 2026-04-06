@@ -100,10 +100,10 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         let symbolExposure = 0;
 
         positions.forEach(p => {
-          const value = Number(p.quantity) * Number(p.avg_entry);
+          const value = Math.abs(Number(p.quantity)) * Number(p.avg_entry);
           totalExposure += value;
           if (p.stop_loss) {
-            totalRisk += Math.abs(Number(p.avg_entry) - Number(p.stop_loss)) * Number(p.quantity);
+            totalRisk += Math.abs(Number(p.avg_entry) - Number(p.stop_loss)) * Math.abs(Number(p.quantity));
           }
           if (p.symbol === signal.asset) {
             symbolExposure += value;
