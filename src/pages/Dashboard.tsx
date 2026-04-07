@@ -230,7 +230,7 @@ export default function Dashboard() {
             {goal?.automation_level === 'full_operator' ? '● AUTO' : '○ GUIDED'}
           </span>
           <span className="text-xs text-muted-foreground font-mono">
-            {positions.length} pos · {operatorStatus?.trades_today ?? 0}/{operatorStatus?.max_trades_per_day ?? 3} trades
+            {operatorStatus?.trades_today ?? positions.length}/{operatorStatus?.max_trades_per_day ?? 3} trades
           </span>
           <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
             · Risk: {operatorStatus?.daily_risk_used?.toFixed(1) ?? '0.0'}%/{operatorStatus?.max_daily_risk ?? 3}%
