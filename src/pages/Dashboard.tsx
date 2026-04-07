@@ -147,6 +147,10 @@ export default function Dashboard() {
   const unrealizedPnl = useMemo(() => {
     let total = 0;
     for (const pos of positions) {
+      if (pos.pnl != null) {
+        total += pos.pnl;
+        continue;
+      }
       const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
       if (!currentPrice) continue;
       const qty = Math.abs(pos.quantity);
@@ -313,9 +317,11 @@ export default function Dashboard() {
           <div className="divide-y divide-border">
             {positions.slice(0, 5).map((pos) => {
               const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
-              const pnl = currentPrice
-                ? (pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice) * pos.quantity
-                : pos.pnl ?? 0;
+              const qty = Math.abs(pos.quantity);
+              const fallbackPnl = currentPrice
+                ? (pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice) * qty
+                : 0;
+              const pnl = pos.pnl ?? fallbackPnl;
               return (
                 <div key={pos.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
                   <div className="flex items-center gap-2">
