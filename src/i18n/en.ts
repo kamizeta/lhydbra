@@ -56,7 +56,7 @@ export const en: Translations = {
     agents: 'Agents',
     tradeIdeas: 'Trade Ideas',
     journal: 'Journal',
-    operator: 'Operator',
+    operator: 'Dashboard',
     signals: 'Signals',
     portfolio: 'Portfolio',
     allocation: 'Allocation',

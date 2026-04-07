@@ -56,7 +56,7 @@ export const es: Translations = {
     agents: 'Agentes',
     tradeIdeas: 'Ideas de Trade',
     journal: 'Diario',
-    operator: 'Operador',
+    operator: 'Dashboard',
     signals: 'Señales',
     portfolio: 'Portafolio',
     allocation: 'Asignación',
