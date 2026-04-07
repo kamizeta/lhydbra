@@ -336,11 +336,6 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         }
       }
 
-      if (error) {
-        toast.error('Error al crear la posición');
-        setSaving(false);
-        return;
-      }
       toast.success(`Posición abierta: ${signal.asset} × ${quantity} @ ${formatCurrency(entryPrice)}`);
     }
 
