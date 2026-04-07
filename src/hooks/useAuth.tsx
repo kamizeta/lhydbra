@@ -21,54 +21,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    const applySession = (nextSession: Session | null, nextUser: User | null) => {
-      if (!isMounted) return;
-      setSession(nextSession);
-      setUser(nextUser);
-    };
+    // Safety net: never stay loading forever
+    const timeout = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 5000);
 
-    const clearLocalSession = async () => {
-      await supabase.auth.signOut({ scope: 'local' });
-      applySession(null, null);
-    };
-
-    const validateSession = async (candidateSession: Session | null) => {
-      if (!candidateSession) {
-        applySession(null, null);
-        return;
-      }
-
-      const { data, error } = await supabase.auth.getUser();
-      if (error || !data.user) {
-        await clearLocalSession();
-        return;
-      }
-
-      applySession(candidateSession, data.user);
-    };
-
-    const initializeAuth = async () => {
-      try {
-        const {
-          data: { session: initialSession },
-        } = await supabase.auth.getSession();
-        await validateSession(initialSession);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
+    // 1. Set up listener FIRST
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      await validateSession(nextSession);
-      if (isMounted) setLoading(false);
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!isMounted) return;
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      setLoading(false);
     });
 
-    void initializeAuth();
+    // 2. Then get initial session
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      if (!isMounted) return;
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
+      setLoading(false);
+    });
 
     return () => {
       isMounted = false;
+      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, []);
