@@ -149,14 +149,15 @@ export default function Dashboard() {
     for (const pos of positions) {
       const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
       if (!currentPrice) continue;
+      const qty = Math.abs(pos.quantity);
       const diff = pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice;
-      total += diff * pos.quantity;
+      total += diff * qty;
     }
     return total;
   }, [positions, priceMap]);
 
   const portfolioValue = settings.current_capital + closedPnl + unrealizedPnl;
-  const totalExposure = positions.reduce((sum, p) => sum + (p.quantity * p.avg_entry), 0);
+  const totalExposure = positions.reduce((sum, p) => sum + Math.abs(p.quantity) * p.avg_entry, 0);
   const exposurePct = portfolioValue > 0 ? (totalExposure / portfolioValue) * 100 : 0;
   const winRate = journalStats.total > 0 ? (journalStats.wins / journalStats.total) * 100 : 0;
   const drawdownPct = settings.initial_capital > 0 ? Math.max(0, ((settings.initial_capital - portfolioValue) / settings.initial_capital) * 100) : 0;
