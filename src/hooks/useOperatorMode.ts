@@ -70,19 +70,38 @@ export function useOperatorMode() {
     if (!user) return;
     setLoading(true);
     setError(null);
+
+    const attempt = async (): Promise<OperatorStatus | null> => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) return null;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/operator-mode`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ action: 'status' }),
+        }
+      );
+      if (!response.ok) return null;
+      return response.json();
+    };
+
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData?.session) throw new Error('No active session');
-      const session = sessionData.session;
-
-      const { data, error: fnError } = await supabase.functions.invoke('operator-mode', {
-        body: { action: 'status' },
-      });
-
-      if (fnError) throw fnError;
-      setStatus(data as OperatorStatus);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch status');
+      let result = await attempt();
+      if (!result) {
+        // Retry after 1s to let token refresh
+        await new Promise(r => setTimeout(r, 1000));
+        result = await attempt();
+      }
+      if (result) setStatus(result);
+    } catch {
+      // Silent fail — dashboard uses local fallbacks
     } finally {
       setLoading(false);
     }
