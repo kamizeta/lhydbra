@@ -600,24 +600,44 @@ Deno.serve(async (req) => {
               : "";
 
             const actualQty = parseFloat(orderResult.order.filled_qty || "0") || trade.quantity;
-            const actualEntry = filledPrice > 0 ? filledPrice : expectedEntry;
 
-            await supabase.from("positions").insert({
-              user_id: user.id,
-              symbol: String(trade.asset),
-              name: String(trade.asset),
-              asset_type: String(trade.asset_class || "stock"),
-              direction: String(trade.direction),
-              quantity: actualQty,
-              avg_entry: actualEntry,
-              stop_loss: adjustedStop,
-              take_profit: Number(trade.take_profit),
-              strategy: String(trade.strategy_family || "operator"),
-              strategy_family: String(trade.strategy_family || "operator"),
-              regime_at_entry: String(trade.market_regime || "undefined"),
-              status: "open",
-              notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}${actualQty < trade.quantity ? ` | Partial fill: ${actualQty}/${trade.quantity}` : ""}`,
-            });
+            // Check if position already exists for this symbol to prevent duplicates
+            const { data: existingPos } = await supabase
+              .from("positions")
+              .select("id")
+              .eq("user_id", user.id)
+              .eq("symbol", String(trade.asset))
+              .eq("status", "open")
+              .maybeSingle();
+
+            if (existingPos) {
+              // Update existing position instead of creating duplicate
+              await supabase.from("positions").update({
+                quantity: actualQty,
+                avg_entry: actualEntry,
+                stop_loss: adjustedStop,
+                take_profit: Number(trade.take_profit),
+                updated_at: new Date().toISOString(),
+                notes: `Operator auto-exec (updated). Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}`,
+              }).eq("id", existingPos.id);
+            } else {
+              await supabase.from("positions").insert({
+                user_id: user.id,
+                symbol: String(trade.asset),
+                name: String(trade.asset),
+                asset_type: String(trade.asset_class || "stock"),
+                direction: String(trade.direction),
+                quantity: actualQty,
+                avg_entry: actualEntry,
+                stop_loss: adjustedStop,
+                take_profit: Number(trade.take_profit),
+                strategy: String(trade.strategy_family || "operator"),
+                strategy_family: String(trade.strategy_family || "operator"),
+                regime_at_entry: String(trade.market_regime || "undefined"),
+                status: "open",
+                notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}${actualQty < trade.quantity ? ` | Partial fill: ${actualQty}/${trade.quantity}` : ""}`,
+              });
+            }
           } else if (!orderResult.success && !orderResult.pending) {
             console.error("Order failed for", trade.asset, ":", orderResult.error);
           } else if (orderResult.pending) {
