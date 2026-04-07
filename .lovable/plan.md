@@ -1,43 +1,35 @@
 
 
-## Diagnóstico
+## Problema
 
-La app se queda infinitamente en "LHYDBRA Loading..." porque:
+La barra de estado del Dashboard muestra "0/3 trades" porque la llamada al edge function `operator-mode` falla con 401 (token no válido o expirado). Cuando `operatorStatus` es `null`, se muestran valores por defecto (`?? 0` / `?? 3`).
 
-1. **`getUser()` cuelga**: Si hay un token stale en localStorage, `getUser()` hace una llamada de red que puede nunca resolver (timeout del servidor).
-2. **Race condition**: `onAuthStateChange` dispara inmediatamente con la sesión cacheada, y su `await validateSession()` compite con `initializeAuth()`. Si `clearLocalSession()` se ejecuta (porque `getUser()` falla), dispara otro `onAuthStateChange` que vuelve a llamar `validateSession` - loop potencial.
-3. **`loading` nunca llega a `false`**: Si `getUser()` cuelga, el `finally` de `initializeAuth` nunca se ejecuta.
+Las posiciones SÍ se muestran (MSFT, NVDA) porque se cargan directamente de la base de datos, pero la información del operador (trades hoy, riesgo, etc.) viene del edge function que falla.
 
-## Plan de corrección
+## Corrección
 
-### 1. Simplificar `useAuth.tsx`
+### 1. Hacer el Dashboard resiliente al fallo del operador
 
-- **No usar `getUser()` durante inicialización** - `getSession()` ya valida el JWT localmente. Solo usar `getUser()` si realmente necesitamos verificar contra el servidor.
-- **Confiar en `onAuthStateChange`** para actualizaciones de sesión en lugar de re-validar manualmente.
-- **Agregar timeout de seguridad** para que `loading` siempre se ponga en `false` tras 5 segundos máximo.
-- **No llamar `signOut` dentro del listener** para evitar loops recursivos de `onAuthStateChange`.
+En `src/pages/Dashboard.tsx`:
+- Mostrar el conteo de posiciones abiertas desde el estado local (`positions.length`) además de los trades del día
+- Usar datos locales como fallback cuando `operatorStatus` es null
 
-```text
-Flujo simplificado:
-1. onAuthStateChange (set first) → actualiza user/session directamente
-2. getSession() → aplica sesión inicial, setLoading(false)
-3. Si el token es inválido, Supabase dispara SIGNED_OUT automáticamente
-4. Timeout de 5s como safety net
+### 2. Corregir `useOperatorMode.ts` para reintentar
+
+- Eliminar la verificación redundante de `getSession()` antes de `invoke` (el SDK lo hace automáticamente)
+- Agregar un retry con delay de 1s si falla la primera vez (da tiempo a que el token se refresque)
+- No mostrar error si el retry también falla, simplemente dejar `status` como null
+
+### 3. Actualizar la barra de estado
+
+Cambiar la línea 233 del Dashboard de:
+```
+{operatorStatus?.trades_today ?? 0}/{operatorStatus?.max_trades_per_day ?? 3} trades
+```
+A:
+```
+{positions.length} pos · {operatorStatus?.trades_today ?? 0}/{operatorStatus?.max_trades_per_day ?? settings.max_trades_per_day} trades
 ```
 
-### 2. Cambios específicos en `src/hooks/useAuth.tsx`
-
-- Eliminar `validateSession` y `clearLocalSession`
-- En `onAuthStateChange`: simplemente hacer `setSession(s); setUser(s?.user ?? null); setLoading(false)`
-- En `initializeAuth`: solo `getSession()`, aplicar resultado, `setLoading(false)`
-- Agregar `setTimeout(() => setLoading(false), 5000)` como safety net
-
-### 3. Verificar `signIn` y `signOut`
-
-- `signIn`: Mantener `signOut({ scope: 'local' })` antes de intentar login
-- `signOut`: Mantener `signOut({ scope: 'local' })` + limpiar estado
-
----
-
-**Resultado esperado**: La app mostrará el formulario de login en menos de 1 segundo cuando no hay sesión, y el dashboard instantáneamente cuando hay sesión válida. Nunca se quedará pegada en "Loading...".
+Esto asegura que el conteo de posiciones SIEMPRE se muestre correcto (viene de la DB directa), independientemente de si el edge function responde o no.
 
