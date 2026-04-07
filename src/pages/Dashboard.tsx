@@ -189,7 +189,25 @@ export default function Dashboard() {
   };
 
   const cooldownActive = operatorStatus?.cooldown_active || false;
-  const dailyCapReached = (operatorStatus?.trades_today || 0) >= (operatorStatus?.max_trades_per_day || 3);
+  const maxTradesPerDay = operatorStatus?.max_trades_per_day ?? settings.max_trades_per_day ?? 3;
+  const dailyCapReached = positions.length >= maxTradesPerDay;
+
+  // Calculate risk from open positions locally as fallback
+  const localRiskPct = useMemo(() => {
+    if (!positions.length || portfolioValue <= 0) return 0;
+    let totalRisk = 0;
+    for (const pos of positions) {
+      if (pos.stop_loss) {
+        const riskPerShare = Math.abs(pos.avg_entry - pos.stop_loss);
+        totalRisk += riskPerShare * Math.abs(pos.quantity);
+      }
+    }
+    return (totalRisk / portfolioValue) * 100;
+  }, [positions, portfolioValue]);
+  const displayRiskUsed = operatorStatus?.daily_risk_used != null && operatorStatus.daily_risk_used > 0
+    ? operatorStatus.daily_risk_used
+    : localRiskPct;
+  const displayMaxRisk = operatorStatus?.max_daily_risk ?? settings.max_daily_risk ?? 3;
 
   const now = new Date();
   const hour = now.getHours();
@@ -230,10 +248,10 @@ export default function Dashboard() {
             {goal?.automation_level === 'full_operator' ? '● AUTO' : '○ GUIDED'}
           </span>
           <span className="text-xs text-muted-foreground font-mono">
-            {operatorStatus?.trades_today ?? positions.length}/{operatorStatus?.max_trades_per_day ?? 3} trades
+            {positions.length}/{maxTradesPerDay} pos
           </span>
           <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
-            · Risk: {operatorStatus?.daily_risk_used?.toFixed(1) ?? '0.0'}%/{operatorStatus?.max_daily_risk ?? 3}%
+            · Risk: {displayRiskUsed.toFixed(1)}%/{displayMaxRisk}%
           </span>
           {(operatorStatus as any)?.vix != null && (
             <span className={cn(
