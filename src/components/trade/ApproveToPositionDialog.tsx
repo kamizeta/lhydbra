@@ -286,28 +286,56 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
         }
       }
 
-      const { error } = await supabase.from('positions').insert({
-        user_id: user.id,
-        symbol: signal.asset,
-        name: signal.asset,
-        asset_type: signal.asset_type,
-        direction: signal.direction,
-        quantity,
-        avg_entry: entryPrice,
-        stop_loss: signal.stop_loss,
-        take_profit: derivedTakeProfit,
-        strategy: signal.strategy,
-        strategy_family: signal.strategy_family || null,
-        regime_at_entry: signal.market_regime || null,
-        status: 'open',
-        signal_id: signal.id,
-      });
+      // Check for existing open position on same symbol to prevent duplicates
+      const { data: existingPos } = await supabase
+        .from('positions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('symbol', signal.asset)
+        .eq('status', 'open')
+        .maybeSingle();
 
-      if (error) {
-        toast.error('Error al crear la posición');
-        setSaving(false);
-        return;
+      if (existingPos) {
+        // Update existing position instead of creating duplicate
+        const { error } = await supabase.from('positions').update({
+          quantity,
+          avg_entry: entryPrice,
+          stop_loss: signal.stop_loss,
+          take_profit: derivedTakeProfit,
+          signal_id: signal.id,
+          updated_at: new Date().toISOString(),
+        }).eq('id', existingPos.id);
+
+        if (error) {
+          toast.error('Error al actualizar la posición');
+          setSaving(false);
+          return;
+        }
+      } else {
+        const { error } = await supabase.from('positions').insert({
+          user_id: user.id,
+          symbol: signal.asset,
+          name: signal.asset,
+          asset_type: signal.asset_type,
+          direction: signal.direction,
+          quantity,
+          avg_entry: entryPrice,
+          stop_loss: signal.stop_loss,
+          take_profit: derivedTakeProfit,
+          strategy: signal.strategy,
+          strategy_family: signal.strategy_family || null,
+          regime_at_entry: signal.market_regime || null,
+          status: 'open',
+          signal_id: signal.id,
+        });
+
+        if (error) {
+          toast.error('Error al crear la posición');
+          setSaving(false);
+          return;
+        }
       }
+
       toast.success(`Posición abierta: ${signal.asset} × ${quantity} @ ${formatCurrency(entryPrice)}`);
     }
 

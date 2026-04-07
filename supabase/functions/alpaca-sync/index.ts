@@ -130,10 +130,31 @@ serve(async (req) => {
       return jsonRes({ error: `DB error: ${localError.message}` }, 500);
     }
 
-    const localBySymbol = new Map<string, typeof localPositions[0]>();
+    // Group local positions by clean symbol (handle duplicates)
+    const localGrouped = new Map<string, (typeof localPositions[0])[]>();
     for (const p of (localPositions || [])) {
-      // Map both formats: "BTC/USD" and "BTCUSD" → key by clean symbol
-      localBySymbol.set(cleanSymbol(p.symbol), p);
+      const key = cleanSymbol(p.symbol);
+      if (!localGrouped.has(key)) localGrouped.set(key, []);
+      localGrouped.get(key)!.push(p);
+    }
+    // Pick the best local position per symbol (highest qty) and mark extras for cleanup
+    const localBySymbol = new Map<string, typeof localPositions[0]>();
+    const duplicatesToRemove: string[] = [];
+    for (const [key, group] of localGrouped) {
+      // Sort by absolute quantity descending, pick first
+      group.sort((a, b) => Math.abs(Number(b.quantity)) - Math.abs(Number(a.quantity)));
+      localBySymbol.set(key, group[0]);
+      // Mark smaller duplicates for deletion
+      for (let i = 1; i < group.length; i++) {
+        duplicatesToRemove.push(group[i].id);
+      }
+    }
+    // Delete duplicate local positions
+    if (duplicatesToRemove.length > 0) {
+      for (const dupId of duplicatesToRemove) {
+        await supabase.from("positions").delete().eq("id", dupId);
+        changes.push({ action: "deleted_duplicate", symbol: "dup", detail: `Removed duplicate position ${dupId}` });
+      }
     }
 
     const alpacaSymbols = new Set<string>();
