@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useI18n } from '@/i18n';
-import { lovable } from '@/integrations/lovable';
 import lhydbraLogo from '@/assets/lhydbra-logo.png';
 
 export default function AuthPage() {
@@ -14,32 +13,6 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState('');
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [appleLoading, setAppleLoading] = useState(false);
-
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true);
-    setError('');
-    const result = await lovable.auth.signInWithOAuth('google', {
-      redirect_uri: window.location.origin,
-    });
-    if (result?.error) {
-      setError(result.error.message || 'Google sign-in failed');
-    }
-    setGoogleLoading(false);
-  };
-
-  const handleAppleSignIn = async () => {
-    setAppleLoading(true);
-    setError('');
-    const result = await lovable.auth.signInWithOAuth('apple', {
-      redirect_uri: window.location.origin,
-    });
-    if (result?.error) {
-      setError(result.error.message || 'Apple sign-in failed');
-    }
-    setAppleLoading(false);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +36,6 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
-      {/* Background animation */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse-glow" />
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-terminal-cyan/5 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: '1s' }} />
@@ -71,14 +43,12 @@ export default function AuthPage() {
       </div>
 
       <div className="relative z-10 w-full max-w-md px-6">
-        {/* Logo */}
         <div className="text-center mb-8">
           <img src={lhydbraLogo} alt="LHYDBRA" style={{ height: '240px', width: '240px' }} className="mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-foreground tracking-[0.25em]">LHYDBRA</h1>
           <p className="text-sm text-terminal-gold font-mono mt-2 tracking-wider">Intelligence. Balance. Evolution.</p>
         </div>
 
-        {/* Form */}
         <div className="terminal-border rounded-lg p-6 space-y-4">
           <h2 className="text-lg font-semibold text-foreground text-center">
             {isLogin ? 'Sign In' : 'Create Account'}
@@ -134,10 +104,13 @@ export default function AuthPage() {
             </button>
           </form>
 
-
           <div className="text-center mt-4">
             <button
-              onClick={() => { setIsLogin(!isLogin); setError(''); setConfirmMessage(''); }}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError('');
+                setConfirmMessage('');
+              }}
               className="text-xs text-primary hover:underline font-mono"
             >
               {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}

@@ -19,19 +19,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+    let isMounted = true;
+
+    const applySession = (nextSession: Session | null, nextUser: User | null) => {
+      if (!isMounted) return;
+      setSession(nextSession);
+      setUser(nextUser);
+    };
+
+    const clearLocalSession = async () => {
+      await supabase.auth.signOut({ scope: 'local' });
+      applySession(null, null);
+    };
+
+    const validateSession = async (candidateSession: Session | null) => {
+      if (!candidateSession) {
+        applySession(null, null);
+        return;
+      }
+
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        await clearLocalSession();
+        return;
+      }
+
+      applySession(candidateSession, data.user);
+    };
+
+    const initializeAuth = async () => {
+      try {
+        const {
+          data: { session: initialSession },
+        } = await supabase.auth.getSession();
+        await validateSession(initialSession);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      await validateSession(nextSession);
+      if (isMounted) setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    void initializeAuth();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -47,12 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
+    await supabase.auth.signOut({ scope: 'local' });
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
+    setSession(null);
+    setUser(null);
   };
 
   return (
