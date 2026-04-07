@@ -192,21 +192,35 @@ export default function Dashboard() {
   const maxTradesPerDay = operatorStatus?.max_trades_per_day ?? settings.max_trades_per_day ?? 3;
   const dailyCapReached = positions.length >= maxTradesPerDay;
 
-  // Calculate risk from open positions locally as fallback
-  const localRiskPct = useMemo(() => {
-    if (!positions.length || portfolioValue <= 0) return 0;
-    let totalRisk = 0;
-    for (const pos of positions) {
-      if (pos.stop_loss) {
-        const riskPerShare = Math.abs(pos.avg_entry - pos.stop_loss);
-        totalRisk += riskPerShare * Math.abs(pos.quantity);
+  const openRiskPct = useMemo(() => {
+    const capitalBase = Number(settings.current_capital) > 0
+      ? Number(settings.current_capital)
+      : portfolioValue > 0
+        ? portfolioValue
+        : 0;
+
+    if (!positions.length || capitalBase <= 0) return 0;
+
+    const totalRisk = positions.reduce((sum, pos) => {
+      const entry = Number(pos.avg_entry);
+      const stopLoss = pos.stop_loss == null ? null : Number(pos.stop_loss);
+      const quantity = Math.abs(Number(pos.quantity));
+
+      if (!Number.isFinite(entry) || !Number.isFinite(quantity) || !stopLoss || !Number.isFinite(stopLoss)) {
+        return sum;
       }
-    }
-    return (totalRisk / portfolioValue) * 100;
-  }, [positions, portfolioValue]);
-  const displayRiskUsed = operatorStatus?.daily_risk_used != null && operatorStatus.daily_risk_used > 0
-    ? operatorStatus.daily_risk_used
-    : localRiskPct;
+
+      return sum + Math.abs(entry - stopLoss) * quantity;
+    }, 0);
+
+    return totalRisk > 0 ? (totalRisk / capitalBase) * 100 : 0;
+  }, [positions, settings.current_capital, portfolioValue]);
+
+  const operatorRiskUsed = Number(operatorStatus?.daily_risk_used ?? 0);
+  const displayRiskUsed = Math.max(
+    Number.isFinite(operatorRiskUsed) ? operatorRiskUsed : 0,
+    Number.isFinite(openRiskPct) ? openRiskPct : 0,
+  );
   const displayMaxRisk = operatorStatus?.max_daily_risk ?? settings.max_daily_risk ?? 3;
 
   const now = new Date();
