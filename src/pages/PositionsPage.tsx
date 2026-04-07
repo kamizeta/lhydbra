@@ -28,6 +28,7 @@ interface Position {
   status: string;
   opened_at: string;
   signal_id: string | null;
+  pnl: number | null;
 }
 
 type SortKey = 'symbol' | 'direction' | 'quantity' | 'avg_entry' | 'capital' | 'current' | 'pnl' | 'pnlPercent' | 'stop_loss' | 'take_profit' | 'strategy' | 'opened_at';
@@ -65,11 +66,15 @@ export default function PositionsPage() {
 
   const getPnL = (pos: Position) => {
     const lookup = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
-    if (!lookup || lookup.isMock) return null;
-    const currentPrice = lookup.price;
+    const currentPrice = lookup && !lookup.isMock ? lookup.price : null;
     const qty = Math.abs(pos.quantity);
-    const diff = pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice;
-    return { pnl: diff * qty, pnlPercent: (diff / pos.avg_entry) * 100, currentPrice, isMock: false };
+    const fallbackPnl = currentPrice != null
+      ? (pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice) * qty
+      : null;
+    const pnl = pos.pnl ?? fallbackPnl;
+    if (pnl == null) return null;
+    const pnlPercent = qty > 0 && pos.avg_entry > 0 ? (pnl / (qty * pos.avg_entry)) * 100 : 0;
+    return { pnl, pnlPercent, currentPrice, isMock: false };
   };
 
   const { totalPnL, totalPnLPercent } = useMemo(() => {

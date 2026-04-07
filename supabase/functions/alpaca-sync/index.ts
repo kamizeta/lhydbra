@@ -153,20 +153,27 @@ serve(async (req) => {
       const assetClass = ap.asset_class === "crypto" ? "crypto" : (isEtf(sym) ? "etf" : "stock");
 
       if (local) {
-        // Update quantity/entry if changed
+        // Update quantity/entry/open PnL if changed
         const localQty = Number(local.quantity);
         const localEntry = Number(local.avg_entry);
-        if (Math.abs(localQty - qty) > 0.0001 || Math.abs(localEntry - avgEntry) > 0.01) {
+        const localPnl = Number(local.pnl || 0);
+        const roundedUnrealizedPl = Number(unrealizedPl.toFixed(2));
+        if (
+          Math.abs(localQty - qty) > 0.0001 ||
+          Math.abs(localEntry - avgEntry) > 0.01 ||
+          Math.abs(localPnl - roundedUnrealizedPl) > 0.01
+        ) {
           await supabase.from("positions").update({
             quantity: qty,
             avg_entry: avgEntry,
+            pnl: roundedUnrealizedPl,
             updated_at: new Date().toISOString(),
           }).eq("id", local.id);
 
           changes.push({
             action: "updated",
             symbol: sym,
-            detail: `qty: ${localQty}→${qty}, entry: ${localEntry.toFixed(2)}→${avgEntry.toFixed(2)}`,
+            detail: `qty: ${localQty}→${qty}, entry: ${localEntry.toFixed(2)}→${avgEntry.toFixed(2)}, pnl: ${localPnl.toFixed(2)}→${roundedUnrealizedPl.toFixed(2)}`,
           });
         }
 
@@ -259,6 +266,7 @@ serve(async (req) => {
           direction: side,
           quantity: qty,
           avg_entry: avgEntry,
+          pnl: Number(unrealizedPl.toFixed(2)),
           status: "open",
           strategy: "alpaca-sync",
           notes: `Synced from Alpaca ${paper ? "(Paper)" : "(Live)"}`,
