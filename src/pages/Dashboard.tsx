@@ -190,7 +190,8 @@ export default function Dashboard() {
 
   const cooldownActive = operatorStatus?.cooldown_active || false;
   const maxTradesPerDay = operatorStatus?.max_trades_per_day ?? settings.max_trades_per_day ?? 3;
-  const dailyCapReached = positions.length >= maxTradesPerDay;
+  const tradesToday = operatorStatus?.trades_today ?? 0;
+  const dailyCapReached = tradesToday >= maxTradesPerDay;
 
   const openRiskPct = useMemo(() => {
     const capitalBase = Number(settings.current_capital) > 0
