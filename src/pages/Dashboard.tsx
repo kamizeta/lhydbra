@@ -96,6 +96,13 @@ export default function Dashboard() {
       toast.error('Error loading dashboard. Please refresh.');
     }
     fetchStatus();
+    // Sync positions with Alpaca on dashboard load
+    supabase.functions.invoke('alpaca-sync', { body: { paper: true } }).then(({ error }) => {
+      if (!error) {
+        supabase.from('positions').select('id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false })
+          .then(({ data }) => setPositions((data || []) as Position[]));
+      }
+    });
   }; loadDashboard(); }, [user, fetchStatus]);
 
   useEffect(() => {
