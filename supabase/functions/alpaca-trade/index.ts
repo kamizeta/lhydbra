@@ -158,7 +158,7 @@ serve(async (req) => {
       if (!["buy", "sell"].includes(String(side).toLowerCase())) {
         return jsonRes({ error: "side must be 'buy' or 'sell'" }, 400);
       }
-      if (!/^[A-Z]{1,5}$/.test(String(symbol).toUpperCase())) {
+      if (!/^[A-Z]{1,10}$/.test(String(symbol).toUpperCase())) {
         return jsonRes({ error: "Invalid symbol format" }, 400);
       }
 
