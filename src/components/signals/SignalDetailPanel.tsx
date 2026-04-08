@@ -177,6 +177,8 @@ export default function SignalDetailPanel({ signal, onSignalSent }: Props) {
                   ? Math.abs(primaryTarget - signal.entry_price) / Math.abs(signal.entry_price - signal.stop_loss)
                   : signal.expected_r_multiple;
 
+                // Signal is already in the 'signals' table with status 'active',
+                // which is what Trade Ideas reads. Just sync a copy to trade_signals for legacy.
                 const { error } = await supabase.from("trade_signals").insert([{
                   user_id: user.id,
                   symbol: signal.asset,
@@ -197,12 +199,6 @@ export default function SignalDetailPanel({ signal, onSignalSent }: Props) {
                   status: "pending",
                 }]);
                 if (error) throw error;
-
-                // Mark signal as closed (sent)
-                await supabase.from("signals").update({
-                  status: "closed",
-                  updated_at: new Date().toISOString(),
-                } as Record<string, unknown>).eq("id", signal.id);
 
                 toast.success(`Señal enviada a Trade Ideas: ${signal.asset}`);
                 onSignalSent?.();
