@@ -252,8 +252,8 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
             time_in_force: isStock ? 'day' : 'gtc',
           };
 
-          // Use bracket order if SL and TP are set
-          if (signal.stop_loss > 0 && derivedTakeProfit > 0) {
+          // Use bracket order if SL and TP are set (not supported for crypto)
+          if (isStock && signal.stop_loss > 0 && derivedTakeProfit > 0) {
             orderBody.order_class = 'bracket';
             orderBody.take_profit = derivedTakeProfit;
             orderBody.stop_loss = signal.stop_loss;
