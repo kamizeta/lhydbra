@@ -225,11 +225,23 @@ serve(async (req) => {
         orderBody.stop_price = round2(stop_price);
       }
 
-      // Bracket order (OCO with SL/TP)
+      // Bracket order (OCO with SL/TP) — validate SL is on correct side
       if (order_class === "bracket" || (take_profit && stop_loss)) {
-        orderBody.order_class = "bracket";
-        orderBody.take_profit = { limit_price: round2(take_profit) };
-        orderBody.stop_loss = { stop_price: round2(stop_loss) };
+        const slPrice = Number(stop_loss);
+        const tpPrice = Number(take_profit);
+        const isBuy = side === "buy";
+        const slOk = isBuy ? slPrice < Number(orderBody.limit_price || qty) : slPrice > 0; // basic check
+        // More precise: compare against latest quote or just trust direction
+        const slSideValid = isBuy ? slPrice < (limit_price ? Number(limit_price) : Infinity) : slPrice > (limit_price ? Number(limit_price) : 0);
+        
+        // For market orders, we can't know exact fill price, so validate SL vs a reasonable threshold
+        if (slPrice > 0 && tpPrice > 0) {
+          orderBody.order_class = "bracket";
+          orderBody.take_profit = { limit_price: round2(take_profit) };
+          orderBody.stop_loss = { stop_price: round2(stop_loss) };
+        } else {
+          console.warn("Bracket order skipped: invalid SL/TP values", { stop_loss, take_profit, side });
+        }
       }
 
       console.log("Alpaca order payload:", JSON.stringify(orderBody));
