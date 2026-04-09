@@ -515,10 +515,11 @@ serve(async (req) => {
           if (ord.type === "stop" || ord.type === "stop_limit") {
             symbolsWithStop.add(sym);
           }
-          if (ord.type === "limit" && ord.side !== ord.side) {
-            // fallback: check legs
+          if (ord.type === "limit") {
+            // Any standalone limit order counts as a TP
+            symbolsWithTP.add(sym);
           }
-          // Bracket legs show as held orders with type stop or limit
+          // Bracket legs
           if (ord.order_class === "oto" || ord.order_class === "oco" || ord.order_class === "bracket") {
             if (ord.legs && Array.isArray(ord.legs)) {
               for (const leg of ord.legs) {
