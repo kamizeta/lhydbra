@@ -567,100 +567,47 @@ serve(async (req) => {
           const slValid = hasSL && (pos.direction === "long" ? sl < entry - 0.01 : sl > entry + 0.01);
           const tpValid = hasTP && (pos.direction === "long" ? tp > entry + 0.01 : tp < entry - 0.01);
 
-          // Strategy: If both SL and TP are needed and neither exists, cancel any stale orders and submit both
-          // If only one is missing but the other holds the qty, we must cancel the existing one and resubmit both
-          const needBoth = (missingStop && slValid) && (missingTP && tpValid);
-          const existingHoldsQty = (missingStop && hasLimitOrder) || (missingTP && hasStopOrder);
+          if (!slValid && !tpValid) continue;
 
-          if (needBoth || existingHoldsQty) {
-            // Cancel all existing protective orders for this symbol
-            const toCancel = [...(symbolStopOrders.get(sym) || []), ...(symbolLimitOrders.get(sym) || [])];
-            for (const ordId of toCancel) {
-              try {
-                await fetch(`${baseUrl}/v2/orders/${ordId}`, { method: "DELETE", headers: alpHdrs });
-              } catch {}
-            }
-            // Small delay for Alpaca to process cancellations
-            await new Promise(r => setTimeout(r, 500));
+          // Cancel ALL existing protective orders for this symbol first
+          const toCancel = [...(symbolStopOrders.get(sym) || []), ...(symbolLimitOrders.get(sym) || [])];
+          for (const ordId of toCancel) {
+            try { await fetch(`${baseUrl}/v2/orders/${ordId}`, { method: "DELETE", headers: alpHdrs }); } catch {}
+          }
+          if (toCancel.length > 0) await new Promise(r => setTimeout(r, 500));
 
-            // Submit SL
-            if (slValid) {
-              try {
-                const slRes = await fetch(`${baseUrl}/v2/orders`, {
-                  method: "POST", headers: alpHdrs,
-                  body: JSON.stringify({
-                    symbol: sym, qty: String(qty), side: closeSide,
-                    type: "stop", time_in_force: "gtc",
-                    stop_price: String(Math.round(sl * 100) / 100),
-                  }),
-                });
-                if (slRes.ok) {
-                  console.log(`[SL-Guardian] ✓ SL for ${sym} @ ${sl.toFixed(2)}`);
-                  changes.push({ action: "updated", symbol: pos.symbol, detail: `SL set @ ${sl.toFixed(2)} (GTC)` });
-                } else {
-                  console.warn(`[SL-Guardian] SL failed ${sym}: ${await slRes.text()}`);
-                }
-              } catch (e) { console.warn(`[SL-Guardian] SL error ${sym}:`, e); }
-            }
-            // Submit TP — qty must not overlap with SL, so skip if SL was submitted
-            // Unfortunately Alpaca doesn't allow two close orders for the same qty
-            // We can only have ONE protective order. Prioritize SL for safety.
-            if (tpValid && !slValid) {
-              try {
-                const tpRes = await fetch(`${baseUrl}/v2/orders`, {
-                  method: "POST", headers: alpHdrs,
-                  body: JSON.stringify({
-                    symbol: sym, qty: String(qty), side: closeSide,
-                    type: "limit", time_in_force: "gtc",
-                    limit_price: String(Math.round(tp * 100) / 100),
-                  }),
-                });
-                if (tpRes.ok) {
-                  console.log(`[SL-Guardian] ✓ TP for ${sym} @ ${tp.toFixed(2)}`);
-                  changes.push({ action: "updated", symbol: pos.symbol, detail: `TP set @ ${tp.toFixed(2)} (GTC)` });
-                } else {
-                  console.warn(`[SL-Guardian] TP failed ${sym}: ${await tpRes.text()}`);
-                }
-              } catch (e) { console.warn(`[SL-Guardian] TP error ${sym}:`, e); }
-            }
-
-            // Silent restore — no user notification for routine SL/TP guardian re-submissions
-          } else if (missingStop && slValid && !hasLimitOrder) {
-            // Only SL missing and no limit order holding qty
+          // Use OCO order to submit BOTH SL and TP together (one-cancels-other)
+          if (slValid && tpValid) {
             try {
-              const slRes = await fetch(`${baseUrl}/v2/orders`, {
+              const ocoBody = {
+                symbol: sym,
+                qty: String(qty),
+                side: closeSide,
+                type: "limit",
+                time_in_force: "gtc",
+                order_class: "oco",
+                limit_price: String(Math.round(tp * 100) / 100),
+                stop_loss: { stop_price: String(Math.round(sl * 100) / 100) },
+              };
+              const ocoRes = await fetch(`${baseUrl}/v2/orders`, {
                 method: "POST", headers: alpHdrs,
-                body: JSON.stringify({
-                  symbol: sym, qty: String(qty), side: closeSide,
-                  type: "stop", time_in_force: "gtc",
-                  stop_price: String(Math.round(sl * 100) / 100),
-                }),
+                body: JSON.stringify(ocoBody),
               });
-              if (slRes.ok) {
-                console.log(`[SL-Guardian] ✓ SL for ${sym} @ ${sl.toFixed(2)}`);
-                changes.push({ action: "updated", symbol: pos.symbol, detail: `SL set @ ${sl.toFixed(2)} (GTC)` });
+              if (ocoRes.ok) {
+                console.log(`[SL-Guardian] ✓ OCO for ${sym}: SL@${sl.toFixed(2)} + TP@${tp.toFixed(2)}`);
+                changes.push({ action: "updated", symbol: pos.symbol, detail: `OCO: SL@${sl.toFixed(2)} + TP@${tp.toFixed(2)} (GTC)` });
               } else {
-                console.warn(`[SL-Guardian] SL failed ${sym}: ${await slRes.text()}`);
+                const errText = await ocoRes.text();
+                console.warn(`[SL-Guardian] OCO failed ${sym}: ${errText}`);
+                // Fallback: submit SL and TP as separate orders
+                await submitSingleOrder(baseUrl, alpHdrs, sym, qty, closeSide, "stop", sl, changes, pos.symbol);
+                await submitSingleOrder(baseUrl, alpHdrs, sym, qty, closeSide, "limit", tp, changes, pos.symbol);
               }
-            } catch (e) { console.warn(`[SL-Guardian] SL error ${sym}:`, e); }
-          } else if (missingTP && tpValid && !hasStopOrder) {
-            // Only TP missing and no stop order holding qty
-            try {
-              const tpRes = await fetch(`${baseUrl}/v2/orders`, {
-                method: "POST", headers: alpHdrs,
-                body: JSON.stringify({
-                  symbol: sym, qty: String(qty), side: closeSide,
-                  type: "limit", time_in_force: "gtc",
-                  limit_price: String(Math.round(tp * 100) / 100),
-                }),
-              });
-              if (tpRes.ok) {
-                console.log(`[SL-Guardian] ✓ TP for ${sym} @ ${tp.toFixed(2)}`);
-                changes.push({ action: "updated", symbol: pos.symbol, detail: `TP set @ ${tp.toFixed(2)} (GTC)` });
-              } else {
-                console.warn(`[SL-Guardian] TP failed ${sym}: ${await tpRes.text()}`);
-              }
-            } catch (e) { console.warn(`[SL-Guardian] TP error ${sym}:`, e); }
+            } catch (e) { console.warn(`[SL-Guardian] OCO error ${sym}:`, e); }
+          } else if (slValid) {
+            await submitSingleOrder(baseUrl, alpHdrs, sym, qty, closeSide, "stop", sl, changes, pos.symbol);
+          } else if (tpValid) {
+            await submitSingleOrder(baseUrl, alpHdrs, sym, qty, closeSide, "limit", tp, changes, pos.symbol);
           }
         }
       } else {
