@@ -489,6 +489,203 @@ serve(async (req) => {
       }
     }
 
+    // ─── SL/TP Guardian: re-submit missing or expired stop/take-profit orders ───
+    try {
+      const alpHdrs = {
+        "APCA-API-KEY-ID": Deno.env.get("ALPACA_API_KEY_ID") ?? "",
+        "APCA-API-SECRET-KEY": Deno.env.get("ALPACA_API_SECRET_KEY") ?? "",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      };
+
+      const openOrdersRes = await fetch(
+        `${baseUrl}/v2/orders?status=open&limit=500`,
+        { headers: alpHdrs, signal: AbortSignal.timeout(8000) }
+      );
+
+      if (openOrdersRes.ok) {
+        const openOrders = await openOrdersRes.json() as any[];
+
+        // Build maps: which symbols have active stop/limit orders & their order IDs
+        const symbolStopOrders = new Map<string, string[]>(); // sym → order IDs
+        const symbolLimitOrders = new Map<string, string[]>();
+
+        for (const ord of openOrders) {
+          const sym = cleanSymbol(ord.symbol);
+          if (ord.type === "stop" || ord.type === "stop_limit") {
+            if (!symbolStopOrders.has(sym)) symbolStopOrders.set(sym, []);
+            symbolStopOrders.get(sym)!.push(ord.id);
+          }
+          if (ord.type === "limit") {
+            if (!symbolLimitOrders.has(sym)) symbolLimitOrders.set(sym, []);
+            symbolLimitOrders.get(sym)!.push(ord.id);
+          }
+          // Bracket legs
+          if (ord.legs && Array.isArray(ord.legs)) {
+            for (const leg of ord.legs) {
+              const legSym = cleanSymbol(leg.symbol || ord.symbol);
+              if (leg.type === "stop" || leg.type === "stop_limit") {
+                if (!symbolStopOrders.has(legSym)) symbolStopOrders.set(legSym, []);
+                symbolStopOrders.get(legSym)!.push(leg.id);
+              }
+              if (leg.type === "limit") {
+                if (!symbolLimitOrders.has(legSym)) symbolLimitOrders.set(legSym, []);
+                symbolLimitOrders.get(legSym)!.push(leg.id);
+              }
+            }
+          }
+        }
+
+        // Check each local open position for missing SL/TP
+        const freshPositions = await supabase
+          .from("positions")
+          .select("id, symbol, direction, avg_entry, stop_loss, take_profit, quantity, asset_type")
+          .eq("user_id", userId)
+          .eq("status", "open");
+
+        for (const pos of (freshPositions.data || [])) {
+          const sym = cleanSymbol(pos.symbol);
+          const isStock = pos.asset_type !== "crypto";
+          if (!isStock) continue;
+
+          const hasSL = pos.stop_loss != null && Number(pos.stop_loss) > 0;
+          const hasTP = pos.take_profit != null && Number(pos.take_profit) > 0;
+          const hasStopOrder = symbolStopOrders.has(sym);
+          const hasLimitOrder = symbolLimitOrders.has(sym);
+
+          const missingStop = hasSL && !hasStopOrder;
+          const missingTP = hasTP && !hasLimitOrder;
+
+          if (!missingStop && !missingTP) continue;
+
+          const qty = Math.abs(Number(pos.quantity));
+          const closeSide = pos.direction === "long" ? "sell" : "buy";
+          const entry = Number(pos.avg_entry);
+          const sl = Number(pos.stop_loss);
+          const tp = Number(pos.take_profit);
+
+          const slValid = hasSL && (pos.direction === "long" ? sl < entry - 0.01 : sl > entry + 0.01);
+          const tpValid = hasTP && (pos.direction === "long" ? tp > entry + 0.01 : tp < entry - 0.01);
+
+          // Strategy: If both SL and TP are needed and neither exists, cancel any stale orders and submit both
+          // If only one is missing but the other holds the qty, we must cancel the existing one and resubmit both
+          const needBoth = (missingStop && slValid) && (missingTP && tpValid);
+          const existingHoldsQty = (missingStop && hasLimitOrder) || (missingTP && hasStopOrder);
+
+          if (needBoth || existingHoldsQty) {
+            // Cancel all existing protective orders for this symbol
+            const toCancel = [...(symbolStopOrders.get(sym) || []), ...(symbolLimitOrders.get(sym) || [])];
+            for (const ordId of toCancel) {
+              try {
+                await fetch(`${baseUrl}/v2/orders/${ordId}`, { method: "DELETE", headers: alpHdrs });
+              } catch {}
+            }
+            // Small delay for Alpaca to process cancellations
+            await new Promise(r => setTimeout(r, 500));
+
+            // Submit SL
+            if (slValid) {
+              try {
+                const slRes = await fetch(`${baseUrl}/v2/orders`, {
+                  method: "POST", headers: alpHdrs,
+                  body: JSON.stringify({
+                    symbol: sym, qty: String(qty), side: closeSide,
+                    type: "stop", time_in_force: "gtc",
+                    stop_price: String(Math.round(sl * 100) / 100),
+                  }),
+                });
+                if (slRes.ok) {
+                  console.log(`[SL-Guardian] ✓ SL for ${sym} @ ${sl.toFixed(2)}`);
+                  changes.push({ action: "updated", symbol: pos.symbol, detail: `SL set @ ${sl.toFixed(2)} (GTC)` });
+                } else {
+                  console.warn(`[SL-Guardian] SL failed ${sym}: ${await slRes.text()}`);
+                }
+              } catch (e) { console.warn(`[SL-Guardian] SL error ${sym}:`, e); }
+            }
+            // Submit TP — qty must not overlap with SL, so skip if SL was submitted
+            // Unfortunately Alpaca doesn't allow two close orders for the same qty
+            // We can only have ONE protective order. Prioritize SL for safety.
+            if (tpValid && !slValid) {
+              try {
+                const tpRes = await fetch(`${baseUrl}/v2/orders`, {
+                  method: "POST", headers: alpHdrs,
+                  body: JSON.stringify({
+                    symbol: sym, qty: String(qty), side: closeSide,
+                    type: "limit", time_in_force: "gtc",
+                    limit_price: String(Math.round(tp * 100) / 100),
+                  }),
+                });
+                if (tpRes.ok) {
+                  console.log(`[SL-Guardian] ✓ TP for ${sym} @ ${tp.toFixed(2)}`);
+                  changes.push({ action: "updated", symbol: pos.symbol, detail: `TP set @ ${tp.toFixed(2)} (GTC)` });
+                } else {
+                  console.warn(`[SL-Guardian] TP failed ${sym}: ${await tpRes.text()}`);
+                }
+              } catch (e) { console.warn(`[SL-Guardian] TP error ${sym}:`, e); }
+            }
+
+            // Notify
+            try {
+              const parts: string[] = [];
+              if (slValid) parts.push(`SL @ $${sl.toFixed(2)}`);
+              if (tpValid && !slValid) parts.push(`TP @ $${tp.toFixed(2)}`);
+              if (parts.length > 0) {
+                await supabase.from("notifications").insert({
+                  user_id: userId,
+                  type: "warning",
+                  title: `🔄 ${pos.symbol}: Protección restaurada`,
+                  message: `Órdenes expiradas detectadas. Re-enviado: ${parts.join(", ")} (GTC). Nota: Alpaca solo permite 1 orden protectora por posición; se priorizó el SL.`,
+                  category: "sl_tp",
+                  severity: "warning",
+                  metadata: { position_id: pos.id, symbol: pos.symbol, stop_loss: sl, take_profit: tp },
+                });
+              }
+            } catch {}
+          } else if (missingStop && slValid && !hasLimitOrder) {
+            // Only SL missing and no limit order holding qty
+            try {
+              const slRes = await fetch(`${baseUrl}/v2/orders`, {
+                method: "POST", headers: alpHdrs,
+                body: JSON.stringify({
+                  symbol: sym, qty: String(qty), side: closeSide,
+                  type: "stop", time_in_force: "gtc",
+                  stop_price: String(Math.round(sl * 100) / 100),
+                }),
+              });
+              if (slRes.ok) {
+                console.log(`[SL-Guardian] ✓ SL for ${sym} @ ${sl.toFixed(2)}`);
+                changes.push({ action: "updated", symbol: pos.symbol, detail: `SL set @ ${sl.toFixed(2)} (GTC)` });
+              } else {
+                console.warn(`[SL-Guardian] SL failed ${sym}: ${await slRes.text()}`);
+              }
+            } catch (e) { console.warn(`[SL-Guardian] SL error ${sym}:`, e); }
+          } else if (missingTP && tpValid && !hasStopOrder) {
+            // Only TP missing and no stop order holding qty
+            try {
+              const tpRes = await fetch(`${baseUrl}/v2/orders`, {
+                method: "POST", headers: alpHdrs,
+                body: JSON.stringify({
+                  symbol: sym, qty: String(qty), side: closeSide,
+                  type: "limit", time_in_force: "gtc",
+                  limit_price: String(Math.round(tp * 100) / 100),
+                }),
+              });
+              if (tpRes.ok) {
+                console.log(`[SL-Guardian] ✓ TP for ${sym} @ ${tp.toFixed(2)}`);
+                changes.push({ action: "updated", symbol: pos.symbol, detail: `TP set @ ${tp.toFixed(2)} (GTC)` });
+              } else {
+                console.warn(`[SL-Guardian] TP failed ${sym}: ${await tpRes.text()}`);
+              }
+            } catch (e) { console.warn(`[SL-Guardian] TP error ${sym}:`, e); }
+          }
+        }
+      } else {
+        console.warn(`[SL-Guardian] Could not fetch open orders: ${openOrdersRes.status}`);
+      }
+    } catch (guardianErr) {
+      console.warn("[SL-Guardian] Non-blocking error:", guardianErr);
+    }
+
     // ─── Update daily performance summary ───
     try {
       const today = new Date().toISOString().split('T')[0];
