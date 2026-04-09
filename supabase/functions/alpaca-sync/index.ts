@@ -716,6 +716,31 @@ interface SyncChange {
   detail: string;
 }
 
+async function submitSingleOrder(
+  baseUrl: string, headers: Record<string, string>,
+  sym: string, qty: number, side: string,
+  orderType: "stop" | "limit", price: number,
+  changes: SyncChange[], displaySymbol: string,
+) {
+  try {
+    const body: Record<string, string> = {
+      symbol: sym, qty: String(qty), side,
+      type: orderType, time_in_force: "gtc",
+    };
+    if (orderType === "stop") body.stop_price = String(Math.round(price * 100) / 100);
+    else body.limit_price = String(Math.round(price * 100) / 100);
+
+    const res = await fetch(`${baseUrl}/v2/orders`, { method: "POST", headers, body: JSON.stringify(body) });
+    const label = orderType === "stop" ? "SL" : "TP";
+    if (res.ok) {
+      console.log(`[SL-Guardian] ✓ ${label} for ${sym} @ ${price.toFixed(2)}`);
+      changes.push({ action: "updated", symbol: displaySymbol, detail: `${label} set @ ${price.toFixed(2)} (GTC)` });
+    } else {
+      console.warn(`[SL-Guardian] ${label} failed ${sym}: ${await res.text()}`);
+    }
+  } catch (e) { console.warn(`[SL-Guardian] order error ${sym}:`, e); }
+}
+
 function jsonRes(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
