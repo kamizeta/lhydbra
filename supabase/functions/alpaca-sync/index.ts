@@ -624,23 +624,7 @@ serve(async (req) => {
               } catch (e) { console.warn(`[SL-Guardian] TP error ${sym}:`, e); }
             }
 
-            // Notify
-            try {
-              const parts: string[] = [];
-              if (slValid) parts.push(`SL @ $${sl.toFixed(2)}`);
-              if (tpValid && !slValid) parts.push(`TP @ $${tp.toFixed(2)}`);
-              if (parts.length > 0) {
-                await supabase.from("notifications").insert({
-                  user_id: userId,
-                  type: "warning",
-                  title: `🔄 ${pos.symbol}: Protección restaurada`,
-                  message: `Órdenes expiradas detectadas. Re-enviado: ${parts.join(", ")} (GTC). Nota: Alpaca solo permite 1 orden protectora por posición; se priorizó el SL.`,
-                  category: "sl_tp",
-                  severity: "warning",
-                  metadata: { position_id: pos.id, symbol: pos.symbol, stop_loss: sl, take_profit: tp },
-                });
-              }
-            } catch {}
+            // Silent restore — no user notification for routine SL/TP guardian re-submissions
           } else if (missingStop && slValid && !hasLimitOrder) {
             // Only SL missing and no limit order holding qty
             try {
