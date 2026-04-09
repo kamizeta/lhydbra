@@ -253,7 +253,15 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
           };
 
           // Use bracket order if SL and TP are set (not supported for crypto)
-          if (isStock && signal.stop_loss > 0 && derivedTakeProfit > 0) {
+          // Alpaca requires: buy → stop < entry, sell → stop > entry
+          const stopValid = alpacaSide === 'buy'
+            ? signal.stop_loss < entryPrice - 0.01
+            : signal.stop_loss > entryPrice + 0.01;
+          const tpValid = alpacaSide === 'buy'
+            ? derivedTakeProfit > entryPrice + 0.01
+            : derivedTakeProfit < entryPrice - 0.01;
+
+          if (isStock && signal.stop_loss > 0 && derivedTakeProfit > 0 && stopValid && tpValid) {
             orderBody.order_class = 'bracket';
             orderBody.take_profit = derivedTakeProfit;
             orderBody.stop_loss = signal.stop_loss;
