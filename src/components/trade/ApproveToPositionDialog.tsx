@@ -265,6 +265,9 @@ export default function ApproveToPositionDialog({ signal, onClose, onConfirm }: 
             orderBody.order_class = 'bracket';
             orderBody.take_profit = derivedTakeProfit;
             orderBody.stop_loss = signal.stop_loss;
+          } else if (isStock && signal.stop_loss > 0 && !stopValid) {
+            console.warn(`[ApproveDialog] SL ${signal.stop_loss} invalid for ${alpacaSide} at entry ${entryPrice} — sending without bracket. Monitor manually.`);
+            toast.warning('El Stop Loss calculado no es válido para esta dirección. La orden se envió SIN protección SL en el broker. Configúralo manualmente.');
           }
 
           const { data, error } = await supabase.functions.invoke('alpaca-trade', {
