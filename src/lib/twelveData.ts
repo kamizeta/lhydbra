@@ -66,6 +66,29 @@ export const MARKET_SYMBOLS: Record<AssetType, { symbol: string; name: string; t
     { symbol: 'PEP', name: 'PepsiCo Inc.', tdSymbol: 'PEP' },
     { symbol: 'ADBE', name: 'Adobe Inc.', tdSymbol: 'ADBE' },
     { symbol: 'ORCL', name: 'Oracle Corp.', tdSymbol: 'ORCL' },
+    // AI Infrastructure & Energy Supercycle — Tier 1
+    { symbol: 'GEV', name: 'GE Vernova', tdSymbol: 'GEV' },
+    { symbol: 'VRT', name: 'Vertiv Holdings', tdSymbol: 'VRT' },
+    { symbol: 'ETN', name: 'Eaton Corp', tdSymbol: 'ETN' },
+    { symbol: 'CEG', name: 'Constellation Energy', tdSymbol: 'CEG' },
+    { symbol: 'VST', name: 'Vistra Corp', tdSymbol: 'VST' },
+    // Tier 2
+    { symbol: 'PWR', name: 'Quanta Services', tdSymbol: 'PWR' },
+    { symbol: 'NEE', name: 'NextEra Energy', tdSymbol: 'NEE' },
+    { symbol: 'MTZ', name: 'MasTec', tdSymbol: 'MTZ' },
+    { symbol: 'BE', name: 'Bloom Energy', tdSymbol: 'BE' },
+    { symbol: 'TLN', name: 'Talen Energy', tdSymbol: 'TLN' },
+    // Tier 3 — Midstream Gas
+    { symbol: 'WMB', name: 'Williams Companies', tdSymbol: 'WMB' },
+    { symbol: 'EQT', name: 'EQT Corporation', tdSymbol: 'EQT' },
+    // Additional thematic
+    { symbol: 'DUK', name: 'Duke Energy', tdSymbol: 'DUK' },
+    { symbol: 'SO', name: 'Southern Company', tdSymbol: 'SO' },
+    { symbol: 'EMR', name: 'Emerson Electric', tdSymbol: 'EMR' },
+    { symbol: 'EQIX', name: 'Equinix', tdSymbol: 'EQIX' },
+    { symbol: 'DLR', name: 'Digital Realty', tdSymbol: 'DLR' },
+    { symbol: 'CCJ', name: 'Cameco Corp', tdSymbol: 'CCJ' },
+    { symbol: 'FCX', name: 'Freeport-McMoRan', tdSymbol: 'FCX' },
   ],
   etf: [
     { symbol: 'SPY', name: 'S&P 500 ETF', tdSymbol: 'SPY' },
