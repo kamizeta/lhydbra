@@ -714,6 +714,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
 
       const setup = setups[0];
+
+      // Final safety: reject if SL is on wrong side of entry
+      if (direction === 'long' && setup.sl >= setup.entry) {
+        rejections.push({ asset: symbol, reason: `Invalid SL for long: sl=${setup.sl} >= entry=${setup.entry}` });
+        continue;
+      }
+      if (direction === 'short' && setup.sl <= setup.entry) {
+        rejections.push({ asset: symbol, reason: `Invalid SL for short: sl=${setup.sl} <= entry=${setup.entry}` });
+        continue;
+      }
+
       const stopDist = Math.abs(setup.entry - setup.sl);
       if (stopDist <= 0) continue;
 
