@@ -506,26 +506,31 @@ serve(async (req) => {
       if (openOrdersRes.ok) {
         const openOrders = await openOrdersRes.json() as any[];
 
-        // Build a set of symbols that already have active stop/limit orders
-        const symbolsWithStop = new Set<string>();
-        const symbolsWithTP = new Set<string>();
+        // Build maps: which symbols have active stop/limit orders & their order IDs
+        const symbolStopOrders = new Map<string, string[]>(); // sym → order IDs
+        const symbolLimitOrders = new Map<string, string[]>();
 
         for (const ord of openOrders) {
           const sym = cleanSymbol(ord.symbol);
           if (ord.type === "stop" || ord.type === "stop_limit") {
-            symbolsWithStop.add(sym);
+            if (!symbolStopOrders.has(sym)) symbolStopOrders.set(sym, []);
+            symbolStopOrders.get(sym)!.push(ord.id);
           }
           if (ord.type === "limit") {
-            // Any standalone limit order counts as a TP
-            symbolsWithTP.add(sym);
+            if (!symbolLimitOrders.has(sym)) symbolLimitOrders.set(sym, []);
+            symbolLimitOrders.get(sym)!.push(ord.id);
           }
           // Bracket legs
-          if (ord.order_class === "oto" || ord.order_class === "oco" || ord.order_class === "bracket") {
-            if (ord.legs && Array.isArray(ord.legs)) {
-              for (const leg of ord.legs) {
-                const legSym = cleanSymbol(leg.symbol || ord.symbol);
-                if (leg.type === "stop" || leg.type === "stop_limit") symbolsWithStop.add(legSym);
-                if (leg.type === "limit") symbolsWithTP.add(legSym);
+          if (ord.legs && Array.isArray(ord.legs)) {
+            for (const leg of ord.legs) {
+              const legSym = cleanSymbol(leg.symbol || ord.symbol);
+              if (leg.type === "stop" || leg.type === "stop_limit") {
+                if (!symbolStopOrders.has(legSym)) symbolStopOrders.set(legSym, []);
+                symbolStopOrders.get(legSym)!.push(leg.id);
+              }
+              if (leg.type === "limit") {
+                if (!symbolLimitOrders.has(legSym)) symbolLimitOrders.set(legSym, []);
+                symbolLimitOrders.get(legSym)!.push(leg.id);
               }
             }
           }
@@ -541,12 +546,15 @@ serve(async (req) => {
         for (const pos of (freshPositions.data || [])) {
           const sym = cleanSymbol(pos.symbol);
           const isStock = pos.asset_type !== "crypto";
-          if (!isStock) continue; // Crypto doesn't support bracket/OCA orders on Alpaca
+          if (!isStock) continue;
 
           const hasSL = pos.stop_loss != null && Number(pos.stop_loss) > 0;
           const hasTP = pos.take_profit != null && Number(pos.take_profit) > 0;
-          const missingStop = hasSL && !symbolsWithStop.has(sym);
-          const missingTP = hasTP && !symbolsWithTP.has(sym);
+          const hasStopOrder = symbolStopOrders.has(sym);
+          const hasLimitOrder = symbolLimitOrders.has(sym);
+
+          const missingStop = hasSL && !hasStopOrder;
+          const missingTP = hasTP && !hasLimitOrder;
 
           if (!missingStop && !missingTP) continue;
 
@@ -556,82 +564,119 @@ serve(async (req) => {
           const sl = Number(pos.stop_loss);
           const tp = Number(pos.take_profit);
 
-          // Validate SL is on correct side
-          const slValid = pos.direction === "long" ? sl < entry - 0.01 : sl > entry + 0.01;
-          const tpValid = pos.direction === "long" ? tp > entry + 0.01 : tp < entry - 0.01;
+          const slValid = hasSL && (pos.direction === "long" ? sl < entry - 0.01 : sl > entry + 0.01);
+          const tpValid = hasTP && (pos.direction === "long" ? tp > entry + 0.01 : tp < entry - 0.01);
 
-          // Submit missing Stop Loss
-          if (missingStop && slValid) {
-            try {
-              const slOrder = {
-                symbol: sym,
-                qty: String(qty),
-                side: closeSide,
-                type: "stop",
-                time_in_force: "gtc",
-                stop_price: String(Math.round(sl * 100) / 100),
-              };
-              const slRes = await fetch(`${baseUrl}/v2/orders`, {
-                method: "POST",
-                headers: alpHdrs,
-                body: JSON.stringify(slOrder),
-              });
-              if (slRes.ok) {
-                console.log(`[SL-Guardian] ✓ Re-submitted SL for ${sym} @ ${sl.toFixed(2)}`);
-                changes.push({ action: "updated", symbol: pos.symbol, detail: `SL re-submitted @ ${sl.toFixed(2)} (was expired/missing)` });
-              } else {
-                const errText = await slRes.text();
-                console.warn(`[SL-Guardian] Failed SL for ${sym}: ${errText}`);
-              }
-            } catch (slErr) {
-              console.warn(`[SL-Guardian] Error submitting SL for ${sym}:`, slErr);
+          // Strategy: If both SL and TP are needed and neither exists, cancel any stale orders and submit both
+          // If only one is missing but the other holds the qty, we must cancel the existing one and resubmit both
+          const needBoth = (missingStop && slValid) && (missingTP && tpValid);
+          const existingHoldsQty = (missingStop && hasLimitOrder) || (missingTP && hasStopOrder);
+
+          if (needBoth || existingHoldsQty) {
+            // Cancel all existing protective orders for this symbol
+            const toCancel = [...(symbolStopOrders.get(sym) || []), ...(symbolLimitOrders.get(sym) || [])];
+            for (const ordId of toCancel) {
+              try {
+                await fetch(`${baseUrl}/v2/orders/${ordId}`, { method: "DELETE", headers: alpHdrs });
+              } catch {}
             }
-          }
+            // Small delay for Alpaca to process cancellations
+            await new Promise(r => setTimeout(r, 500));
 
-          // Submit missing Take Profit
-          if (missingTP && tpValid) {
-            try {
-              const tpOrder = {
-                symbol: sym,
-                qty: String(qty),
-                side: closeSide,
-                type: "limit",
-                time_in_force: "gtc",
-                limit_price: String(Math.round(tp * 100) / 100),
-              };
-              const tpRes = await fetch(`${baseUrl}/v2/orders`, {
-                method: "POST",
-                headers: alpHdrs,
-                body: JSON.stringify(tpOrder),
-              });
-              if (tpRes.ok) {
-                console.log(`[SL-Guardian] ✓ Re-submitted TP for ${sym} @ ${tp.toFixed(2)}`);
-                changes.push({ action: "updated", symbol: pos.symbol, detail: `TP re-submitted @ ${tp.toFixed(2)} (was expired/missing)` });
-              } else {
-                const errText = await tpRes.text();
-                console.warn(`[SL-Guardian] Failed TP for ${sym}: ${errText}`);
-              }
-            } catch (tpErr) {
-              console.warn(`[SL-Guardian] Error submitting TP for ${sym}:`, tpErr);
+            // Submit SL
+            if (slValid) {
+              try {
+                const slRes = await fetch(`${baseUrl}/v2/orders`, {
+                  method: "POST", headers: alpHdrs,
+                  body: JSON.stringify({
+                    symbol: sym, qty: String(qty), side: closeSide,
+                    type: "stop", time_in_force: "gtc",
+                    stop_price: String(Math.round(sl * 100) / 100),
+                  }),
+                });
+                if (slRes.ok) {
+                  console.log(`[SL-Guardian] ✓ SL for ${sym} @ ${sl.toFixed(2)}`);
+                  changes.push({ action: "updated", symbol: pos.symbol, detail: `SL set @ ${sl.toFixed(2)} (GTC)` });
+                } else {
+                  console.warn(`[SL-Guardian] SL failed ${sym}: ${await slRes.text()}`);
+                }
+              } catch (e) { console.warn(`[SL-Guardian] SL error ${sym}:`, e); }
             }
-          }
+            // Submit TP — qty must not overlap with SL, so skip if SL was submitted
+            // Unfortunately Alpaca doesn't allow two close orders for the same qty
+            // We can only have ONE protective order. Prioritize SL for safety.
+            if (tpValid && !slValid) {
+              try {
+                const tpRes = await fetch(`${baseUrl}/v2/orders`, {
+                  method: "POST", headers: alpHdrs,
+                  body: JSON.stringify({
+                    symbol: sym, qty: String(qty), side: closeSide,
+                    type: "limit", time_in_force: "gtc",
+                    limit_price: String(Math.round(tp * 100) / 100),
+                  }),
+                });
+                if (tpRes.ok) {
+                  console.log(`[SL-Guardian] ✓ TP for ${sym} @ ${tp.toFixed(2)}`);
+                  changes.push({ action: "updated", symbol: pos.symbol, detail: `TP set @ ${tp.toFixed(2)} (GTC)` });
+                } else {
+                  console.warn(`[SL-Guardian] TP failed ${sym}: ${await tpRes.text()}`);
+                }
+              } catch (e) { console.warn(`[SL-Guardian] TP error ${sym}:`, e); }
+            }
 
-          // Notify user about re-submitted orders
-          if ((missingStop && slValid) || (missingTP && tpValid)) {
+            // Notify
             try {
               const parts: string[] = [];
-              if (missingStop && slValid) parts.push(`SL @ $${sl.toFixed(2)}`);
-              if (missingTP && tpValid) parts.push(`TP @ $${tp.toFixed(2)}`);
-              await supabase.from("notifications").insert({
-                user_id: userId,
-                type: "warning",
-                title: `🔄 ${pos.symbol}: Órdenes re-enviadas`,
-                message: `Se detectaron órdenes expiradas/faltantes para ${pos.symbol}. Re-enviadas: ${parts.join(", ")} con vigencia GTC.`,
-                category: "sl_tp",
-                severity: "warning",
-                metadata: { position_id: pos.id, symbol: pos.symbol, stop_loss: sl, take_profit: tp },
-              });
+              if (slValid) parts.push(`SL @ $${sl.toFixed(2)}`);
+              if (tpValid && !slValid) parts.push(`TP @ $${tp.toFixed(2)}`);
+              if (parts.length > 0) {
+                await supabase.from("notifications").insert({
+                  user_id: userId,
+                  type: "warning",
+                  title: `🔄 ${pos.symbol}: Protección restaurada`,
+                  message: `Órdenes expiradas detectadas. Re-enviado: ${parts.join(", ")} (GTC). Nota: Alpaca solo permite 1 orden protectora por posición; se priorizó el SL.`,
+                  category: "sl_tp",
+                  severity: "warning",
+                  metadata: { position_id: pos.id, symbol: pos.symbol, stop_loss: sl, take_profit: tp },
+                });
+              }
             } catch {}
+          } else if (missingStop && slValid && !hasLimitOrder) {
+            // Only SL missing and no limit order holding qty
+            try {
+              const slRes = await fetch(`${baseUrl}/v2/orders`, {
+                method: "POST", headers: alpHdrs,
+                body: JSON.stringify({
+                  symbol: sym, qty: String(qty), side: closeSide,
+                  type: "stop", time_in_force: "gtc",
+                  stop_price: String(Math.round(sl * 100) / 100),
+                }),
+              });
+              if (slRes.ok) {
+                console.log(`[SL-Guardian] ✓ SL for ${sym} @ ${sl.toFixed(2)}`);
+                changes.push({ action: "updated", symbol: pos.symbol, detail: `SL set @ ${sl.toFixed(2)} (GTC)` });
+              } else {
+                console.warn(`[SL-Guardian] SL failed ${sym}: ${await slRes.text()}`);
+              }
+            } catch (e) { console.warn(`[SL-Guardian] SL error ${sym}:`, e); }
+          } else if (missingTP && tpValid && !hasStopOrder) {
+            // Only TP missing and no stop order holding qty
+            try {
+              const tpRes = await fetch(`${baseUrl}/v2/orders`, {
+                method: "POST", headers: alpHdrs,
+                body: JSON.stringify({
+                  symbol: sym, qty: String(qty), side: closeSide,
+                  type: "limit", time_in_force: "gtc",
+                  limit_price: String(Math.round(tp * 100) / 100),
+                }),
+              });
+              if (tpRes.ok) {
+                console.log(`[SL-Guardian] ✓ TP for ${sym} @ ${tp.toFixed(2)}`);
+                changes.push({ action: "updated", symbol: pos.symbol, detail: `TP set @ ${tp.toFixed(2)} (GTC)` });
+              } else {
+                console.warn(`[SL-Guardian] TP failed ${sym}: ${await tpRes.text()}`);
+              }
+            } catch (e) { console.warn(`[SL-Guardian] TP error ${sym}:`, e); }
           }
         }
       } else {
