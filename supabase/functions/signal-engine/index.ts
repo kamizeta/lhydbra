@@ -234,19 +234,42 @@ function generateSetups(features: Record<string, unknown>, direction: string): {
   const price = Number(features.current_price || features.sma_20 || 0);
   if (price <= 0) return [];
   const atr = Number(features.atr_14 || price * 0.02);
-  const support = Number(features.support_level || price - atr * 2);
-  const resistance = Number(features.resistance_level || price + atr * 2);
+  const support = Number(features.support_level || 0);
+  const resistance = Number(features.resistance_level || 0);
+
   if (direction === "long") {
+    // For long: SL must be BELOW entry. Use support only if it's below price.
+    const validSupport = support > 0 && support < price ? support : 0;
+    let sl = validSupport > 0
+      ? Math.max(validSupport, price - atr * 1.5)  // tighter of support vs 1.5 ATR
+      : price - atr * 1.5;                          // fallback: 1.5 ATR below
+    // Safety: ensure SL is always below entry by at least 0.5 ATR
+    if (sl >= price) sl = price - atr * 1.0;
+    // Absolute floor
+    if (sl >= price - 0.01) sl = price - Math.max(atr * 0.5, price * 0.005);
+
+    const validResistance = resistance > price ? resistance : price + atr * 3;
     return [{
       entry: price,
-      sl: Math.max(support, price - atr * 1.5),
-      targets: [+(price + atr * 2).toFixed(4), +(price + atr * 3).toFixed(4), +resistance.toFixed(4)],
+      sl: +sl.toFixed(4),
+      targets: [+(price + atr * 2).toFixed(4), +(price + atr * 3).toFixed(4), +validResistance.toFixed(4)],
     }];
   }
+
+  // Short: SL must be ABOVE entry. Use resistance only if it's above price.
+  const validResistance = resistance > 0 && resistance > price ? resistance : 0;
+  let sl = validResistance > 0
+    ? Math.min(validResistance, price + atr * 1.5)
+    : price + atr * 1.5;
+  // Safety: ensure SL is always above entry by at least 0.5 ATR
+  if (sl <= price) sl = price + atr * 1.0;
+  if (sl <= price + 0.01) sl = price + Math.max(atr * 0.5, price * 0.005);
+
+  const validSupport = support > 0 && support < price ? support : price - atr * 3;
   return [{
     entry: price,
-    sl: Math.min(resistance, price + atr * 1.5),
-    targets: [+(price - atr * 2).toFixed(4), +(price - atr * 3).toFixed(4), +support.toFixed(4)],
+    sl: +sl.toFixed(4),
+    targets: [+(price - atr * 2).toFixed(4), +(price - atr * 3).toFixed(4), +validSupport.toFixed(4)],
   }];
 }
 
@@ -691,6 +714,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
 
       const setup = setups[0];
+
+      // Final safety: reject if SL is on wrong side of entry
+      if (direction === 'long' && setup.sl >= setup.entry) {
+        rejections.push({ asset: symbol, reason: `Invalid SL for long: sl=${setup.sl} >= entry=${setup.entry}` });
+        continue;
+      }
+      if (direction === 'short' && setup.sl <= setup.entry) {
+        rejections.push({ asset: symbol, reason: `Invalid SL for short: sl=${setup.sl} <= entry=${setup.entry}` });
+        continue;
+      }
+
       const stopDist = Math.abs(setup.entry - setup.sl);
       if (stopDist <= 0) continue;
 
