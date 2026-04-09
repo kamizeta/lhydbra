@@ -586,7 +586,7 @@ serve(async (req) => {
                 type: "limit",
                 time_in_force: "gtc",
                 order_class: "oco",
-                limit_price: String(Math.round(tp * 100) / 100),
+                take_profit: { limit_price: String(Math.round(tp * 100) / 100) },
                 stop_loss: { stop_price: String(Math.round(sl * 100) / 100) },
               };
               const ocoRes = await fetch(`${baseUrl}/v2/orders`, {
@@ -599,9 +599,8 @@ serve(async (req) => {
               } else {
                 const errText = await ocoRes.text();
                 console.warn(`[SL-Guardian] OCO failed ${sym}: ${errText}`);
-                // Fallback: submit SL and TP as separate orders
+                // Fallback: at least set SL (TP can't coexist with SL for same qty)
                 await submitSingleOrder(baseUrl, alpHdrs, sym, qty, closeSide, "stop", sl, changes, pos.symbol);
-                await submitSingleOrder(baseUrl, alpHdrs, sym, qty, closeSide, "limit", tp, changes, pos.symbol);
               }
             } catch (e) { console.warn(`[SL-Guardian] OCO error ${sym}:`, e); }
           } else if (slValid) {
