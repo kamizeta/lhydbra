@@ -198,6 +198,35 @@ serve(async (req) => {
           });
         }
 
+        // If position has no SL/TP, try to populate from signals
+        const localHasSL = local.stop_loss != null && Number(local.stop_loss) > 0;
+        const localHasTP = local.take_profit != null && Number(local.take_profit) > 0;
+        if (!localHasSL || !localHasTP) {
+          try {
+            const { data: matchSig } = await supabase
+              .from("signals")
+              .select("stop_loss, targets, strategy_family, market_regime")
+              .eq("user_id", userId)
+              .eq("asset", sym)
+              .in("status", ["active", "approved"])
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (matchSig) {
+              const ud: Record<string, unknown> = { updated_at: new Date().toISOString() };
+              if (!localHasSL && matchSig.stop_loss) ud.stop_loss = Number(matchSig.stop_loss);
+              if (!localHasTP && matchSig.targets) {
+                const tgts = matchSig.targets as number[];
+                if (tgts.length > 0) ud.take_profit = Number(tgts[0]);
+              }
+              if (Object.keys(ud).length > 1) {
+                await supabase.from("positions").update(ud).eq("id", local.id);
+                changes.push({ action: "updated", symbol: sym, detail: `SL/TP populated from signal` });
+              }
+            }
+          } catch {}
+        }
+
         // ─── Breakeven stop management ───
         if (local.stop_loss) {
           const currentSL = Number(local.stop_loss);
