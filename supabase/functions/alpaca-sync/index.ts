@@ -536,9 +536,16 @@ serve(async (req) => {
         // Build maps: which symbols have active stop/limit orders & their order IDs
         const symbolStopOrders = new Map<string, string[]>(); // sym → order IDs
         const symbolLimitOrders = new Map<string, string[]>();
+        const symbolHasOCO = new Set<string>(); // symbols with existing OCO orders
 
         for (const ord of openOrders) {
           const sym = cleanSymbol(ord.symbol);
+
+          // Detect OCO orders (they have order_class = "oco")
+          if (ord.order_class === "oco") {
+            symbolHasOCO.add(sym);
+          }
+
           if (ord.type === "stop" || ord.type === "stop_limit") {
             if (!symbolStopOrders.has(sym)) symbolStopOrders.set(sym, []);
             symbolStopOrders.get(sym)!.push(ord.id);
