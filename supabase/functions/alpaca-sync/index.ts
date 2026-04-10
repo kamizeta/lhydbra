@@ -278,7 +278,30 @@ serve(async (req) => {
           }
         }
       } else {
-        // New position from Alpaca → create locally
+        // New position from Alpaca → create locally, try to get SL/TP from signals
+        let sigSL: number | null = null;
+        let sigTP: number | null = null;
+        let sigStrategy: string | null = null;
+        let sigRegime: string | null = null;
+        try {
+          const { data: matchSig } = await supabase
+            .from("signals")
+            .select("stop_loss, targets, strategy_family, market_regime")
+            .eq("user_id", userId)
+            .eq("asset", sym)
+            .in("status", ["active", "approved"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (matchSig) {
+            sigSL = Number(matchSig.stop_loss) || null;
+            const targets = matchSig.targets as number[] | null;
+            sigTP = targets && targets.length > 0 ? Number(targets[0]) : null;
+            sigStrategy = matchSig.strategy_family;
+            sigRegime = matchSig.market_regime;
+          }
+        } catch {}
+
         await supabase.from("positions").insert({
           user_id: userId,
           symbol: sym,
@@ -287,13 +310,17 @@ serve(async (req) => {
           direction: side,
           quantity: qty,
           avg_entry: avgEntry,
+          stop_loss: sigSL,
+          take_profit: sigTP,
           pnl: Number(unrealizedPl.toFixed(2)),
           status: "open",
-          strategy: "alpaca-sync",
-          notes: `Synced from Alpaca ${paper ? "(Paper)" : "(Live)"}`,
+          strategy: sigStrategy || "alpaca-sync",
+          strategy_family: sigStrategy,
+          regime_at_entry: sigRegime,
+          notes: `Synced from Alpaca ${paper ? "(Paper)" : "(Live)"}${sigSL ? ` | SL: ${sigSL}` : ""}${sigTP ? ` | TP: ${sigTP}` : ""}`,
         });
 
-        changes.push({ action: "opened", symbol: sym, detail: `${side} ${qty} @ ${avgEntry.toFixed(2)}` });
+        changes.push({ action: "opened", symbol: sym, detail: `${side} ${qty} @ ${avgEntry.toFixed(2)}${sigSL ? ` SL:${sigSL}` : ""}${sigTP ? ` TP:${sigTP}` : ""}` });
       }
     }
 
