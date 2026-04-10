@@ -586,6 +586,10 @@ serve(async (req) => {
           const hasTP = pos.take_profit != null && Number(pos.take_profit) > 0;
           const hasStopOrder = symbolStopOrders.has(sym);
           const hasLimitOrder = symbolLimitOrders.has(sym);
+          const hasOCO = symbolHasOCO.has(sym);
+
+          // If OCO already exists, both SL and TP are covered — skip
+          if (hasOCO) continue;
 
           const missingStop = hasSL && !hasStopOrder;
           const missingTP = hasTP && !hasLimitOrder;
