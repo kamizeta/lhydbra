@@ -367,7 +367,7 @@ export default function PositionsPage() {
                       {pnlData.pnl >= 0 ? '+' : '-'}{fmtPrice(Math.abs(pnlData.pnl))}
                     </span>
                     <div className={cn("text-[10px] font-mono", pnlData.pnlPercent >= 0 ? "text-profit" : "text-loss")}>
-                      {pnlData.pnlPercent >= 0 ? '+' : ''}{pnlData.pnlPercent.toFixed(2)}%
+                      {pnlData.pnlPercent != null ? `${pnlData.pnlPercent >= 0 ? '+' : ''}${pnlData.pnlPercent.toFixed(2)}%` : '—'}
                     </div>
                   </div>
                 )}
@@ -516,7 +516,7 @@ export default function PositionsPage() {
                   <td className="text-right p-2 font-mono text-xs">
                     {pnlData ? (
                       <div className="flex items-center justify-end gap-0.5">
-                        <span className="text-foreground">${pnlData.currentPrice.toFixed(2)}</span>
+                        <span className="text-foreground">{pnlData.currentPrice != null ? `$${pnlData.currentPrice.toFixed(2)}` : '—'}</span>
                         {pnlData.isMock && <AlertTriangle className="h-2.5 w-2.5 text-muted-foreground" />}
                       </div>
                     ) : <span className="text-muted-foreground">—</span>}
@@ -525,10 +525,10 @@ export default function PositionsPage() {
                     {pnlData ? (
                       <div>
                         <span className={cn("font-bold", pnlData.pnl >= 0 ? "text-profit" : "text-loss")}>
-                          {pnlData.pnl >= 0 ? '+' : ''}${pnlData.pnl.toFixed(2)}
-                        </span>
-                        <div className={cn("text-[10px]", pnlData.pnlPercent >= 0 ? "text-profit" : "text-loss")}>
-                          {pnlData.pnlPercent >= 0 ? '+' : ''}{pnlData.pnlPercent.toFixed(2)}%
+                         {pnlData.pnl != null ? `${pnlData.pnl >= 0 ? '+' : ''}$${pnlData.pnl.toFixed(2)}` : '—'}
+                       </span>
+                       <div className={cn("text-[10px]", (pnlData.pnlPercent ?? 0) >= 0 ? "text-profit" : "text-loss")}>
+                         {pnlData.pnlPercent != null ? `${pnlData.pnlPercent >= 0 ? '+' : ''}${pnlData.pnlPercent.toFixed(2)}%` : ''}
                         </div>
                       </div>
                     ) : <span className="text-muted-foreground text-[10px]">Sin precio</span>}
