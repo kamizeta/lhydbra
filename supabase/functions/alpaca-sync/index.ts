@@ -198,6 +198,35 @@ serve(async (req) => {
           });
         }
 
+        // If position has no SL/TP, try to populate from signals
+        const localHasSL = local.stop_loss != null && Number(local.stop_loss) > 0;
+        const localHasTP = local.take_profit != null && Number(local.take_profit) > 0;
+        if (!localHasSL || !localHasTP) {
+          try {
+            const { data: matchSig } = await supabase
+              .from("signals")
+              .select("stop_loss, targets, strategy_family, market_regime")
+              .eq("user_id", userId)
+              .eq("asset", sym)
+              .in("status", ["active", "approved"])
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (matchSig) {
+              const ud: Record<string, unknown> = { updated_at: new Date().toISOString() };
+              if (!localHasSL && matchSig.stop_loss) ud.stop_loss = Number(matchSig.stop_loss);
+              if (!localHasTP && matchSig.targets) {
+                const tgts = matchSig.targets as number[];
+                if (tgts.length > 0) ud.take_profit = Number(tgts[0]);
+              }
+              if (Object.keys(ud).length > 1) {
+                await supabase.from("positions").update(ud).eq("id", local.id);
+                changes.push({ action: "updated", symbol: sym, detail: `SL/TP populated from signal` });
+              }
+            }
+          } catch {}
+        }
+
         // ─── Breakeven stop management ───
         if (local.stop_loss) {
           const currentSL = Number(local.stop_loss);
@@ -278,7 +307,30 @@ serve(async (req) => {
           }
         }
       } else {
-        // New position from Alpaca → create locally
+        // New position from Alpaca → create locally, try to get SL/TP from signals
+        let sigSL: number | null = null;
+        let sigTP: number | null = null;
+        let sigStrategy: string | null = null;
+        let sigRegime: string | null = null;
+        try {
+          const { data: matchSig } = await supabase
+            .from("signals")
+            .select("stop_loss, targets, strategy_family, market_regime")
+            .eq("user_id", userId)
+            .eq("asset", sym)
+            .in("status", ["active", "approved"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (matchSig) {
+            sigSL = Number(matchSig.stop_loss) || null;
+            const targets = matchSig.targets as number[] | null;
+            sigTP = targets && targets.length > 0 ? Number(targets[0]) : null;
+            sigStrategy = matchSig.strategy_family;
+            sigRegime = matchSig.market_regime;
+          }
+        } catch {}
+
         await supabase.from("positions").insert({
           user_id: userId,
           symbol: sym,
@@ -287,13 +339,17 @@ serve(async (req) => {
           direction: side,
           quantity: qty,
           avg_entry: avgEntry,
+          stop_loss: sigSL,
+          take_profit: sigTP,
           pnl: Number(unrealizedPl.toFixed(2)),
           status: "open",
-          strategy: "alpaca-sync",
-          notes: `Synced from Alpaca ${paper ? "(Paper)" : "(Live)"}`,
+          strategy: sigStrategy || "alpaca-sync",
+          strategy_family: sigStrategy,
+          regime_at_entry: sigRegime,
+          notes: `Synced from Alpaca ${paper ? "(Paper)" : "(Live)"}${sigSL ? ` | SL: ${sigSL}` : ""}${sigTP ? ` | TP: ${sigTP}` : ""}`,
         });
 
-        changes.push({ action: "opened", symbol: sym, detail: `${side} ${qty} @ ${avgEntry.toFixed(2)}` });
+        changes.push({ action: "opened", symbol: sym, detail: `${side} ${qty} @ ${avgEntry.toFixed(2)}${sigSL ? ` SL:${sigSL}` : ""}${sigTP ? ` TP:${sigTP}` : ""}` });
       }
     }
 
@@ -509,9 +565,16 @@ serve(async (req) => {
         // Build maps: which symbols have active stop/limit orders & their order IDs
         const symbolStopOrders = new Map<string, string[]>(); // sym → order IDs
         const symbolLimitOrders = new Map<string, string[]>();
+        const symbolHasOCO = new Set<string>(); // symbols with existing OCO orders
 
         for (const ord of openOrders) {
           const sym = cleanSymbol(ord.symbol);
+
+          // Detect OCO orders (they have order_class = "oco")
+          if (ord.order_class === "oco") {
+            symbolHasOCO.add(sym);
+          }
+
           if (ord.type === "stop" || ord.type === "stop_limit") {
             if (!symbolStopOrders.has(sym)) symbolStopOrders.set(sym, []);
             symbolStopOrders.get(sym)!.push(ord.id);
@@ -552,6 +615,10 @@ serve(async (req) => {
           const hasTP = pos.take_profit != null && Number(pos.take_profit) > 0;
           const hasStopOrder = symbolStopOrders.has(sym);
           const hasLimitOrder = symbolLimitOrders.has(sym);
+          const hasOCO = symbolHasOCO.has(sym);
+
+          // If OCO already exists, both SL and TP are covered — skip
+          if (hasOCO) continue;
 
           const missingStop = hasSL && !hasStopOrder;
           const missingTP = hasTP && !hasLimitOrder;

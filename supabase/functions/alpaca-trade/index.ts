@@ -22,7 +22,6 @@ function alpacaHeaders() {
   };
 }
 
-// ─── Retry helper ───
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, delayMs = 1000): Promise<Response> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -43,7 +42,6 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, de
   throw new Error("Retry exhausted");
 }
 
-// ─── Poll order until filled or terminal ───
 async function pollOrderStatus(baseUrl: string, orderId: string, headers: Record<string, string>, maxAttempts = 10): Promise<Record<string, unknown>> {
   const url = `${baseUrl}/v2/orders/${orderId}`;
   for (let i = 0; i < maxAttempts; i++) {
@@ -68,11 +66,98 @@ async function pollOrderStatus(baseUrl: string, orderId: string, headers: Record
   return { status: 'polling_timeout', id: orderId };
 }
 
+const round2 = (v: unknown) => {
+  const n = Number(v);
+  return isNaN(n) ? v : String(Math.round(n * 100) / 100);
+};
+
+// Submit OCO (SL + TP) after a fill - GTC so they don't expire
+async function submitPostFillOCO(
+  baseUrl: string,
+  headers: Record<string, string>,
+  symbol: string,
+  qty: number,
+  side: string, // direction of original trade
+  stopLoss: number,
+  takeProfit: number,
+): Promise<{ success: boolean; error?: string }> {
+  const closeSide = side === "buy" ? "sell" : "buy";
+  const sl = Math.round(stopLoss * 100) / 100;
+  const tp = Math.round(takeProfit * 100) / 100;
+
+  // Validate SL is on correct side
+  const isLong = side === "buy";
+  if (isLong && sl >= tp) {
+    console.warn(`[alpaca-trade] OCO skip: long SL(${sl}) >= TP(${tp})`);
+    return { success: false, error: "SL must be below TP for long" };
+  }
+  if (!isLong && sl <= tp) {
+    console.warn(`[alpaca-trade] OCO skip: short SL(${sl}) <= TP(${tp})`);
+    return { success: false, error: "SL must be above TP for short" };
+  }
+
+  try {
+    const ocoBody = {
+      symbol: symbol.replace("/", ""),
+      qty: String(qty),
+      side: closeSide,
+      type: "limit",
+      time_in_force: "gtc",
+      order_class: "oco",
+      take_profit: { limit_price: String(tp) },
+      stop_loss: { stop_price: String(sl) },
+    };
+
+    console.log(`[alpaca-trade] Submitting OCO: ${JSON.stringify(ocoBody)}`);
+
+    const res = await fetchWithRetry(`${baseUrl}/v2/orders`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(ocoBody),
+    });
+
+    if (res.ok) {
+      console.log(`[alpaca-trade] ✓ OCO placed for ${symbol}: SL@${sl} + TP@${tp} (GTC)`);
+      return { success: true };
+    } else {
+      const errBody = await res.text();
+      console.error(`[alpaca-trade] OCO failed for ${symbol}: ${errBody}`);
+
+      // Fallback: at least set a stop order
+      try {
+        const stopBody = {
+          symbol: symbol.replace("/", ""),
+          qty: String(qty),
+          side: closeSide,
+          type: "stop",
+          time_in_force: "gtc",
+          stop_price: String(sl),
+        };
+        const stopRes = await fetch(`${baseUrl}/v2/orders`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(stopBody),
+        });
+        if (stopRes.ok) {
+          console.log(`[alpaca-trade] ✓ Fallback SL placed for ${symbol}: SL@${sl} (GTC)`);
+          return { success: true, error: `OCO failed, SL-only fallback active. OCO error: ${errBody}` };
+        }
+        const stopErr = await stopRes.text();
+        return { success: false, error: `OCO failed: ${errBody}. SL fallback also failed: ${stopErr}` };
+      } catch {
+        return { success: false, error: `OCO failed: ${errBody}` };
+      }
+    }
+  } catch (e) {
+    console.error(`[alpaca-trade] OCO error:`, e);
+    return { success: false, error: e instanceof Error ? e.message : "OCO submit error" };
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Auth check - fixed: use getUser instead of getClaims
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return jsonRes({ error: "Unauthorized" }, 401);
@@ -92,7 +177,6 @@ serve(async (req) => {
 
     let userId: string;
     if (isServiceRole && user_id_override) {
-      // Trusted call from operator-mode
       userId = user_id_override;
     } else {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -114,16 +198,11 @@ serve(async (req) => {
       return jsonRes({
         success: true,
         account: {
-          id: data.id,
-          status: data.status,
-          currency: data.currency,
-          buying_power: data.buying_power,
-          cash: data.cash,
-          portfolio_value: data.portfolio_value,
-          equity: data.equity,
+          id: data.id, status: data.status, currency: data.currency,
+          buying_power: data.buying_power, cash: data.cash,
+          portfolio_value: data.portfolio_value, equity: data.equity,
           pattern_day_trader: data.pattern_day_trader,
-          trading_blocked: data.trading_blocked,
-          account_blocked: data.account_blocked,
+          trading_blocked: data.trading_blocked, account_blocked: data.account_blocked,
         },
       });
     }
@@ -141,7 +220,7 @@ serve(async (req) => {
     // ─── ACTION: place_order ───
     if (action === "place_order") {
       const { symbol, qty, side, type = "market", time_in_force = "day",
-        limit_price, stop_price, order_class, take_profit, stop_loss,
+        limit_price, stop_price, take_profit, stop_loss,
         signal_id } = body;
 
       if (!symbol || !qty || !side) {
@@ -167,7 +246,6 @@ serve(async (req) => {
       if (acctRes.ok) {
         const acct = await acctRes.json();
         const buyingPower = Number(acct.buying_power || 0);
-        // Simple check: if buying power is very low, block
         if (buyingPower < 10) {
           return jsonRes({ error: "Insufficient buying power" }, 400);
         }
@@ -182,36 +260,27 @@ serve(async (req) => {
         if (assetRes.ok) {
           const asset = await assetRes.json();
           if (asset.tradable === false) {
-            return jsonRes({
-              error: `${symbol} is not tradable on Alpaca (status: ${asset.status || "unknown"})`,
-            }, 400);
+            return jsonRes({ error: `${symbol} is not tradable on Alpaca (status: ${asset.status || "unknown"})` }, 400);
           }
           if (asset.status === "inactive") {
-            return jsonRes({
-              error: `${symbol} is inactive on Alpaca`,
-            }, 400);
+            return jsonRes({ error: `${symbol} is inactive on Alpaca` }, 400);
           }
           if (side === "sell" && asset.easy_to_borrow === false) {
-            console.warn(`${symbol} is not easy-to-borrow, short may be rejected by Alpaca`);
+            console.warn(`${symbol} is not easy-to-borrow, short may be rejected`);
           }
         }
       } catch {
-        console.warn(`Asset tradability check failed for ${symbol}, proceeding with order`);
+        console.warn(`Asset tradability check failed for ${symbol}, proceeding`);
       }
 
       const idempotencyId = signal_id
         ? `lhy-${String(signal_id).slice(0, 8)}`
         : `lhy-${crypto.randomUUID().slice(0, 12)}`;
 
-      // Round price to 2 decimals to avoid Alpaca sub-penny rejection
-      const round2 = (v: unknown) => {
-        const n = Number(v);
-        return isNaN(n) ? v : String(Math.round(n * 100) / 100);
-      };
-
+      // ── Submit as plain market/limit order (NO bracket) ──
       const orderBody: Record<string, unknown> = {
         client_order_id: idempotencyId,
-        symbol,
+        symbol: symbol.replace("/", ""),
         qty: String(qty),
         side,
         type,
@@ -225,26 +294,7 @@ serve(async (req) => {
         orderBody.stop_price = round2(stop_price);
       }
 
-      // Bracket order (OCO with SL/TP) — validate SL is on correct side
-      if (order_class === "bracket" || (take_profit && stop_loss)) {
-        const slPrice = Number(stop_loss);
-        const tpPrice = Number(take_profit);
-        const isBuy = side === "buy";
-        const slOk = isBuy ? slPrice < Number(orderBody.limit_price || qty) : slPrice > 0; // basic check
-        // More precise: compare against latest quote or just trust direction
-        const slSideValid = isBuy ? slPrice < (limit_price ? Number(limit_price) : Infinity) : slPrice > (limit_price ? Number(limit_price) : 0);
-        
-        // For market orders, we can't know exact fill price, so validate SL vs a reasonable threshold
-        if (slPrice > 0 && tpPrice > 0) {
-          orderBody.order_class = "bracket";
-          orderBody.take_profit = { limit_price: round2(take_profit) };
-          orderBody.stop_loss = { stop_price: round2(stop_loss) };
-        } else {
-          console.warn("Bracket order skipped: invalid SL/TP values", { stop_loss, take_profit, side });
-        }
-      }
-
-      console.log("Alpaca order payload:", JSON.stringify(orderBody));
+      console.log(`[alpaca-trade] Order payload: ${JSON.stringify(orderBody)}`);
 
       const res = await fetchWithRetry(`${baseUrl}/v2/orders`, {
         method: "POST",
@@ -254,7 +304,7 @@ serve(async (req) => {
       const data = await res.json();
 
       if (!res.ok) {
-        console.error("Alpaca order error:", JSON.stringify(data));
+        console.error(`[alpaca-trade] Order error: ${JSON.stringify(data)}`);
         return jsonRes({ error: `Alpaca order error [${res.status}]: ${data.message || JSON.stringify(data)}` }, res.status);
       }
 
@@ -270,11 +320,40 @@ serve(async (req) => {
             pending: true,
             order_id: data.id,
             client_order_id: idempotencyId,
-            message: "Order sent to Alpaca but fill not confirmed within timeout. Run alpaca-sync to reconcile.",
+            message: "Order sent but fill not confirmed. Run alpaca-sync to reconcile.",
           });
         }
         finalOrder = polled;
         fillConfirmed = String(finalOrder.status) === 'filled';
+      }
+
+      // ── After fill: submit OCO with GTC for SL/TP ──
+      let ocoResult: { success: boolean; error?: string } | null = null;
+      const slPrice = Number(stop_loss);
+      const tpPrice = Number(take_profit);
+      const filledQty = parseFloat(String(finalOrder.filled_qty || "0")) || parsedQty;
+
+      if (fillConfirmed && slPrice > 0 && tpPrice > 0) {
+        console.log(`[alpaca-trade] Fill confirmed for ${symbol}, submitting OCO SL@${slPrice} TP@${tpPrice}`);
+        // Small delay to ensure Alpaca has registered the position
+        await new Promise(r => setTimeout(r, 500));
+        ocoResult = await submitPostFillOCO(baseUrl, headers, symbol, filledQty, side, slPrice, tpPrice);
+      } else if (fillConfirmed && (slPrice > 0 || tpPrice > 0)) {
+        // Only one of SL/TP provided
+        const closeSide = side === "buy" ? "sell" : "buy";
+        if (slPrice > 0) {
+          try {
+            const stopRes = await fetch(`${baseUrl}/v2/orders`, {
+              method: "POST", headers,
+              body: JSON.stringify({
+                symbol: symbol.replace("/", ""), qty: String(filledQty),
+                side: closeSide, type: "stop", time_in_force: "gtc",
+                stop_price: round2(slPrice),
+              }),
+            });
+            ocoResult = { success: stopRes.ok, error: stopRes.ok ? undefined : await stopRes.text() };
+          } catch {}
+        }
       }
 
       // Audit log
@@ -283,7 +362,11 @@ serve(async (req) => {
         action: "trade_executed",
         entity: "order",
         entity_id: String(finalOrder.id),
-        new_values: { symbol, qty, side, status: finalOrder.status, filled_avg_price: finalOrder.filled_avg_price },
+        new_values: {
+          symbol, qty, side, status: finalOrder.status,
+          filled_avg_price: finalOrder.filled_avg_price,
+          oco_submitted: ocoResult?.success || false,
+        },
       } as Record<string, unknown>).then(({ error: auditErr }) => {
         if (auditErr) console.error("[audit_log] insert error:", auditErr.message);
       });
@@ -302,8 +385,8 @@ serve(async (req) => {
           submitted_at: finalOrder.submitted_at,
           filled_at: finalOrder.filled_at,
           filled_avg_price: finalOrder.filled_avg_price,
-          order_class: finalOrder.order_class,
         },
+        oco: ocoResult,
       });
     }
 
@@ -311,6 +394,20 @@ serve(async (req) => {
     if (action === "close_position") {
       const { symbol, qty } = body;
       if (!symbol) return jsonRes({ error: "Missing: symbol" }, 400);
+
+      // Cancel any open protective orders for this symbol first
+      try {
+        const openOrdersRes = await fetch(`${baseUrl}/v2/orders?status=open&limit=200`, { headers });
+        if (openOrdersRes.ok) {
+          const openOrders = await openOrdersRes.json() as any[];
+          const cleanSym = String(symbol).replace("/", "").toUpperCase();
+          for (const ord of openOrders) {
+            if (ord.symbol === cleanSym && (ord.type === "stop" || ord.type === "limit" || ord.order_class === "oco")) {
+              try { await fetch(`${baseUrl}/v2/orders/${ord.id}`, { method: "DELETE", headers }); } catch {}
+            }
+          }
+        }
+      } catch {}
 
       const absQty = qty ? Math.abs(Number(qty)) : null;
       const url = absQty
@@ -324,7 +421,7 @@ serve(async (req) => {
         return jsonRes({ error: `Alpaca close error [${res.status}]: ${data.message || JSON.stringify(data)}` }, res.status);
       }
 
-      // Immediately update local position record
+      // Update local position record
       try {
         const fillPrice = parseFloat(data.filled_avg_price || "0");
         if (fillPrice > 0) {
@@ -352,10 +449,9 @@ serve(async (req) => {
           }
         }
       } catch (syncErr) {
-        console.error("Local position sync failed (Alpaca close succeeded):", syncErr);
+        console.error("Local position sync failed:", syncErr);
       }
 
-      // Audit log
       await supabase.from("audit_log").insert({
         user_id: userId,
         action: "position_closed",

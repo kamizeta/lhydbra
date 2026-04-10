@@ -573,7 +573,7 @@ Deno.serve(async (req) => {
               symbol: String(trade.asset).replace("/", ""),
               qty: trade.quantity,
               side: trade.direction === "long" ? "buy" : "sell",
-              type: "market", time_in_force: "day", order_class: "bracket",
+              type: "market", time_in_force: "day",
               take_profit: trade.take_profit, stop_loss: trade.stop_loss,
               user_id_override: user.id,
             }),
