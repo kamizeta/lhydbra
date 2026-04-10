@@ -608,8 +608,6 @@ serve(async (req) => {
 
         for (const pos of (freshPositions.data || [])) {
           const sym = cleanSymbol(pos.symbol);
-          const isStock = pos.asset_type !== "crypto";
-          if (!isStock) continue;
 
           const hasSL = pos.stop_loss != null && Number(pos.stop_loss) > 0;
           const hasTP = pos.take_profit != null && Number(pos.take_profit) > 0;
@@ -619,6 +617,9 @@ serve(async (req) => {
 
           // If OCO already exists, both SL and TP are covered — skip
           if (hasOCO) continue;
+
+          // If both individual orders exist, skip
+          if (hasStopOrder && hasLimitOrder) continue;
 
           const missingStop = hasSL && !hasStopOrder;
           const missingTP = hasTP && !hasLimitOrder;
