@@ -218,10 +218,12 @@ export default function PositionsPage() {
   };
 
   // Format price compactly
-  const fmtPrice = (n: number) => {
-    if (n >= 1000) return `$${(n / 1000).toFixed(1)}k`;
-    if (n >= 1) return `$${n.toFixed(2)}`;
-    return `$${n.toPrecision(3)}`;
+  const fmtPrice = (n: number | null | undefined) => {
+    if (n == null || isNaN(Number(n))) return '—';
+    const v = Number(n);
+    if (v >= 1000) return `$${(v / 1000).toFixed(1)}k`;
+    if (v >= 1) return `$${v.toFixed(2)}`;
+    return `$${v.toPrecision(3)}`;
   };
 
   return (
