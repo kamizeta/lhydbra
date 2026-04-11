@@ -60,9 +60,10 @@ export function useDashboardMetrics({
     return total;
   }, [positions, priceMap]);
 
+  // current_capital from Alpaca already includes realized PnL — don't double-count closedPnl
   const portfolioValue = useMemo(
-    () => settings.current_capital + closedPnl + unrealizedPnl,
-    [settings.current_capital, closedPnl, unrealizedPnl],
+    () => settings.current_capital + unrealizedPnl,
+    [settings.current_capital, unrealizedPnl],
   );
 
   const totalExposure = useMemo(
