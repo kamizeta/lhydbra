@@ -101,8 +101,19 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
+    // ─── Load Alpha Notes (Director macro context, last 3 days, from all users) ───
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: alphaNotes } = await admin
+      .from('alpha_notes')
+      .select('message')
+      .eq('role', 'user')
+      .gte('created_at', threeDaysAgo)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    const alphaContext = (alphaNotes ?? []).map((n: { message: string }) => n.message).join('\n---\n') || undefined;
+
     console.log("[screener] Calling Anthropic for momentum tickers...");
-    const newTickers = await discoverHighMomentumTickers(anthropicKey);
+    const newTickers = await discoverHighMomentumTickers(anthropicKey, alphaContext);
     console.log("[screener] AI discovered:", newTickers);
 
     if (newTickers.length === 0) {
