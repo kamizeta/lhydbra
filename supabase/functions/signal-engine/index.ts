@@ -523,6 +523,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
       (sectorData ?? []).map((r: { symbol: string; sector: string }) => [r.symbol, r.sector])
     );
 
+    // ─── Load Alpha Notes (Director macro context, last 3 days) ───
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: alphaNotes } = await supabase
+      .from('alpha_notes')
+      .select('message')
+      .eq('user_id', user_id)
+      .eq('role', 'user')
+      .gte('created_at', threeDaysAgo)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    const alphaContext = (alphaNotes ?? []).map((n: { message: string }) => n.message).join('\n---\n') || "";
+
     // ─── Expire stale signals (older than 24h) ───
     const expiryThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     await supabase
