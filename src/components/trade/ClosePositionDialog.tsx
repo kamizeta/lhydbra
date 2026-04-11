@@ -157,7 +157,7 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
       }
 
       // Get current scoring weights for weight_profile_used
-      let weightProfile: Record<string, unknown> = {};
+      let weightProfile: Record<string, number> = {};
       const { data: weights } = await supabase.from('scoring_weights')
         .select('*')
         .eq('user_id', user.id)
@@ -190,7 +190,7 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
         strategy_family: signalData?.strategy_family || position.strategy_family || position.strategy || null,
         market_regime: signalData?.market_regime || position.regime_at_entry || null,
         score_breakdown: signalData?.score_breakdown || {},
-        weight_profile_used: weightProfile as Record<string, string | number | null>,
+        weight_profile_used: weightProfile,
         resolved_at: new Date().toISOString(),
       }]);
 
