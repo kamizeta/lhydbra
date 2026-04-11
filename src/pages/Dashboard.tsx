@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Play, Loader2,
+  Play, Loader2, AlertTriangle,
   Briefcase, Target, Shield, Activity,
 } from "lucide-react";
 import MetricCard from "@/components/shared/MetricCard";
@@ -12,26 +12,29 @@ import { useI18n } from "@/i18n";
 import { useOperatorMode } from "@/hooks/useOperatorMode";
 import { useGoalProfile } from "@/hooks/useGoalProfile";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
+import { useDashboardData } from "@/hooks/useDashboardData";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useMarketData } from "@/hooks/useMarketData";
 import { toast } from "sonner";
 
-interface Position {
-  id: string;
-  symbol: string;
-  direction: string;
-  quantity: number;
-  avg_entry: number;
-  stop_loss: number | null;
-  take_profit: number | null;
-  strategy: string | null;
-  pnl: number | null;
-  opened_at: string;
+function SectionError({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-3 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded font-mono">
+      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+      Error loading {label}
+    </div>
+  );
 }
 
-const POS_SELECT = 'id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at' as const;
+function SectionSkeleton() {
+  return (
+    <div className="px-4 py-6 flex items-center justify-center">
+      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -41,91 +44,17 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { data: marketAssets } = useMarketData();
   const { status: operatorStatus, loading: opLoading, error: opError, fetchStatus, runOperator } = useOperatorMode();
-
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [closedPnl, setClosedPnl] = useState(0);
-  const [journalStats, setJournalStats] = useState({ total: 0, wins: 0, avgR: 0 });
   const [showGoalSetup, setShowGoalSetup] = useState(false);
-  const [activeSignals, setActiveSignals] = useState<Array<{
-    id: string; asset: string; direction: string;
-    opportunity_score: number; expected_r_multiple: number;
-    confidence_score: number;
-  }>>([]);
-  const [dataFreshness, setDataFreshness] = useState<{ fresh: boolean; symbol_count: number } | null>(null);
 
-  // ── Data loading ──
-  useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      const now = new Date();
-      try {
-        const [posRes, closedRes, allRes] = await Promise.all([
-          supabase.from('positions').select(POS_SELECT).eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false }),
-          supabase.from('positions').select('pnl').eq('user_id', user.id).eq('status', 'closed'),
-          supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id),
-        ]);
-
-        setPositions((posRes.data ?? []) as Position[]);
-        setClosedPnl((closedRes.data ?? []).reduce((s, p) => s + (p.pnl || 0), 0));
-
-        const all = (allRes.data ?? []) as { pnl: number | null; r_multiple: number | null }[];
-        const wins = all.filter(t => (t.pnl || 0) > 0).length;
-        const rTrades = all.filter(t => t.r_multiple != null);
-        setJournalStats({
-          total: all.length, wins,
-          avgR: rTrades.length > 0 ? rTrades.reduce((s, t) => s + (t.r_multiple || 0), 0) / rTrades.length : 0,
-        });
-      } catch (err) {
-        console.error('Dashboard load failed:', err);
-        toast.error('Error loading dashboard. Please refresh.');
-      }
-
-      fetchStatus();
-
-      // Sync with Alpaca
-      supabase.functions.invoke('alpaca-sync', { body: { paper: true } }).then(({ error }) => {
-        if (!error) {
-          supabase.from('positions').select(POS_SELECT).eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false })
-            .then(({ data }) => setPositions((data || []) as Position[]));
-        }
-      });
-    };
-    load();
-  }, [user, fetchStatus]);
-
-  // ── Realtime positions ──
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel('dashboard-operator')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'positions', filter: `user_id=eq.${user.id}` }, () => {
-        supabase.from('positions').select(POS_SELECT).eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false })
-          .then(({ data }) => setPositions((data || []) as Position[]));
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user]);
-
-  // ── Active signals ──
-  const loadSignals = useCallback(() => {
-    if (!user) return;
-    supabase.from('signals')
-      .select('id, asset, direction, opportunity_score, expected_r_multiple, confidence_score')
-      .eq('user_id', user.id).eq('status', 'active')
-      .order('opportunity_score', { ascending: false }).limit(3)
-      .then(({ data }) => setActiveSignals(data || []));
-  }, [user]);
-
-  useEffect(() => { loadSignals(); }, [loadSignals]);
-
-  // ── Data freshness ──
-  useEffect(() => {
-    if (!user) return;
-    const cutoff = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
-    supabase.from('market_features').select('symbol', { count: 'exact', head: true })
-      .eq('timeframe', '1d').gte('computed_at', cutoff)
-      .then(({ count }) => setDataFreshness({ fresh: (count || 0) > 0, symbol_count: count || 0 }));
-  }, [user]);
+  // ── Data from react-query (independent queries) ──
+  const {
+    positions, positionsLoading, positionsError,
+    closedPnl,
+    journalStats, journalLoading, journalError,
+    activeSignals, signalsLoading,
+    dataFreshness,
+    refetchSignals,
+  } = useDashboardData(user?.id);
 
   // ── Price map ──
   const priceMap = useMemo(() => {
@@ -133,12 +62,12 @@ export default function Dashboard() {
     if (!marketAssets) return map;
     for (const asset of marketAssets) {
       map.set(asset.symbol, asset.price);
-      map.set(asset.symbol.replace('/', ''), asset.price);
+      map.set(asset.symbol.replace("/", ""), asset.price);
     }
     return map;
   }, [marketAssets]);
 
-  // ── All metrics from custom hook ──
+  // ── Metrics ──
   const metrics = useDashboardMetrics({
     positions, closedPnl, journalStats, settings, priceMap, operatorStatus,
   });
@@ -151,14 +80,14 @@ export default function Dashboard() {
     } else {
       toast.success(t.operator.operatorCycleComplete);
       try {
-        await supabase.functions.invoke('alpaca-sync', { body: { paper: true } });
+        await supabase.functions.invoke("alpaca-sync", { body: { paper: true } });
         toast.success("Positions synced with Alpaca");
       } catch {
         toast.info("Run manual sync if positions don't update");
       }
-      loadSignals();
+      refetchSignals();
     }
-  }, [runOperator, opError, t, loadSignals]);
+  }, [runOperator, opError, t, refetchSignals]);
 
   // ── Goal setup guard ──
   if (!goalLoading && !goalExists && !showGoalSetup) {
@@ -188,7 +117,7 @@ export default function Dashboard() {
             {metrics.cooldownActive ? "COOLDOWN" : metrics.dailyCapReached ? "CAP REACHED" : "ACTIVE"}
           </span>
           <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider hidden sm:inline">
-            {goal?.automation_level === 'full_operator' ? '● AUTO' : '○ GUIDED'}
+            {goal?.automation_level === "full_operator" ? "● AUTO" : "○ GUIDED"}
           </span>
           <span className="text-xs text-muted-foreground font-mono">
             {positions.length}/{metrics.maxTradesPerDay} pos
@@ -243,14 +172,10 @@ export default function Dashboard() {
 
       {/* ── 3 KPI Cards ── */}
       <div className="grid grid-cols-3 gap-3">
-        <MetricCard
-          label="Portfolio"
-          value={formatCurrency(metrics.portfolioValue)}
-          icon={Briefcase}
-        />
+        <MetricCard label="Portfolio" value={formatCurrency(metrics.portfolioValue)} icon={Briefcase} />
         <MetricCard
           label="Today P&L"
-          value={`${(operatorStatus?.today_pnl ?? 0) >= 0 ? '+' : ''}${formatCurrency(operatorStatus?.today_pnl ?? 0)}`}
+          value={`${(operatorStatus?.today_pnl ?? 0) >= 0 ? "+" : ""}${formatCurrency(operatorStatus?.today_pnl ?? 0)}`}
           changeType={(operatorStatus?.today_pnl ?? 0) >= 0 ? "positive" : "negative"}
           icon={Activity}
         />
@@ -267,20 +192,24 @@ export default function Dashboard() {
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
           <span className="text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Open Positions</span>
           {positions.length > 5 && (
-            <button onClick={() => navigate('/portfolio')} className="text-xs text-primary hover:underline font-mono">
+            <button onClick={() => navigate("/portfolio")} className="text-xs text-primary hover:underline font-mono">
               +{positions.length - 5} more →
             </button>
           )}
         </div>
-        {positions.length === 0 ? (
+        {positionsError ? (
+          <SectionError label="positions" />
+        ) : positionsLoading ? (
+          <SectionSkeleton />
+        ) : positions.length === 0 ? (
           <div className="px-4 py-6 text-center text-xs text-muted-foreground font-mono">No open positions</div>
         ) : (
           <div className="divide-y divide-border">
             {positions.slice(0, 5).map((pos) => {
-              const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
+              const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace("/", ""));
               const qty = Math.abs(pos.quantity);
               const fallbackPnl = currentPrice
-                ? (pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice) * qty
+                ? (pos.direction === "long" ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice) * qty
                 : 0;
               const pnl = pos.pnl ?? fallbackPnl;
               return (
@@ -288,14 +217,14 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-bold text-foreground">{pos.symbol}</span>
                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-mono uppercase",
-                      pos.direction === 'long' ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+                      pos.direction === "long" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
                     )}>{pos.direction}</span>
                   </div>
                   <div className="flex items-center gap-4 text-muted-foreground font-mono">
                     <span>Entry: {formatCurrency(pos.avg_entry)}</span>
                     {pos.stop_loss && <span className="hidden sm:inline text-destructive/70">SL: {formatCurrency(pos.stop_loss)}</span>}
                     <span className={cn("font-medium", pnl >= 0 ? "text-green-400" : "text-red-400")}>
-                      {pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+                      {pnl >= 0 ? "+" : ""}{formatCurrency(pnl)}
                     </span>
                   </div>
                 </div>
@@ -309,11 +238,13 @@ export default function Dashboard() {
       <div className="rounded-lg border border-border bg-card">
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
           <span className="text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Active Signals</span>
-          <button onClick={() => navigate('/trade-ideas')} className="text-xs text-primary hover:underline font-mono">
+          <button onClick={() => navigate("/trade-ideas")} className="text-xs text-primary hover:underline font-mono">
             View all →
           </button>
         </div>
-        {activeSignals.length === 0 ? (
+        {signalsLoading ? (
+          <SectionSkeleton />
+        ) : activeSignals.length === 0 ? (
           <div className="px-4 py-6 text-center text-xs text-muted-foreground font-mono">
             No active signals — run operator to generate
           </div>
@@ -324,14 +255,14 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-bold text-foreground">{sig.asset}</span>
                   <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-mono uppercase",
-                    sig.direction === 'long' ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+                    sig.direction === "long" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
                   )}>{sig.direction}</span>
                 </div>
                 <div className="flex items-center gap-3 font-mono text-muted-foreground">
                   <span>Score: <span className="text-foreground">{sig.opportunity_score.toFixed(0)}</span></span>
                   <span>R: <span className="text-foreground">{sig.expected_r_multiple.toFixed(1)}</span></span>
                   <button
-                    onClick={() => navigate('/trade-ideas')}
+                    onClick={() => navigate("/trade-ideas")}
                     className="px-2 py-1 rounded border border-border hover:bg-accent text-[10px] text-primary hover:text-primary-foreground hover:bg-primary transition-colors"
                   >
                     Approve →
@@ -342,6 +273,9 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* ── Journal error banner (non-blocking) ── */}
+      {journalError && <SectionError label="trade journal" />}
     </div>
   );
 }
