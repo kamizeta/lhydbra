@@ -71,87 +71,105 @@ const round2 = (v: unknown) => {
   return isNaN(n) ? v : String(Math.round(n * 100) / 100);
 };
 
-// Submit OCO (SL + TP) after a fill - GTC so they don't expire
-async function submitPostFillOCO(
+// Submit Trailing Stop + Take Profit after fill
+// trail_amount = abs(entry_price - stop_loss) → dynamic trailing distance
+async function submitPostFillProtection(
   baseUrl: string,
   headers: Record<string, string>,
   symbol: string,
   qty: number,
-  side: string, // direction of original trade
+  side: string,
+  entryPrice: number,
   stopLoss: number,
   takeProfit: number,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; trailing?: boolean }> {
   const closeSide = side === "buy" ? "sell" : "buy";
-  const sl = Math.round(stopLoss * 100) / 100;
   const tp = Math.round(takeProfit * 100) / 100;
+  const trailAmount = Math.round(Math.abs(entryPrice - stopLoss) * 100) / 100;
+  const cleanSymbol = symbol.replace("/", "");
 
-  // Validate SL is on correct side
-  const isLong = side === "buy";
-  if (isLong && sl >= tp) {
-    console.warn(`[alpaca-trade] OCO skip: long SL(${sl}) >= TP(${tp})`);
-    return { success: false, error: "SL must be below TP for long" };
-  }
-  if (!isLong && sl <= tp) {
-    console.warn(`[alpaca-trade] OCO skip: short SL(${sl}) <= TP(${tp})`);
-    return { success: false, error: "SL must be above TP for short" };
+  if (trailAmount <= 0) {
+    console.warn(`[alpaca-trade] Trail amount is 0 for ${symbol}, skipping trailing stop`);
+    return { success: false, error: "Trail amount is 0 (entry === stop_loss)" };
   }
 
+  console.log(`[alpaca-trade] Protection for ${symbol}: Trailing Stop $${trailAmount} + TP Limit @${tp}`);
+
+  let trailingOk = false;
+  let tpOk = false;
+  let trailError = "";
+  let tpError = "";
+
+  // 1) Submit Trailing Stop order
   try {
-    const ocoBody = {
-      symbol: symbol.replace("/", ""),
+    const trailBody = {
+      symbol: cleanSymbol,
       qty: String(qty),
       side: closeSide,
-      type: "limit",
+      type: "trailing_stop",
       time_in_force: "gtc",
-      order_class: "oco",
-      take_profit: { limit_price: String(tp) },
-      stop_loss: { stop_price: String(sl) },
+      trail_price: String(trailAmount),
     };
-
-    console.log(`[alpaca-trade] Submitting OCO: ${JSON.stringify(ocoBody)}`);
-
-    const res = await fetchWithRetry(`${baseUrl}/v2/orders`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(ocoBody),
+    console.log(`[alpaca-trade] Submitting trailing stop: ${JSON.stringify(trailBody)}`);
+    const trailRes = await fetchWithRetry(`${baseUrl}/v2/orders`, {
+      method: "POST", headers, body: JSON.stringify(trailBody),
     });
-
-    if (res.ok) {
-      console.log(`[alpaca-trade] ✓ OCO placed for ${symbol}: SL@${sl} + TP@${tp} (GTC)`);
-      return { success: true };
+    if (trailRes.ok) {
+      console.log(`[alpaca-trade] ✓ Trailing stop placed for ${symbol}: trail $${trailAmount} (GTC)`);
+      trailingOk = true;
     } else {
-      const errBody = await res.text();
-      console.error(`[alpaca-trade] OCO failed for ${symbol}: ${errBody}`);
+      trailError = await trailRes.text();
+      console.error(`[alpaca-trade] Trailing stop failed for ${symbol}: ${trailError}`);
 
-      // Fallback: at least set a stop order
-      try {
-        const stopBody = {
-          symbol: symbol.replace("/", ""),
-          qty: String(qty),
-          side: closeSide,
-          type: "stop",
-          time_in_force: "gtc",
-          stop_price: String(sl),
-        };
-        const stopRes = await fetch(`${baseUrl}/v2/orders`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(stopBody),
-        });
-        if (stopRes.ok) {
-          console.log(`[alpaca-trade] ✓ Fallback SL placed for ${symbol}: SL@${sl} (GTC)`);
-          return { success: true, error: `OCO failed, SL-only fallback active. OCO error: ${errBody}` };
-        }
-        const stopErr = await stopRes.text();
-        return { success: false, error: `OCO failed: ${errBody}. SL fallback also failed: ${stopErr}` };
-      } catch {
-        return { success: false, error: `OCO failed: ${errBody}` };
+      // Fallback: static stop if trailing not supported
+      const fallbackBody = {
+        symbol: cleanSymbol, qty: String(qty), side: closeSide,
+        type: "stop", time_in_force: "gtc",
+        stop_price: String(Math.round(stopLoss * 100) / 100),
+      };
+      const fallbackRes = await fetch(`${baseUrl}/v2/orders`, {
+        method: "POST", headers, body: JSON.stringify(fallbackBody),
+      });
+      if (fallbackRes.ok) {
+        console.log(`[alpaca-trade] ✓ Fallback static SL placed for ${symbol} @ ${stopLoss}`);
+        trailingOk = true;
+        trailError = `Trailing not supported, static SL fallback active`;
+      } else {
+        const fbErr = await fallbackRes.text();
+        trailError += ` | Fallback also failed: ${fbErr}`;
       }
     }
   } catch (e) {
-    console.error(`[alpaca-trade] OCO error:`, e);
-    return { success: false, error: e instanceof Error ? e.message : "OCO submit error" };
+    trailError = e instanceof Error ? e.message : "Trailing stop error";
+    console.error(`[alpaca-trade] Trailing stop exception:`, e);
   }
+
+  // 2) Submit Take Profit limit order (independent)
+  if (tp > 0) {
+    try {
+      const tpBody = {
+        symbol: cleanSymbol, qty: String(qty), side: closeSide,
+        type: "limit", time_in_force: "gtc",
+        limit_price: String(tp),
+      };
+      const tpRes = await fetchWithRetry(`${baseUrl}/v2/orders`, {
+        method: "POST", headers, body: JSON.stringify(tpBody),
+      });
+      if (tpRes.ok) {
+        console.log(`[alpaca-trade] ✓ TP limit placed for ${symbol} @ ${tp} (GTC)`);
+        tpOk = true;
+      } else {
+        tpError = await tpRes.text();
+        console.error(`[alpaca-trade] TP limit failed for ${symbol}: ${tpError}`);
+      }
+    } catch (e) {
+      tpError = e instanceof Error ? e.message : "TP limit error";
+    }
+  }
+
+  const success = trailingOk || tpOk;
+  const errors = [trailError, tpError].filter(Boolean).join(" | ");
+  return { success, trailing: trailingOk, error: success ? (errors || undefined) : errors };
 }
 
 serve(async (req) => {
