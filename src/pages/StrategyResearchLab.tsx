@@ -9,14 +9,19 @@ import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
 
+interface StrategyLogic {
+  conditions?: string[];
+  [key: string]: string | number | boolean | string[] | undefined;
+}
+
 interface StrategyTemplate {
   id: string;
   name: string;
   strategy_family: string;
   description: string | null;
-  entry_logic: Record<string, unknown>;
-  exit_logic: Record<string, unknown>;
-  risk_model: Record<string, unknown>;
+  entry_logic: StrategyLogic;
+  exit_logic: StrategyLogic;
+  risk_model: StrategyLogic;
   preferred_regime: string[];
 }
 
@@ -83,9 +88,9 @@ export default function StrategyResearchLab() {
       name: tmpl.name,
       strategy_family: tmpl.strategy_family,
       description: tmpl.description,
-      entry_logic: tmpl.entry_logic as any,
-      exit_logic: tmpl.exit_logic as any,
-      risk_model: tmpl.risk_model as any,
+      entry_logic: tmpl.entry_logic as Record<string, string | number | boolean>,
+      exit_logic: tmpl.exit_logic as Record<string, string | number | boolean>,
+      risk_model: tmpl.risk_model as Record<string, string | number | boolean>,
       preferred_regime: tmpl.preferred_regime,
       status: "active",
     }]);
