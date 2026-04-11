@@ -1,23 +1,17 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  DollarSign, TrendingUp, Shield, Activity,
-  AlertTriangle, Play, Loader2, CheckCircle, XCircle,
-  Briefcase, Target, Zap, Sun, Moon,
+  Play, Loader2,
+  Briefcase, Target, Shield, Activity,
 } from "lucide-react";
 import MetricCard from "@/components/shared/MetricCard";
-import StatusBadge from "@/components/shared/StatusBadge";
-import ProgressBar from "@/components/shared/ProgressBar";
 import GoalSetup from "@/components/operator/GoalSetup";
-import GoalProgress from "@/components/operator/GoalProgress";
-import CoachingPanel from "@/components/operator/CoachingPanel";
-import DailyRoutine from "@/components/operator/DailyRoutine";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/i18n";
 import { useOperatorMode } from "@/hooks/useOperatorMode";
 import { useGoalProfile } from "@/hooks/useGoalProfile";
-import { usePerformanceCoach } from "@/hooks/usePerformanceCoach";
+import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -37,19 +31,19 @@ interface Position {
   opened_at: string;
 }
 
+const POS_SELECT = 'id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at' as const;
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useI18n();
   const { settings } = useUserSettings();
   const { goal, exists: goalExists, loading: goalLoading } = useGoalProfile();
-  const { result: coachResult, loading: coachLoading, getPreMarket, getDailyReview } = usePerformanceCoach();
   const navigate = useNavigate();
   const { data: marketAssets } = useMarketData();
-  const { status: operatorStatus, runResult, loading: opLoading, error: opError, fetchStatus, runOperator } = useOperatorMode();
+  const { status: operatorStatus, loading: opLoading, error: opError, fetchStatus, runOperator } = useOperatorMode();
+
   const [positions, setPositions] = useState<Position[]>([]);
   const [closedPnl, setClosedPnl] = useState(0);
-  const [weeklyPnl, setWeeklyPnl] = useState(0);
-  const [monthlyPnl, setMonthlyPnl] = useState(0);
   const [journalStats, setJournalStats] = useState({ total: 0, wins: 0, avgR: 0 });
   const [showGoalSetup, setShowGoalSetup] = useState(false);
   const [activeSignals, setActiveSignals] = useState<Array<{
@@ -59,88 +53,81 @@ export default function Dashboard() {
   }>>([]);
   const [dataFreshness, setDataFreshness] = useState<{ fresh: boolean; symbol_count: number } | null>(null);
 
-  useEffect(() => { const loadDashboard = async () => {
+  // ── Data loading ──
+  useEffect(() => {
     if (!user) return;
-    const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
-    const monthAgo = new Date(now.getTime() - 30 * 86400000).toISOString();
+    const load = async () => {
+      const now = new Date();
+      try {
+        const [posRes, closedRes, allRes] = await Promise.all([
+          supabase.from('positions').select(POS_SELECT).eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false }),
+          supabase.from('positions').select('pnl').eq('user_id', user.id).eq('status', 'closed'),
+          supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id),
+        ]);
 
-    try {
-      const [posRes, closedRes, weekRes, monthRes, allRes] = await Promise.all([
-        supabase.from('positions').select('id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false }),
-        supabase.from('positions').select('pnl').eq('user_id', user.id).eq('status', 'closed'),
-        supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id).gte('entered_at', weekAgo),
-        supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id).gte('entered_at', monthAgo),
-        supabase.from('trade_journal').select('pnl, r_multiple').eq('user_id', user.id),
-      ]);
+        setPositions((posRes.data ?? []) as Position[]);
+        setClosedPnl((closedRes.data ?? []).reduce((s, p) => s + (p.pnl || 0), 0));
 
-      if (posRes.error) console.error('positions error:', posRes.error);
-      if (closedRes.error) console.error('closed trades error:', closedRes.error);
-      if (weekRes.error) console.error('weekly journal error:', weekRes.error);
-      if (monthRes.error) console.error('monthly journal error:', monthRes.error);
-      if (allRes.error) console.error('all journal error:', allRes.error);
-
-      setPositions((posRes.data ?? []) as Position[]);
-      setClosedPnl((closedRes.data ?? []).reduce((s, p) => s + (p.pnl || 0), 0));
-      setWeeklyPnl((weekRes.data ?? []).reduce((s, t) => s + (t.pnl || 0), 0));
-      setMonthlyPnl((monthRes.data ?? []).reduce((s, t) => s + (t.pnl || 0), 0));
-      const all = (allRes.data ?? []) as { pnl: number | null; r_multiple: number | null }[];
-      const wins = all.filter(t => (t.pnl || 0) > 0).length;
-      const rTrades = all.filter(t => t.r_multiple != null);
-      setJournalStats({
-        total: all.length, wins,
-        avgR: rTrades.length > 0 ? rTrades.reduce((s, t) => s + (t.r_multiple || 0), 0) / rTrades.length : 0,
-      });
-    } catch (err) {
-      console.error('Dashboard load failed:', err);
-      toast.error('Error loading dashboard. Please refresh.');
-    }
-    fetchStatus();
-    // Sync positions with Alpaca on dashboard load
-    supabase.functions.invoke('alpaca-sync', { body: { paper: true } }).then(({ error }) => {
-      if (!error) {
-        supabase.from('positions').select('id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false })
-          .then(({ data }) => setPositions((data || []) as Position[]));
+        const all = (allRes.data ?? []) as { pnl: number | null; r_multiple: number | null }[];
+        const wins = all.filter(t => (t.pnl || 0) > 0).length;
+        const rTrades = all.filter(t => t.r_multiple != null);
+        setJournalStats({
+          total: all.length, wins,
+          avgR: rTrades.length > 0 ? rTrades.reduce((s, t) => s + (t.r_multiple || 0), 0) / rTrades.length : 0,
+        });
+      } catch (err) {
+        console.error('Dashboard load failed:', err);
+        toast.error('Error loading dashboard. Please refresh.');
       }
-    });
-  }; loadDashboard(); }, [user, fetchStatus]);
 
+      fetchStatus();
+
+      // Sync with Alpaca
+      supabase.functions.invoke('alpaca-sync', { body: { paper: true } }).then(({ error }) => {
+        if (!error) {
+          supabase.from('positions').select(POS_SELECT).eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false })
+            .then(({ data }) => setPositions((data || []) as Position[]));
+        }
+      });
+    };
+    load();
+  }, [user, fetchStatus]);
+
+  // ── Realtime positions ──
   useEffect(() => {
     if (!user) return;
     const channel = supabase
       .channel('dashboard-operator')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'positions', filter: `user_id=eq.${user.id}` }, () => {
-        supabase.from('positions').select('id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at').eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false })
+        supabase.from('positions').select(POS_SELECT).eq('user_id', user.id).eq('status', 'open').order('opened_at', { ascending: false })
           .then(({ data }) => setPositions((data || []) as Position[]));
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  useEffect(() => {
+  // ── Active signals ──
+  const loadSignals = useCallback(() => {
     if (!user) return;
     supabase.from('signals')
       .select('id, asset, direction, opportunity_score, expected_r_multiple, confidence_score')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('opportunity_score', { ascending: false })
-      .limit(3)
+      .eq('user_id', user.id).eq('status', 'active')
+      .order('opportunity_score', { ascending: false }).limit(3)
       .then(({ data }) => setActiveSignals(data || []));
   }, [user]);
 
+  useEffect(() => { loadSignals(); }, [loadSignals]);
+
+  // ── Data freshness ──
   useEffect(() => {
     if (!user) return;
     const cutoff = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
-    supabase
-      .from('market_features')
-      .select('symbol', { count: 'exact', head: true })
-      .eq('timeframe', '1d')
-      .gte('computed_at', cutoff)
-      .then(({ count }) => {
-        setDataFreshness({ fresh: (count || 0) > 0, symbol_count: count || 0 });
-      });
+    supabase.from('market_features').select('symbol', { count: 'exact', head: true })
+      .eq('timeframe', '1d').gte('computed_at', cutoff)
+      .then(({ count }) => setDataFreshness({ fresh: (count || 0) > 0, symbol_count: count || 0 }));
   }, [user]);
 
+  // ── Price map ──
   const priceMap = useMemo(() => {
     const map = new Map<string, number>();
     if (!marketAssets) return map;
@@ -151,29 +138,13 @@ export default function Dashboard() {
     return map;
   }, [marketAssets]);
 
-  const unrealizedPnl = useMemo(() => {
-    let total = 0;
-    for (const pos of positions) {
-      if (pos.pnl != null) {
-        total += pos.pnl;
-        continue;
-      }
-      const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
-      if (!currentPrice) continue;
-      const qty = Math.abs(pos.quantity);
-      const diff = pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice;
-      total += diff * qty;
-    }
-    return total;
-  }, [positions, priceMap]);
+  // ── All metrics from custom hook ──
+  const metrics = useDashboardMetrics({
+    positions, closedPnl, journalStats, settings, priceMap, operatorStatus,
+  });
 
-  const portfolioValue = settings.current_capital + closedPnl + unrealizedPnl;
-  const totalExposure = positions.reduce((sum, p) => sum + Math.abs(p.quantity) * p.avg_entry, 0);
-  const exposurePct = portfolioValue > 0 ? (totalExposure / portfolioValue) * 100 : 0;
-  const winRate = journalStats.total > 0 ? (journalStats.wins / journalStats.total) * 100 : 0;
-  const drawdownPct = settings.initial_capital > 0 ? Math.max(0, ((settings.initial_capital - portfolioValue) / settings.initial_capital) * 100) : 0;
-
-  const handleRunOperator = async () => {
+  // ── Operator run ──
+  const handleRunOperator = useCallback(async () => {
     await runOperator(true);
     if (opError) {
       toast.error(opError);
@@ -185,61 +156,11 @@ export default function Dashboard() {
       } catch {
         toast.info("Run manual sync if positions don't update");
       }
-      supabase.from('signals')
-        .select('id, asset, direction, opportunity_score, expected_r_multiple, confidence_score')
-        .eq('user_id', user!.id)
-        .eq('status', 'active')
-        .order('opportunity_score', { ascending: false })
-        .limit(3)
-        .then(({ data }) => setActiveSignals(data || []));
+      loadSignals();
     }
-  };
+  }, [runOperator, opError, t, loadSignals]);
 
-  const cooldownActive = operatorStatus?.cooldown_active || false;
-  const maxTradesPerDay = operatorStatus?.max_trades_per_day ?? settings.max_trades_per_day ?? 3;
-  const tradesToday = operatorStatus?.trades_today ?? 0;
-  const dailyCapReached = tradesToday >= maxTradesPerDay;
-
-  const openRiskPct = useMemo(() => {
-    const capitalBase = Number(settings.current_capital) > 0
-      ? Number(settings.current_capital)
-      : portfolioValue > 0
-        ? portfolioValue
-        : 0;
-
-    if (!positions.length || capitalBase <= 0) return 0;
-
-    const totalRisk = positions.reduce((sum, pos) => {
-      const entry = Number(pos.avg_entry);
-      const stopLoss = pos.stop_loss == null ? null : Number(pos.stop_loss);
-      const quantity = Math.abs(Number(pos.quantity));
-
-      if (!Number.isFinite(entry) || !Number.isFinite(quantity) || !stopLoss || !Number.isFinite(stopLoss)) {
-        return sum;
-      }
-
-      return sum + Math.abs(entry - stopLoss) * quantity;
-    }, 0);
-
-    return totalRisk > 0 ? (totalRisk / capitalBase) * 100 : 0;
-  }, [positions, settings.current_capital, portfolioValue]);
-
-  const operatorRiskUsed = Number(operatorStatus?.daily_risk_used ?? 0);
-  const displayRiskUsed = Math.max(
-    Number.isFinite(operatorRiskUsed) ? operatorRiskUsed : 0,
-    Number.isFinite(openRiskPct) ? openRiskPct : 0,
-  );
-  const displayMaxRisk = operatorStatus?.max_daily_risk ?? settings.max_daily_risk ?? 3;
-
-  const now = new Date();
-  const hour = now.getHours();
-  const dayOfWeek = now.getDay(); // 0=Sun, 6=Sat
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  const phase: 'pre_market' | 'market_open' | 'post_market' =
-    isWeekend ? 'post_market' : hour < 9 ? 'pre_market' : hour < 16 ? 'market_open' : 'post_market';
-
-  const tradingDaysPassed = Math.floor(new Date().getDate() * 22 / 30);
-
+  // ── Goal setup guard ──
   if (!goalLoading && !goalExists && !showGoalSetup) {
     return (
       <div className="p-3 md:p-6 space-y-4 animate-slide-in max-w-2xl mx-auto">
@@ -260,20 +181,20 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <span className={cn(
             "px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-widest uppercase",
-            cooldownActive ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30" :
-            dailyCapReached ? "bg-red-500/10 text-red-400 border border-red-500/30" :
+            metrics.cooldownActive ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30" :
+            metrics.dailyCapReached ? "bg-red-500/10 text-red-400 border border-red-500/30" :
             "bg-green-500/10 text-green-400 border border-green-500/30"
           )}>
-            {cooldownActive ? "COOLDOWN" : dailyCapReached ? "CAP REACHED" : "ACTIVE"}
+            {metrics.cooldownActive ? "COOLDOWN" : metrics.dailyCapReached ? "CAP REACHED" : "ACTIVE"}
           </span>
           <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider hidden sm:inline">
             {goal?.automation_level === 'full_operator' ? '● AUTO' : '○ GUIDED'}
           </span>
           <span className="text-xs text-muted-foreground font-mono">
-            {positions.length}/{maxTradesPerDay} pos
+            {positions.length}/{metrics.maxTradesPerDay} pos
           </span>
           <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
-            · Risk: {displayRiskUsed.toFixed(1)}%/{displayMaxRisk}%
+            · Risk: {metrics.displayRiskUsed.toFixed(1)}%/{metrics.displayMaxRisk}%
           </span>
           {(operatorStatus as any)?.vix != null && (
             <span className={cn(
@@ -298,11 +219,11 @@ export default function Dashboard() {
         </div>
         <button
           onClick={handleRunOperator}
-          disabled={opLoading || cooldownActive || dailyCapReached}
+          disabled={opLoading || metrics.cooldownActive || metrics.dailyCapReached}
           className={cn(
             "flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono font-medium transition-all",
             opLoading ? "opacity-50 cursor-not-allowed" :
-            (cooldownActive || dailyCapReached) ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground" :
+            (metrics.cooldownActive || metrics.dailyCapReached) ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground" :
             "bg-primary text-primary-foreground hover:bg-primary/90"
           )}
         >
@@ -324,7 +245,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-3 gap-3">
         <MetricCard
           label="Portfolio"
-          value={formatCurrency(portfolioValue)}
+          value={formatCurrency(metrics.portfolioValue)}
           icon={Briefcase}
         />
         <MetricCard
@@ -335,8 +256,8 @@ export default function Dashboard() {
         />
         <MetricCard
           label="Drawdown"
-          value={`${drawdownPct.toFixed(1)}%`}
-          changeType={drawdownPct > 5 ? "negative" : "neutral"}
+          value={`${metrics.drawdownPct.toFixed(1)}%`}
+          changeType={metrics.drawdownPct > 5 ? "negative" : "neutral"}
           icon={Shield}
         />
       </div>
