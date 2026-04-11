@@ -153,11 +153,9 @@ Deno.serve(async (req) => {
     }
 
     // ─── Standard auth flow ───
-    const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return jsonRes({ error: "Unauthorized" }, 401);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     // Support user_id_override for scheduled per-user calls
@@ -165,7 +163,6 @@ Deno.serve(async (req) => {
 
     let user: { id: string } | null = null;
     if (user_id_override) {
-      const isServiceRole = authHeader === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
       if (!isServiceRole) {
         return jsonRes({ error: "Forbidden: user_id_override requires service role" }, 403);
       }
