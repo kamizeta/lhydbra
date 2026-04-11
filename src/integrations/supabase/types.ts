@@ -2066,6 +2066,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_and_increment_rate_limit: {
+        Args: { p_key: string; p_max_count?: number; p_window_seconds?: number }
+        Returns: number
+      }
       create_secret: {
         Args: { new_name: string; new_secret: string }
         Returns: string
