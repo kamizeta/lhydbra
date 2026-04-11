@@ -1425,6 +1425,7 @@ export type Database = {
           opportunity_score: number
           reasoning: string | null
           score_breakdown: Json
+          signal_key: string | null
           status: string
           stop_loss: number
           strategy_family: string | null
@@ -1452,6 +1453,7 @@ export type Database = {
           opportunity_score?: number
           reasoning?: string | null
           score_breakdown?: Json
+          signal_key?: string | null
           status?: string
           stop_loss: number
           strategy_family?: string | null
@@ -1479,6 +1481,7 @@ export type Database = {
           opportunity_score?: number
           reasoning?: string | null
           score_breakdown?: Json
+          signal_key?: string | null
           status?: string
           stop_loss?: number
           strategy_family?: string | null
