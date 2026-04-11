@@ -911,6 +911,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
         continue;
       }
 
+      // ─── AI Grading Filter (Anthropic Claude 3.5 Haiku) ───
+      const aiResult = await gradeSignalWithAI(
+        symbol, direction, strategyFamily, regime,
+        subscores, finalScore, expectedR, enriched,
+      );
+
+      let aiGrade: string | null = null;
+      let aiRationale: string | null = null;
+
+      if (aiResult) {
+        aiGrade = aiResult.grade;
+        aiRationale = aiResult.rationale;
+
+        if (aiResult.grade === "C") {
+          rejections.push({ asset: symbol, reason: `AI Rejection (Grade C): ${aiResult.rationale}` });
+          continue;
+        }
+      }
+      // If aiResult is null (API down/no key), fail-open: approve mathematically
+
       // Build explanation
       const sortedSubscores = Object.entries(subscores).sort((a, b) => b[1] - a[1]);
       const explanation = {
@@ -943,6 +963,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         reasoning: explanation.summary,
         explanation,
         status: "active",
+        ai_grade: aiGrade,
+        ai_rationale: aiRationale,
       };
 
       candidates.push({ signal, finalScore, confidenceScore });
