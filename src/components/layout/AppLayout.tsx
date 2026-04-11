@@ -34,10 +34,7 @@ export default function AppLayout() {
 
   const coreNavItems = [
     { to: "/", icon: LayoutDashboard, label: t.nav.operator },
-    { to: "/signals", icon: Zap, label: t.nav.signals },
-    { to: "/trade-ideas", icon: Activity, label: t.nav.tradeIdeas },
     { to: "/portfolio", icon: Briefcase, label: t.nav.portfolio },
-    
     { to: "/allocation", icon: PieChart, label: t.nav.allocation },
     { to: "/settings", icon: Settings, label: t.nav.settings },
   ];
