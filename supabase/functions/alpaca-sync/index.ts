@@ -1,11 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://lhydbra.lovable.app",
+  "https://id-preview--cfc6c4be-124b-47d1-b6e8-26dbf563d3b8.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : "",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 const ALPACA_PAPER_URL = "https://paper-api.alpaca.markets";
 const ALPACA_LIVE_URL = "https://api.alpaca.markets";
@@ -22,7 +32,7 @@ function alpacaHeaders() {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -67,13 +77,13 @@ serve(async (req) => {
         }
       }
 
-      return jsonRes({ scheduled: true, processed: uniqueUsers.length, results });
+      return jsonRes(req, { scheduled: true, processed: uniqueUsers.length, results });
     }
 
     // ─── Auth ───
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return jsonRes({ error: "Unauthorized" }, 401);
+      return jsonRes(req, { error: "Unauthorized" }, 401);
     }
 
     let userId: string;
@@ -91,7 +101,7 @@ serve(async (req) => {
       const token = authHeader.replace("Bearer ", "");
       const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
       if (claimsError || !claimsData?.claims?.sub) {
-        return jsonRes({ error: "Unauthorized" }, 401);
+        return jsonRes(req, { error: "Unauthorized" }, 401);
       }
       userId = claimsData.claims.sub as string;
     }
@@ -108,7 +118,7 @@ serve(async (req) => {
     const alpacaRes = await fetch(`${baseUrl}/v2/positions`, { headers });
     if (!alpacaRes.ok) {
       const errBody = await alpacaRes.text();
-      return jsonRes({ error: `Alpaca API error [${alpacaRes.status}]: ${errBody}` }, alpacaRes.status);
+      return jsonRes(req, { error: `Alpaca API error [${alpacaRes.status}]: ${errBody}` }, alpacaRes.status);
     }
     const alpacaPositions = await alpacaRes.json() as AlpacaPosition[];
 
@@ -128,7 +138,7 @@ serve(async (req) => {
       .eq("status", "open");
 
     if (localError) {
-      return jsonRes({ error: `DB error: ${localError.message}` }, 500);
+      return jsonRes(req, { error: `DB error: ${localError.message}` }, 500);
     }
 
     // Group local positions by clean symbol (handle duplicates)
@@ -724,7 +734,7 @@ serve(async (req) => {
     const acctRes = await fetch(`${baseUrl}/v2/account`, { headers });
     const account = acctRes.ok ? await acctRes.json() : null;
 
-    return jsonRes({
+    return jsonRes(req, {
       success: true,
       synced_at: new Date().toISOString(),
       paper,
@@ -740,7 +750,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("Alpaca sync error:", e);
-    return jsonRes({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return jsonRes(req, { error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });
 
@@ -816,9 +826,9 @@ async function submitSingleOrder(
   } catch (e) { console.warn(`[SL-Guardian] order error ${sym}:`, e); }
 }
 
-function jsonRes(data: unknown, status = 200) {
+function jsonRes(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
   });
 }

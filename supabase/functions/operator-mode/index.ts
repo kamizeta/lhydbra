@@ -1,15 +1,25 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://lhydbra.lovable.app",
+  "https://id-preview--cfc6c4be-124b-47d1-b6e8-26dbf563d3b8.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
 
-function jsonRes(data: unknown, status = 200) {
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : "",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
+
+function jsonRes(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -107,7 +117,7 @@ function nyFallbackMarketOpen(): boolean {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -120,7 +130,7 @@ Deno.serve(async (req) => {
     // ─── Scheduled run: iterate all full_operator users ───
     if (scheduled) {
       if (!isServiceRole) {
-        return jsonRes({ error: "Forbidden: scheduled requires service role" }, 403);
+        return jsonRes(req, { error: "Forbidden: scheduled requires service role" }, 403);
       }
       const adminSupabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
@@ -150,11 +160,11 @@ Deno.serve(async (req) => {
         }
       }
 
-      return jsonRes({ scheduled: true, processed: results.length, results });
+      return jsonRes(req, { scheduled: true, processed: results.length, results });
     }
 
     // ─── Standard auth flow ───
-    if (!authHeader?.startsWith("Bearer ")) return jsonRes({ error: "Unauthorized" }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return jsonRes(req, { error: "Unauthorized" }, 401);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -165,7 +175,7 @@ Deno.serve(async (req) => {
     let user: { id: string } | null = null;
     if (user_id_override) {
       if (!isServiceRole) {
-        return jsonRes({ error: "Forbidden: user_id_override requires service role" }, 403);
+        return jsonRes(req, { error: "Forbidden: user_id_override requires service role" }, 403);
       }
       user = { id: user_id_override } as typeof user;
     } else {
@@ -173,7 +183,7 @@ Deno.serve(async (req) => {
         global: { headers: { Authorization: authHeader } },
       });
       const { data: { user: authUser }, error: userError } = await userSupabase.auth.getUser();
-      if (userError || !authUser) return jsonRes({ error: "Unauthorized" }, 401);
+      if (userError || !authUser) return jsonRes(req, { error: "Unauthorized" }, 401);
       user = authUser;
     }
 
@@ -190,7 +200,7 @@ Deno.serve(async (req) => {
       console.warn('[operator-mode][rate-limit] RPC error:', rlError.message);
     }
     if (currentCount && currentCount > 10) {
-      return jsonRes({ error: "Rate limit exceeded. Try again in a minute." }, 429);
+      return jsonRes(req, { error: "Rate limit exceeded. Try again in a minute." }, 429);
     }
 
     // ─── Load user settings & goal ───
@@ -200,7 +210,7 @@ Deno.serve(async (req) => {
     ]);
 
     const settings = settingsRes.data;
-    if (!settings) return jsonRes({ error: "User settings not found. Configure your account first." }, 400);
+    if (!settings) return jsonRes(req, { error: "User settings not found. Configure your account first." }, 400);
 
     if (goalRes.error) {
       console.error('[operator-mode] goal_profiles fetch error:', goalRes.error.message);
@@ -288,7 +298,7 @@ Deno.serve(async (req) => {
     }
 
     if (preflight.length > 0 && action !== "status") {
-      return jsonRes({ status: "blocked", reasons: preflight, trades_today: tradesToday, consecutive_losses: consecutiveLosses, daily_risk_used: dailyRiskUsed });
+      return jsonRes(req, { status: "blocked", reasons: preflight, trades_today: tradesToday, consecutive_losses: consecutiveLosses, daily_risk_used: dailyRiskUsed });
     }
 
     // ─── Fetch VIX for dynamic thresholds (via VIXY proxy on Alpaca) ───
@@ -358,7 +368,7 @@ Deno.serve(async (req) => {
       const todayPnl = (todayJournal || []).reduce((s, t) => s + (t.pnl || 0), 0);
       const todayWins = (todayJournal || []).filter(t => (t.pnl || 0) > 0).length;
 
-      return jsonRes({
+      return jsonRes(req, {
         status: "ready",
         capital: currentCapital,
         positions_open: (openPositions || []).length,
@@ -444,11 +454,11 @@ Deno.serve(async (req) => {
     });
 
     const signalResult = await signalResponse.json();
-    if (signalResult.blocked) return jsonRes({ status: "blocked", ...signalResult });
+    if (signalResult.blocked) return jsonRes(req, { status: "blocked", ...signalResult });
 
     const signals = signalResult.signals || [];
     if (signals.length === 0) {
-      return jsonRes({
+      return jsonRes(req, {
         status: "no_opportunities",
         message: "No signals passed quality filters",
         rejected: signalResult.rejected || 0,
@@ -463,7 +473,7 @@ Deno.serve(async (req) => {
     );
     const marketOpen = await isUSMarketOpen(paper);
     if (hasEquitySignals && !marketOpen) {
-      return jsonRes({
+      return jsonRes(req, {
         status: "blocked",
         reasons: ["🔴 MARKET CLOSED: US equity execution blocked outside NYSE hours (14:30–21:00 UTC Mon–Fri)"],
         market_open: false,
@@ -828,7 +838,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return jsonRes({
+    return jsonRes(req, {
       status: shouldExecute ? "executed" : "ready_for_approval",
       automation_level: automationLevel,
       signals_generated: signals.length,
@@ -863,7 +873,7 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     console.error("Operator mode error:", e);
-    return jsonRes({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return jsonRes(req, { error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });
 

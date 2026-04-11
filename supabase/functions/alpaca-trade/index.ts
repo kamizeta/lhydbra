@@ -1,11 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://lhydbra.lovable.app",
+  "https://id-preview--cfc6c4be-124b-47d1-b6e8-26dbf563d3b8.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : "",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 const ALPACA_PAPER_URL = "https://paper-api.alpaca.markets";
 const ALPACA_LIVE_URL = "https://api.alpaca.markets";
@@ -173,12 +183,12 @@ async function submitPostFillProtection(
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return jsonRes({ error: "Unauthorized" }, 401);
+      return jsonRes(req, { error: "Unauthorized" }, 401);
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -200,7 +210,7 @@ serve(async (req) => {
       // They must pass user_id in the body for audit purposes only after internal auth
       const bodyUserId = body.authenticated_user_id;
       if (!bodyUserId) {
-        return jsonRes({ error: "Service role calls must include authenticated_user_id" }, 400);
+        return jsonRes(req, { error: "Service role calls must include authenticated_user_id" }, 400);
       }
       userId = bodyUserId;
     } else {
@@ -208,7 +218,7 @@ serve(async (req) => {
         authHeader!.replace("Bearer ", "")
       );
       if (claimsErr || !claimsData?.claims?.sub) {
-        return jsonRes({ error: "Unauthorized" }, 401);
+        return jsonRes(req, { error: "Unauthorized" }, 401);
       }
       userId = claimsData.claims.sub as string;
     }
@@ -220,9 +230,9 @@ serve(async (req) => {
       const res = await fetchWithRetry(`${baseUrl}/v2/account`, { headers });
       const data = await res.json();
       if (!res.ok) {
-        return jsonRes({ error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
+        return jsonRes(req, { error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
       }
-      return jsonRes({
+      return jsonRes(req, {
         success: true,
         account: {
           id: data.id, status: data.status, currency: data.currency,
@@ -239,9 +249,9 @@ serve(async (req) => {
       const res = await fetchWithRetry(`${baseUrl}/v2/positions`, { headers });
       const data = await res.json();
       if (!res.ok) {
-        return jsonRes({ error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
+        return jsonRes(req, { error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
       }
-      return jsonRes({ success: true, positions: data });
+      return jsonRes(req, { success: true, positions: data });
     }
 
     // ─── ACTION: place_order ───
@@ -251,21 +261,21 @@ serve(async (req) => {
         signal_id } = body;
 
       if (!symbol || !qty || !side) {
-        return jsonRes({ error: "Missing required: symbol, qty, side" }, 400);
+        return jsonRes(req, { error: "Missing required: symbol, qty, side" }, 400);
       }
 
       const parsedQty = parseFloat(qty);
       if (isNaN(parsedQty) || parsedQty <= 0) {
-        return jsonRes({ error: "qty must be a positive number" }, 400);
+        return jsonRes(req, { error: "qty must be a positive number" }, 400);
       }
       if (parsedQty > 10000) {
-        return jsonRes({ error: "qty exceeds maximum allowed per order" }, 400);
+        return jsonRes(req, { error: "qty exceeds maximum allowed per order" }, 400);
       }
       if (!["buy", "sell"].includes(String(side).toLowerCase())) {
-        return jsonRes({ error: "side must be 'buy' or 'sell'" }, 400);
+        return jsonRes(req, { error: "side must be 'buy' or 'sell'" }, 400);
       }
       if (!/^[A-Z]{1,10}$/.test(String(symbol).toUpperCase())) {
-        return jsonRes({ error: "Invalid symbol format" }, 400);
+        return jsonRes(req, { error: "Invalid symbol format" }, 400);
       }
 
       // Pre-trade validation: check account buying power
@@ -274,7 +284,7 @@ serve(async (req) => {
         const acct = await acctRes.json();
         const buyingPower = Number(acct.buying_power || 0);
         if (buyingPower < 10) {
-          return jsonRes({ error: "Insufficient buying power" }, 400);
+          return jsonRes(req, { error: "Insufficient buying power" }, 400);
         }
       }
 
@@ -287,10 +297,10 @@ serve(async (req) => {
         if (assetRes.ok) {
           const asset = await assetRes.json();
           if (asset.tradable === false) {
-            return jsonRes({ error: `${symbol} is not tradable on Alpaca (status: ${asset.status || "unknown"})` }, 400);
+            return jsonRes(req, { error: `${symbol} is not tradable on Alpaca (status: ${asset.status || "unknown"})` }, 400);
           }
           if (asset.status === "inactive") {
-            return jsonRes({ error: `${symbol} is inactive on Alpaca` }, 400);
+            return jsonRes(req, { error: `${symbol} is inactive on Alpaca` }, 400);
           }
           if (side === "sell" && asset.easy_to_borrow === false) {
             console.warn(`${symbol} is not easy-to-borrow, short may be rejected`);
@@ -332,7 +342,7 @@ serve(async (req) => {
 
       if (!res.ok) {
         console.error(`[alpaca-trade] Order error: ${JSON.stringify(data)}`);
-        return jsonRes({ error: `Alpaca order error [${res.status}]: ${data.message || JSON.stringify(data)}` }, res.status);
+        return jsonRes(req, { error: `Alpaca order error [${res.status}]: ${data.message || JSON.stringify(data)}` }, res.status);
       }
 
       // Poll for fill confirmation
@@ -342,7 +352,7 @@ serve(async (req) => {
       if (!fillConfirmed) {
         const polled = await pollOrderStatus(baseUrl, data.id, headers);
         if (polled.status === 'polling_timeout') {
-          return jsonRes({
+          return jsonRes(req, {
             success: false,
             pending: true,
             order_id: data.id,
@@ -410,7 +420,7 @@ serve(async (req) => {
                   },
                 } as Record<string, unknown>);
 
-                return jsonRes({
+                return jsonRes(req, {
                   success: false,
                   fail_safe_triggered: true,
                   reason: "Protection failed, position closed for safety",
@@ -442,7 +452,7 @@ serve(async (req) => {
               },
             } as Record<string, unknown>);
 
-            return jsonRes({
+            return jsonRes(req, {
               success: false,
               critical: true,
               reason: "Position filled but unprotected AND fail-safe close failed. MANUAL INTERVENTION REQUIRED.",
@@ -493,7 +503,7 @@ serve(async (req) => {
         if (auditErr) console.error("[audit_log] insert error:", auditErr.message);
       });
 
-      return jsonRes({
+      return jsonRes(req, {
         success: fillConfirmed,
         order: {
           id: finalOrder.id,
@@ -515,7 +525,7 @@ serve(async (req) => {
     // ─── ACTION: close_position ───
     if (action === "close_position") {
       const { symbol, qty } = body;
-      if (!symbol) return jsonRes({ error: "Missing: symbol" }, 400);
+      if (!symbol) return jsonRes(req, { error: "Missing: symbol" }, 400);
 
       // Cancel any open protective orders for this symbol first
       try {
@@ -540,7 +550,7 @@ serve(async (req) => {
       const data = await res.json();
 
       if (!res.ok) {
-        return jsonRes({ error: `Alpaca close error [${res.status}]: ${data.message || JSON.stringify(data)}` }, res.status);
+        return jsonRes(req, { error: `Alpaca close error [${res.status}]: ${data.message || JSON.stringify(data)}` }, res.status);
       }
 
       // Update local position record
@@ -584,7 +594,7 @@ serve(async (req) => {
         if (auditErr) console.error("[audit_log] insert error:", auditErr.message);
       });
 
-      return jsonRes({ success: true, order: data });
+      return jsonRes(req, { success: true, order: data });
     }
 
     // ─── ACTION: get_orders ───
@@ -593,33 +603,33 @@ serve(async (req) => {
       const res = await fetchWithRetry(`${baseUrl}/v2/orders?status=${orderStatus}&limit=${limit}`, { headers });
       const data = await res.json();
       if (!res.ok) {
-        return jsonRes({ error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
+        return jsonRes(req, { error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
       }
-      return jsonRes({ success: true, orders: data });
+      return jsonRes(req, { success: true, orders: data });
     }
 
     // ─── ACTION: get_order_status ───
     if (action === "get_order_status") {
       const { order_id } = body;
-      if (!order_id) return jsonRes({ error: "Missing: order_id" }, 400);
+      if (!order_id) return jsonRes(req, { error: "Missing: order_id" }, 400);
       const res = await fetchWithRetry(`${baseUrl}/v2/orders/${order_id}`, { headers });
       const data = await res.json();
       if (!res.ok) {
-        return jsonRes({ error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
+        return jsonRes(req, { error: `Alpaca error [${res.status}]: ${JSON.stringify(data)}` }, res.status);
       }
-      return jsonRes({ success: true, order: data });
+      return jsonRes(req, { success: true, order: data });
     }
 
-    return jsonRes({ error: "Invalid action. Use: test_connection, get_positions, place_order, close_position, get_orders, get_order_status" }, 400);
+    return jsonRes(req, { error: "Invalid action. Use: test_connection, get_positions, place_order, close_position, get_orders, get_order_status" }, 400);
   } catch (e) {
     console.error("Alpaca trade error:", e);
-    return jsonRes({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return jsonRes(req, { error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });
 
-function jsonRes(data: unknown, status = 200) {
+function jsonRes(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
   });
 }

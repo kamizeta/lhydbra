@@ -1,13 +1,23 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://lhydbra.lovable.app",
+  "https://id-preview--cfc6c4be-124b-47d1-b6e8-26dbf563d3b8.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : "",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
   try {
     const payload = await req.json();
@@ -15,14 +25,14 @@ Deno.serve(async (req) => {
 
     if (!record) {
       return new Response(JSON.stringify({ ok: false, reason: "no record" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
     const userId = record.user_id;
     if (!userId) {
       return new Response(JSON.stringify({ ok: false, reason: "no user_id" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -40,7 +50,7 @@ Deno.serve(async (req) => {
 
     if (!settings?.notify_telegram_chat_id) {
       return new Response(JSON.stringify({ ok: false, reason: "no telegram configured" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -101,7 +111,7 @@ Deno.serve(async (req) => {
 
         if (changes.length === 0) {
           return new Response(JSON.stringify({ ok: false, reason: "no notable changes" }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
           });
         }
 
@@ -118,7 +128,7 @@ Deno.serve(async (req) => {
 
     if (!message) {
       return new Response(JSON.stringify({ ok: false, reason: "no message" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -126,7 +136,7 @@ Deno.serve(async (req) => {
     const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
     if (!token) {
       return new Response(JSON.stringify({ ok: false, reason: "no bot token" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -161,13 +171,13 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ ok: true, telegram: tgResponse.ok ? "sent" : "failed" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("notify-position-change error:", e);
     return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

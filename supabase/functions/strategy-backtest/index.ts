@@ -1,11 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://lhydbra.lovable.app",
+  "https://id-preview--cfc6c4be-124b-47d1-b6e8-26dbf563d3b8.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : "",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 interface OHLCVBar {
   open: number;
@@ -246,7 +256,7 @@ function computeMetrics(trades: BacktestTrade[]) {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
   try {
     const body = await req.json();
@@ -269,7 +279,7 @@ serve(async (req) => {
       const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
       if (claimsErr || !claimsData?.claims?.sub) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         });
       }
       userId = claimsData.claims.sub as string;
@@ -289,7 +299,7 @@ serve(async (req) => {
     if (ohlcvErr) throw new Error(`OHLCV fetch error: ${ohlcvErr.message}`);
     if (!ohlcvData || ohlcvData.length < 30) {
       return new Response(JSON.stringify({ error: `Insufficient OHLCV data for ${symbol}. Need at least 30 bars, got ${ohlcvData?.length || 0}.` }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" }
       });
     }
 
@@ -326,12 +336,12 @@ serve(async (req) => {
       trades: trades.length,
       trade_log: trades,
       id: inserted?.id,
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }), { headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
 
   } catch (e) {
     console.error("backtest error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" }
     });
   }
 });
