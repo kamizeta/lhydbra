@@ -6,19 +6,20 @@ export interface KellySymbolStats {
   total_trades: number;
   wins: number;
   losses: number;
-  win_rate: number; // 0-1
+  win_rate: number;
   avg_win_pnl: number;
   avg_loss_pnl: number;
   r_ratio: number;
   kelly_raw: number;
-  kelly_pct: number; // half-kelly as percentage
+  kelly_pct: number;
 }
 
-function computeKellyStats(positions: Array<{ symbol: string; pnl: number | null }>): KellySymbolStats[] {
+function computeKellyStats(rows: Array<{ symbol: string; pnl: number | null }>): KellySymbolStats[] {
   const grouped: Record<string, { wins: number[]; losses: number[] }> = {};
 
-  for (const p of positions) {
+  for (const p of rows) {
     const pnl = p.pnl ?? 0;
+    if (pnl === 0) continue;
     if (!grouped[p.symbol]) grouped[p.symbol] = { wins: [], losses: [] };
     if (pnl > 0) grouped[p.symbol].wins.push(pnl);
     else grouped[p.symbol].losses.push(pnl);
@@ -57,15 +58,24 @@ export function useKellyStats() {
   return useQuery({
     queryKey: ["kelly-stats"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("positions")
-        .select("symbol, pnl")
-        .eq("status", "closed")
-        .order("closed_at", { ascending: false })
-        .limit(150);
+      // Fetch from both sources for maximum coverage
+      const [journalRes, positionsRes] = await Promise.all([
+        supabase
+          .from("trade_journal")
+          .select("symbol, pnl")
+          .order("entered_at", { ascending: false })
+          .limit(500),
+        supabase
+          .from("positions")
+          .select("symbol, pnl")
+          .eq("status", "closed")
+          .order("closed_at", { ascending: false })
+          .limit(500),
+      ]);
 
-      if (error) throw error;
-      return computeKellyStats(data || []);
+      // Deduplicate by merging both sources
+      const allRows = [...(journalRes.data || []), ...(positionsRes.data || [])];
+      return computeKellyStats(allRows);
     },
     staleTime: 5 * 60 * 1000,
   });
