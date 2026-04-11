@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Play, Loader2, AlertTriangle,
-  Briefcase, Target, Shield, Activity,
+  Briefcase, Target, Shield, Activity, TrendingUp,
 } from "lucide-react";
 import MetricCard from "@/components/shared/MetricCard";
 import GoalSetup from "@/components/operator/GoalSetup";
@@ -13,6 +13,7 @@ import { useOperatorMode } from "@/hooks/useOperatorMode";
 import { useGoalProfile } from "@/hooks/useGoalProfile";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { useKellyStats } from "@/hooks/useKellyStats";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
