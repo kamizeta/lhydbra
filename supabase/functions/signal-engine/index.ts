@@ -361,6 +361,7 @@ async function gradeSignalWithAI(
   finalScore: number,
   expectedR: number,
   features: Record<string, unknown>,
+  alphaContext?: string,
 ): Promise<{ grade: string; rationale: string } | null> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) return null; // No key → skip AI filter
@@ -395,7 +396,7 @@ async function gradeSignalWithAI(
 
 Grades: A = High conviction setup, B = Acceptable but watch closely, C = Risky / likely false breakout — reject.
 
-Signal data:
+${alphaContext ? `CONTEXTO MACROECONÓMICO DE LA DIRECCIÓN DEL FONDO (Aplica fuertemente este contexto para sesgar, aprobar o descartar oportunidades en tus operaciones matemáticas):\n${alphaContext}\n\n` : ""}Signal data:
 ${JSON.stringify(context, null, 2)}
 
 Respond with JSON only.`,
@@ -521,6 +522,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const SYMBOL_SECTORS: Record<string, string> = Object.fromEntries(
       (sectorData ?? []).map((r: { symbol: string; sector: string }) => [r.symbol, r.sector])
     );
+
+    // ─── Load Alpha Notes (Director macro context, last 3 days) ───
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: alphaNotes } = await supabase
+      .from('alpha_notes')
+      .select('message')
+      .eq('user_id', user_id)
+      .eq('role', 'user')
+      .gte('created_at', threeDaysAgo)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    const alphaContext = (alphaNotes ?? []).map((n: { message: string }) => n.message).join('\n---\n') || "";
 
     // ─── Expire stale signals (older than 24h) ───
     const expiryThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -914,7 +927,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // ─── AI Grading Filter (Anthropic Claude 3.5 Haiku) ───
       const aiResult = await gradeSignalWithAI(
         symbol, direction, strategyFamily, regime,
-        subscores, finalScore, expectedR, enriched,
+        subscores, finalScore, expectedR, enriched, alphaContext,
       );
 
       let aiGrade: string | null = null;

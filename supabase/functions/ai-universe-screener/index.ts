@@ -9,8 +9,12 @@ const corsHeaders = {
 const PROTECTED_SYMBOLS = new Set(["BTC/USD", "ETH/USD"]);
 const MAX_WATCHLIST = 50;
 
-async function discoverHighMomentumTickers(apiKey: string): Promise<string[]> {
+async function discoverHighMomentumTickers(apiKey: string, alphaContext?: string): Promise<string[]> {
   const today = new Date().toISOString().slice(0, 10);
+
+  const macroBlock = alphaContext
+    ? `\n\nCONTEXTO MACROECONÓMICO DE LA DIRECCIÓN DEL FONDO (Aplica fuertemente este contexto para sesgar, aprobar o descartar oportunidades en tus operaciones matemáticas):\n${alphaContext}\n`
+    : "";
 
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -24,7 +28,7 @@ async function discoverHighMomentumTickers(apiKey: string): Promise<string[]> {
       max_tokens: 300,
       messages: [{
         role: "user",
-        content: `Today is ${today}. You are a Wall Street asset screener. Identify 5 to 10 US stock tickers (NASDAQ/NYSE only) that are exhibiting the highest real-world momentum narratives RIGHT NOW — earnings beats, sector rotation catalysts, institutional accumulation, breakout setups, or macro tailwinds.
+        content: `Today is ${today}. You are a Wall Street asset screener. Identify 5 to 10 US stock tickers (NASDAQ/NYSE only) that are exhibiting the highest real-world momentum narratives RIGHT NOW — earnings beats, sector rotation catalysts, institutional accumulation, breakout setups, or macro tailwinds.${macroBlock}
 
 Return ONLY a valid JSON array of ticker strings. No markdown, no explanation, no code blocks. Example: ["NVDA","PLTR","SOFI"]`,
       }],
@@ -97,8 +101,19 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
+    // ─── Load Alpha Notes (Director macro context, last 3 days, from all users) ───
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: alphaNotes } = await admin
+      .from('alpha_notes')
+      .select('message')
+      .eq('role', 'user')
+      .gte('created_at', threeDaysAgo)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    const alphaContext = (alphaNotes ?? []).map((n: { message: string }) => n.message).join('\n---\n') || undefined;
+
     console.log("[screener] Calling Anthropic for momentum tickers...");
-    const newTickers = await discoverHighMomentumTickers(anthropicKey);
+    const newTickers = await discoverHighMomentumTickers(anthropicKey, alphaContext);
     console.log("[screener] AI discovered:", newTickers);
 
     if (newTickers.length === 0) {

@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.ai-universe-screener]
 verify_jwt = false
+
+[functions.alpha-ingestor]
+verify_jwt = false

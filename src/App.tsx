@@ -28,6 +28,7 @@ import ResearchPage from "@/pages/ResearchPage";
 import ReportsPage from "@/pages/ReportsPage";
 import DiagnosticPage from "@/pages/DiagnosticPage";
 import KellyDashboard from "@/pages/KellyDashboard";
+import AlphaChat from "@/pages/AlphaChat";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ function ProtectedRoutes() {
         <Route path="/advanced/reports" element={<ReportsPage />} />
         <Route path="/advanced/diagnostic" element={<DiagnosticPage />} />
         <Route path="/kelly" element={<KellyDashboard />} />
+        <Route path="/alpha-chat" element={<AlphaChat />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
