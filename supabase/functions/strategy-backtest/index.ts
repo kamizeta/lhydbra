@@ -249,10 +249,32 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { user_id, strategy_id, variant_id, symbol, strategy_family, parameters, timeframe } = await req.json();
+    const body = await req.json();
+    const { strategy_id, variant_id, symbol, strategy_family, parameters, timeframe, user_id_override } = body;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const authHeader = req.headers.get("Authorization") || "";
+    const isServiceRole = authHeader === `Bearer ${serviceKey}`;
+
+    // Authenticate caller
+    let userId: string;
+    if (user_id_override && isServiceRole) {
+      userId = user_id_override;
+    } else {
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(authHeader.replace("Bearer ", ""));
+      if (claimsErr || !claimsData?.claims?.sub) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = claimsData.claims.sub as string;
+    }
+
     const db = createClient(supabaseUrl, serviceKey);
 
     // Fetch OHLCV from cache
@@ -284,7 +306,7 @@ serve(async (req) => {
 
     // Store results
     const result = {
-      user_id,
+      user_id: userId,
       strategy_id: strategy_id || null,
       variant_id: variant_id || null,
       symbol,
