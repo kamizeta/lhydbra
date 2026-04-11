@@ -627,7 +627,17 @@ Deno.serve(async (req) => {
             }),
           });
           const orderResult = await orderRes.json();
-          execResults.push({ symbol: trade.asset, success: orderResult.success || false, order: orderResult.order || null, error: orderResult.error || null });
+          execResults.push({ symbol: trade.asset, success: orderResult.success || false, order: orderResult.order || null, error: orderResult.error || null, fail_safe_triggered: orderResult.fail_safe_triggered || false, critical: orderResult.critical || false });
+
+          // ─── HALT: fail-safe or critical from alpaca-trade ───
+          if (orderResult.fail_safe_triggered) {
+            console.error(`[operator-mode] FAIL-SAFE triggered for ${trade.asset}. Halting execution for this user.`);
+            break; // Stop processing remaining trades
+          }
+          if (orderResult.critical) {
+            console.error(`[operator-mode] CRITICAL: Unprotected position for ${trade.asset}. Halting ALL execution immediately.`);
+            break; // Stop processing remaining trades
+          }
 
           if (orderResult.success && orderResult.order) {
             const expectedEntry = Number(trade.entry_price);

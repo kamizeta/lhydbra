@@ -369,7 +369,81 @@ serve(async (req) => {
             if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
           }
           if (!protectionResult?.success) {
-            console.error(`[alpaca-trade] ⚠ ALL protection attempts failed for ${symbol}.`);
+            console.error(`[alpaca-trade] ⚠ ALL protection attempts failed for ${symbol}. EXECUTING FAIL-SAFE.`);
+
+            // Fail-safe: close position immediately to prevent unprotected exposure
+            try {
+              const closeSide = side === "buy" ? "sell" : "buy";
+              const closeRes = await fetchWithRetry(`${baseUrl}/v2/orders`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  symbol: symbol.replace("/", ""),
+                  qty: String(filledQty),
+                  side: closeSide,
+                  type: "market",
+                  time_in_force: "day",
+                }),
+              });
+
+              if (closeRes.ok) {
+                console.log(`[alpaca-trade] Fail-safe: Position closed successfully for ${symbol}`);
+
+                await supabase.from("audit_log").insert({
+                  user_id: userId,
+                  action: "fail_safe_close",
+                  entity: "order",
+                  entity_id: String(finalOrder.id),
+                  new_values: {
+                    symbol, qty: filledQty, side: closeSide,
+                    reason: "All SL/TP protection attempts failed",
+                    protection_error: protectionResult?.error,
+                  },
+                } as Record<string, unknown>);
+
+                return jsonRes({
+                  success: false,
+                  fail_safe_triggered: true,
+                  reason: "Protection failed, position closed for safety",
+                  order: {
+                    id: finalOrder.id,
+                    symbol: finalOrder.symbol,
+                    status: finalOrder.status,
+                    filled_avg_price: finalOrder.filled_avg_price,
+                  },
+                });
+              } else {
+                const closeErrorText = await closeRes.text();
+                console.error(`[alpaca-trade] Fail-safe close failed [${closeRes.status}]: ${closeErrorText}`);
+              }
+            } catch (closeErr) {
+              console.error(`[alpaca-trade] CRITICAL: Fail-safe close exception:`, closeErr);
+            }
+
+            // If even the fail-safe close failed, return critical error
+            await supabase.from("audit_log").insert({
+              user_id: userId,
+              action: "critical_unprotected_position",
+              entity: "order",
+              entity_id: String(finalOrder.id),
+              new_values: {
+                symbol, qty: filledQty, side,
+                reason: "Position filled but unprotected AND fail-safe close failed",
+                protection_error: protectionResult?.error,
+              },
+            } as Record<string, unknown>);
+
+            return jsonRes({
+              success: false,
+              critical: true,
+              reason: "Position filled but unprotected AND fail-safe close failed. MANUAL INTERVENTION REQUIRED.",
+              order: {
+                id: finalOrder.id,
+                symbol: finalOrder.symbol,
+                status: finalOrder.status,
+                filled_avg_price: finalOrder.filled_avg_price,
+              },
+            }, 500);
           }
         } else if (tpPrice > 0) {
           // Only TP, no SL
