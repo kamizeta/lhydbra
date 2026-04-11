@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const PROTECTED_SYMBOLS = new Set(["BTC/USD", "ETH/USD"]);
-const MAX_WATCHLIST = 25;
+const MAX_WATCHLIST = 50;
 
 async function discoverHighMomentumTickers(apiKey: string): Promise<string[]> {
   const today = new Date().toISOString().slice(0, 10);
