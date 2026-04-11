@@ -146,7 +146,7 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
 
     // Generate signal_outcome for the adaptive feedback loop
     try {
-      let signalData: { opportunity_score?: number; score_breakdown?: unknown; confidence?: number; strategy_family?: string; market_regime?: string } | null = null;
+      let signalData: { opportunity_score?: number; score_breakdown?: Record<string, number>; confidence?: number; strategy_family?: string; market_regime?: string } | null = null;
       
       if (position.signal_id) {
         const { data } = await supabase.from('trade_signals')
