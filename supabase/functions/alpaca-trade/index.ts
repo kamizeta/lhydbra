@@ -400,7 +400,8 @@ serve(async (req) => {
         new_values: {
           symbol, qty, side, status: finalOrder.status,
           filled_avg_price: finalOrder.filled_avg_price,
-          oco_submitted: ocoResult?.success || false,
+          trailing_stop: protectionResult?.trailing || false,
+          protection_submitted: protectionResult?.success || false,
         },
       } as Record<string, unknown>).then(({ error: auditErr }) => {
         if (auditErr) console.error("[audit_log] insert error:", auditErr.message);
@@ -421,7 +422,7 @@ serve(async (req) => {
           filled_at: finalOrder.filled_at,
           filled_avg_price: finalOrder.filled_avg_price,
         },
-        oco: ocoResult,
+        protection: protectionResult,
       });
     }
 
