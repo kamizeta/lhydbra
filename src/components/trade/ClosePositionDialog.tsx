@@ -178,7 +178,7 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
 
       const outcome = pnl >= 0 ? 'win' : 'loss';
 
-      await supabase.from('signal_outcomes').insert({
+      await supabase.from('signal_outcomes').insert([{
         user_id: user.id,
         signal_id: position.signal_id || null,
         symbol: position.symbol,
@@ -189,10 +189,10 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
         outcome,
         strategy_family: signalData?.strategy_family || position.strategy_family || position.strategy || null,
         market_regime: signalData?.market_regime || position.regime_at_entry || null,
-        score_breakdown: (signalData?.score_breakdown || {}) as Record<string, unknown>,
-        weight_profile_used: weightProfile as Record<string, unknown>,
+        score_breakdown: signalData?.score_breakdown || {},
+        weight_profile_used: weightProfile as Record<string, string | number | null>,
         resolved_at: new Date().toISOString(),
-      });
+      }]);
 
       console.log(`[FeedbackLoop] Signal outcome recorded: ${position.symbol} → ${outcome}, R: ${actualRMultiple?.toFixed(2) ?? 'N/A'}`);
     } catch (outcomeErr) {

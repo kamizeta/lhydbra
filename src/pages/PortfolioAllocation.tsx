@@ -121,8 +121,8 @@ export default function PortfolioAllocation() {
         free_capital: p.free_capital,
         status: p.status,
         created_at: p.created_at,
-        allocations: p.allocations || {},
-        risk_budget: p.risk_budget || {},
+        allocations: (p.allocations || {}) as Record<string, number>,
+        risk_budget: (p.risk_budget || {}) as Record<string, number>,
       });
 
       // Load items for this plan
