@@ -52,14 +52,16 @@ Return ONLY a valid JSON array of ticker strings. No markdown, no explanation, n
     .map((t: string) => t.toUpperCase());
 }
 
-function mergeWatchlists(oldList: string[], newTickers: string[]): string[] {
+function mergeWatchlists(oldList: string[], newTickers: string[], kellyProtected: Set<string>): string[] {
   const combined = [...oldList, ...newTickers];
   const unique = [...new Set(combined)];
 
   if (unique.length <= MAX_WATCHLIST) return unique;
 
-  const protectedItems = unique.filter(s => PROTECTED_SYMBOLS.has(s));
-  const unprotected = unique.filter(s => !PROTECTED_SYMBOLS.has(s));
+  // Never trim: hardcoded protected + Kelly-positive symbols
+  const isProtected = (s: string) => PROTECTED_SYMBOLS.has(s) || kellyProtected.has(s);
+  const protectedItems = unique.filter(isProtected);
+  const unprotected = unique.filter(s => !isProtected(s));
 
   const trimmed = unprotected.slice(unprotected.length - (MAX_WATCHLIST - protectedItems.length));
   return [...protectedItems, ...trimmed];
@@ -135,8 +137,35 @@ Deno.serve(async (req) => {
 
     let updatedCount = 0;
     for (const setting of allSettings) {
+      // Compute Kelly-protected symbols for this user
+      const kellyProtected = new Set<string>();
+      const { data: trades } = await admin
+        .from("trade_journal")
+        .select("symbol, pnl")
+        .eq("user_id", setting.user_id)
+        .limit(500);
+      if (trades && trades.length > 0) {
+        const grouped: Record<string, { wins: number; losses: number; avgWin: number; avgLoss: number }> = {};
+        for (const t of trades) {
+          const pnl = t.pnl ?? 0;
+          if (pnl === 0) continue;
+          if (!grouped[t.symbol]) grouped[t.symbol] = { wins: 0, losses: 0, avgWin: 0, avgLoss: 0 };
+          const g = grouped[t.symbol];
+          if (pnl > 0) { g.wins++; g.avgWin += pnl; }
+          else { g.losses++; g.avgLoss += Math.abs(pnl); }
+        }
+        for (const [sym, g] of Object.entries(grouped)) {
+          const total = g.wins + g.losses;
+          if (total < 3) continue;
+          const W = g.wins / total;
+          const R = g.losses > 0 ? (g.avgWin / g.wins) / (g.avgLoss / g.losses) : 0;
+          const kelly = R > 0 ? (W - (1 - W) / R) * 0.5 * 100 : 0;
+          if (kelly > 0) kellyProtected.add(sym);
+        }
+      }
+
       const oldWatchlist: string[] = Array.isArray(setting.watchlist) ? setting.watchlist : [];
-      const merged = mergeWatchlists(oldWatchlist, newTickers);
+      const merged = mergeWatchlists(oldWatchlist, newTickers, kellyProtected);
 
       if (JSON.stringify(merged) === JSON.stringify(oldWatchlist)) continue;
 
