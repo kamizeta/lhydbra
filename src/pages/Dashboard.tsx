@@ -46,6 +46,18 @@ export default function Dashboard() {
   const { data: marketAssets } = useMarketData();
   const { status: operatorStatus, loading: opLoading, error: opError, fetchStatus, runOperator } = useOperatorMode();
   const [showGoalSetup, setShowGoalSetup] = useState(false);
+  const { data: kellyStats } = useKellyStats();
+
+  // Build kelly map: symbol → kelly_pct
+  const kellyMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!kellyStats) return map;
+    for (const s of kellyStats) {
+      map.set(s.symbol, s.kelly_pct);
+      map.set(s.symbol.replace("/", ""), s.kelly_pct);
+    }
+    return map;
+  }, [kellyStats]);
 
   // ── Data from react-query (independent queries) ──
   const {
