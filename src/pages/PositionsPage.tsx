@@ -348,7 +348,14 @@ export default function PositionsPage() {
               {/* Row 1: Symbol + Direction + PnL */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-sm text-foreground">{pos.symbol}</span>
+                  <div className="min-w-0">
+                    <a href={`https://app.alpaca.markets/trade/${pos.symbol.replace('/', '')}?asset_class=${pos.asset_type === 'crypto' ? 'crypto' : 'stocks'}`}
+                      target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                      className="font-mono font-bold text-sm text-foreground hover:text-primary transition-colors">
+                      {pos.symbol}
+                    </a>
+                    {pos.name && <div className="text-[9px] text-muted-foreground truncate leading-tight">{pos.name}</div>}
+                  </div>
                   <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded",
                     pos.direction === 'long' ? "bg-profit/10 text-profit" : "bg-loss/10 text-loss"
                   )}>
@@ -492,8 +499,12 @@ export default function PositionsPage() {
                   <td className="p-2">
                     <div className="flex items-center gap-1.5">
                       <div className="min-w-0">
-                        <div className="font-mono font-medium text-foreground text-xs truncate">{pos.symbol}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">{pos.name}</div>
+                        <a href={`https://app.alpaca.markets/trade/${pos.symbol.replace('/', '')}?asset_class=${pos.asset_type === 'crypto' ? 'crypto' : 'stocks'}`}
+                          target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                          className="font-mono font-medium text-foreground text-xs truncate block hover:text-primary transition-colors">
+                          {pos.symbol}
+                        </a>
+                        <div className="text-[9px] text-muted-foreground truncate leading-tight">{pos.name}</div>
                       </div>
                       {pos.signal_id && <Lightbulb className="h-3 w-3 text-primary/60 shrink-0" />}
                       {(hitSl || hitTp) && (
