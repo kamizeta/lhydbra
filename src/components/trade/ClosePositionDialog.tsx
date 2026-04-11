@@ -55,7 +55,7 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
   const diff = position.direction === 'long'
     ? closePrice - position.avg_entry
     : position.avg_entry - closePrice;
-  const pnl = diff * position.quantity;
+  const pnl = diff * Math.abs(position.quantity);
   const pnlPercent = (diff / position.avg_entry) * 100;
 
   const handleConfirm = async () => {
