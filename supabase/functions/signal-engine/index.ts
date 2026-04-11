@@ -361,6 +361,7 @@ async function gradeSignalWithAI(
   finalScore: number,
   expectedR: number,
   features: Record<string, unknown>,
+  alphaContext?: string,
 ): Promise<{ grade: string; rationale: string } | null> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) return null; // No key → skip AI filter
