@@ -179,22 +179,19 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // ─── Rate limit: max 10 calls per minute per user ───
+    // ─── Atomic rate limit: max 10 calls per minute per user ───
     const rateLimitKey = `operator-mode:${user.id}:${Math.floor(Date.now() / 60000)}`;
-    const { data: rateData } = await supabase
-      .from('rate_limit_log')
-      .select('count')
-      .eq('key', rateLimitKey)
-      .maybeSingle();
-    const currentCount = (rateData as { count: number } | null)?.count ?? 0;
-    if (currentCount >= 10) {
+    const { data: currentCount, error: rlError } = await supabase.rpc('check_and_increment_rate_limit', {
+      p_key: rateLimitKey,
+      p_max_count: 10,
+      p_window_seconds: 60,
+    });
+    if (rlError) {
+      console.warn('[operator-mode][rate-limit] RPC error:', rlError.message);
+    }
+    if (currentCount && currentCount > 10) {
       return jsonRes({ error: "Rate limit exceeded. Try again in a minute." }, 429);
     }
-    await supabase.from('rate_limit_log').upsert({
-      key: rateLimitKey,
-      count: currentCount + 1,
-      expires_at: new Date(Date.now() + 60000).toISOString(),
-    } as Record<string, unknown>);
 
     // ─── Load user settings & goal ───
     const [settingsRes, goalRes] = await Promise.all([
