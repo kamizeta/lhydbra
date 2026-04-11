@@ -345,60 +345,49 @@ serve(async (req) => {
         fillConfirmed = String(finalOrder.status) === 'filled';
       }
 
-      // ── After fill: ALWAYS submit OCO with GTC for SL/TP ──
-      let ocoResult: { success: boolean; error?: string } | null = null;
+      // ── After fill: Submit Trailing Stop + TP ──
+      let protectionResult: { success: boolean; error?: string; trailing?: boolean } | null = null;
       const slPrice = Number(stop_loss);
       const tpPrice = Number(take_profit);
+      const entryPriceNum = parseFloat(String(finalOrder.filled_avg_price || "0")) || Number(body.entry_price || 0);
       const filledQty = parseFloat(String(finalOrder.filled_qty || "0")) || parsedQty;
 
       if (fillConfirmed) {
         // Wait for Alpaca to register the position
         await new Promise(r => setTimeout(r, 800));
 
-        if (slPrice > 0 && tpPrice > 0) {
-          console.log(`[alpaca-trade] Fill confirmed for ${symbol}, submitting OCO SL@${slPrice} TP@${tpPrice}`);
-          // Retry OCO up to 3 times
+        if (slPrice > 0 && entryPriceNum > 0) {
+          console.log(`[alpaca-trade] Fill confirmed for ${symbol}, submitting trailing stop + TP`);
+          // Retry up to 3 times
           for (let attempt = 1; attempt <= 3; attempt++) {
-            ocoResult = await submitPostFillOCO(baseUrl, headers, symbol, filledQty, side, slPrice, tpPrice);
-            if (ocoResult.success) break;
-            console.warn(`[alpaca-trade] OCO attempt ${attempt}/3 failed for ${symbol}: ${ocoResult.error}`);
+            protectionResult = await submitPostFillProtection(
+              baseUrl, headers, symbol, filledQty, side,
+              entryPriceNum, slPrice, tpPrice
+            );
+            if (protectionResult.success) break;
+            console.warn(`[alpaca-trade] Protection attempt ${attempt}/3 failed: ${protectionResult.error}`);
             if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
           }
-          if (!ocoResult?.success) {
-            console.error(`[alpaca-trade] ⚠ ALL OCO attempts failed for ${symbol}. SL/TP NOT SET.`);
+          if (!protectionResult?.success) {
+            console.error(`[alpaca-trade] ⚠ ALL protection attempts failed for ${symbol}.`);
           }
-        } else if (slPrice > 0 || tpPrice > 0) {
-          // At least set whichever we have
+        } else if (tpPrice > 0) {
+          // Only TP, no SL
           const closeSide = side === "buy" ? "sell" : "buy";
-          if (slPrice > 0) {
-            try {
-              const stopRes = await fetch(`${baseUrl}/v2/orders`, {
-                method: "POST", headers,
-                body: JSON.stringify({
-                  symbol: symbol.replace("/", ""), qty: String(filledQty),
-                  side: closeSide, type: "stop", time_in_force: "gtc",
-                  stop_price: round2(slPrice),
-                }),
-              });
-              ocoResult = { success: stopRes.ok, error: stopRes.ok ? undefined : await stopRes.text() };
-            } catch {}
-          }
-          if (tpPrice > 0) {
-            try {
-              const tpRes = await fetch(`${baseUrl}/v2/orders`, {
-                method: "POST", headers,
-                body: JSON.stringify({
-                  symbol: symbol.replace("/", ""), qty: String(filledQty),
-                  side: closeSide, type: "limit", time_in_force: "gtc",
-                  limit_price: round2(tpPrice),
-                }),
-              });
-              if (!ocoResult) ocoResult = { success: tpRes.ok, error: tpRes.ok ? undefined : await tpRes.text() };
-            } catch {}
-          }
+          try {
+            const tpRes = await fetch(`${baseUrl}/v2/orders`, {
+              method: "POST", headers,
+              body: JSON.stringify({
+                symbol: symbol.replace("/", ""), qty: String(filledQty),
+                side: closeSide, type: "limit", time_in_force: "gtc",
+                limit_price: round2(tpPrice),
+              }),
+            });
+            protectionResult = { success: tpRes.ok, error: tpRes.ok ? undefined : await tpRes.text() };
+          } catch {}
         } else {
           console.warn(`[alpaca-trade] ⚠ No SL/TP provided for ${symbol}. Position UNPROTECTED.`);
-          ocoResult = { success: false, error: "No SL/TP values provided" };
+          protectionResult = { success: false, error: "No SL/TP values provided" };
         }
       }
 
