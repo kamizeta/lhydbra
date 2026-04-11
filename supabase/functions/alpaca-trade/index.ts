@@ -438,7 +438,7 @@ serve(async (req) => {
           const openOrders = await openOrdersRes.json() as any[];
           const cleanSym = String(symbol).replace("/", "").toUpperCase();
           for (const ord of openOrders) {
-            if (ord.symbol === cleanSym && (ord.type === "stop" || ord.type === "limit" || ord.order_class === "oco")) {
+            if (ord.symbol === cleanSym && (ord.type === "stop" || ord.type === "limit" || ord.type === "trailing_stop" || ord.order_class === "oco")) {
               try { await fetch(`${baseUrl}/v2/orders/${ord.id}`, { method: "DELETE", headers }); } catch {}
             }
           }
