@@ -332,10 +332,17 @@ serve(async (req) => {
           }
         } catch {}
 
+        // Look up display name from symbol_mapping
+        let displayName = sym;
+        try {
+          const { data: mapping } = await supabase.from("symbol_mapping").select("display_name").eq("internal_symbol", sym).maybeSingle();
+          if (mapping?.display_name) displayName = mapping.display_name;
+        } catch {}
+
         await supabase.from("positions").insert({
           user_id: userId,
           symbol: sym,
-          name: sym,
+          name: displayName,
           asset_type: assetClass,
           direction: side,
           quantity: qty,
