@@ -52,14 +52,16 @@ Return ONLY a valid JSON array of ticker strings. No markdown, no explanation, n
     .map((t: string) => t.toUpperCase());
 }
 
-function mergeWatchlists(oldList: string[], newTickers: string[]): string[] {
+function mergeWatchlists(oldList: string[], newTickers: string[], kellyProtected: Set<string>): string[] {
   const combined = [...oldList, ...newTickers];
   const unique = [...new Set(combined)];
 
   if (unique.length <= MAX_WATCHLIST) return unique;
 
-  const protectedItems = unique.filter(s => PROTECTED_SYMBOLS.has(s));
-  const unprotected = unique.filter(s => !PROTECTED_SYMBOLS.has(s));
+  // Never trim: hardcoded protected + Kelly-positive symbols
+  const isProtected = (s: string) => PROTECTED_SYMBOLS.has(s) || kellyProtected.has(s);
+  const protectedItems = unique.filter(isProtected);
+  const unprotected = unique.filter(s => !isProtected(s));
 
   const trimmed = unprotected.slice(unprotected.length - (MAX_WATCHLIST - protectedItems.length));
   return [...protectedItems, ...trimmed];
