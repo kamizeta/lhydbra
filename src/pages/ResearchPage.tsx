@@ -14,10 +14,15 @@ import { toast } from "sonner";
 
 // ─── Types ───
 
+interface StrategyLogic {
+  conditions?: string[];
+  [key: string]: string | number | boolean | string[] | undefined;
+}
+
 interface StrategyTemplate {
   id: string; name: string; strategy_family: string; description: string | null;
-  entry_logic: Record<string, unknown>; exit_logic: Record<string, unknown>;
-  risk_model: Record<string, unknown>; preferred_regime: string[];
+  entry_logic: StrategyLogic; exit_logic: StrategyLogic;
+  risk_model: StrategyLogic; preferred_regime: string[];
 }
 
 interface BacktestResult {
