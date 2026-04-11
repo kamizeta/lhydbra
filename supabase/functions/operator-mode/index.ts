@@ -49,13 +49,14 @@ function calcPositionSize(params: {
   maxSingleAssetPct: number;
   maxLeverage: number;
   isFractional: boolean;
+  existingExposure?: number;
 }): number {
   if (params.capital <= 0 || params.entryPrice <= 0) return 0;
   const riskPerUnit = Math.abs(params.entryPrice - params.stopLoss);
   if (riskPerUnit <= 0) return 0;
   const dollarRisk = params.capital * (params.riskPct / 100);
   const riskBasedSize = dollarRisk / riskPerUnit;
-  const maxAssetValue = params.capital * params.maxSingleAssetPct / 100;
+  const maxAssetValue = Math.max(0, (params.capital * params.maxSingleAssetPct / 100) - (params.existingExposure || 0));
   const concentrationCap = maxAssetValue / params.entryPrice;
   const maxExposure = params.capital * params.maxLeverage;
   const leverageCap = maxExposure / params.entryPrice;
@@ -554,6 +555,19 @@ Deno.serve(async (req) => {
       console.log(`[operator-mode] Half-Kelly ${sym}: W=${k.W.toFixed(2)}, R=${k.R.toFixed(2)}, risk=${k.kelly_pct.toFixed(2)}% (${k.trades} trades)`);
     }
 
+    // ─── Build exposure map from open positions ───
+    const { data: existingPositions } = await supabase
+      .from("positions")
+      .select("symbol, quantity, avg_entry")
+      .eq("user_id", user.id)
+      .eq("status", "open");
+    const exposureBySymbol: Record<string, number> = {};
+    for (const pos of (existingPositions || [])) {
+      const exposure = Math.abs((Number(pos.quantity) || 0) * (Number(pos.avg_entry) || 0));
+      exposureBySymbol[String(pos.symbol)] = (exposureBySymbol[String(pos.symbol)] || 0) + exposure;
+    }
+    console.log(`[operator-mode] Exposure map:`, exposureBySymbol);
+
     // ─── Size positions with Half-Kelly risk ───
     const sized = signals.map((sig: Record<string, unknown>) => {
       const entryPrice = Number(sig.entry_price);
@@ -574,6 +588,7 @@ Deno.serve(async (req) => {
       const riskDollars = liveCapital * (finalRisk / 100);
 
       const isFractional = ['crypto'].includes(String(sig.asset_class || 'stock'));
+      const existingExposure = exposureBySymbol[String(sig.asset)] || 0;
       const quantity = calcPositionSize({
         capital: liveCapital,
         riskPct: finalRisk,
@@ -582,6 +597,7 @@ Deno.serve(async (req) => {
         maxSingleAssetPct: Number(settings.max_single_asset || 25),
         maxLeverage: Number(settings.max_leverage || 2.0),
         isFractional,
+        existingExposure,
       });
 
       if (quantity <= 0) {
