@@ -665,7 +665,7 @@ export default function ResearchPage() {
               <div key={key}>
                 <label className="text-[10px] text-muted-foreground font-mono block mb-1">{label}</label>
                 <input type="number" step={step}
-                  value={(simConfig as any)[key]}
+                  value={simConfig[key as keyof typeof simConfig]}
                   onChange={e => setSimConfig(prev => ({ ...prev, [key]: parseFloat(e.target.value) }))}
                   className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
               </div>
