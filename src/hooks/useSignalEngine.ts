@@ -18,7 +18,7 @@ export interface Signal {
   opportunity_score: number;
   confidence_score: number;
   score_breakdown: Record<string, number>;
-  modifiers_applied: { strategy: number; regime: number; historical: number };
+  modifiers_applied: Record<string, number>;
   weight_profile_used: Record<string, number>;
   reasoning: string | null;
   explanation: {
@@ -28,6 +28,8 @@ export interface Signal {
   } | null;
   status: string;
   invalidation_reason: string | null;
+  ai_grade: string | null;
+  ai_rationale: string | null;
   created_at: string;
   updated_at: string;
 }
