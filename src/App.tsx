@@ -28,7 +28,7 @@ import ResearchPage from "@/pages/ResearchPage";
 import ReportsPage from "@/pages/ReportsPage";
 import DiagnosticPage from "@/pages/DiagnosticPage";
 import KellyDashboard from "@/pages/KellyDashboard";
-import AlphaChat from "@/pages/AlphaChat";
+import FloatingAlphaChat from "@/components/chat/FloatingAlphaChat";
 
 const queryClient = new QueryClient();
 
@@ -46,8 +46,10 @@ function ProtectedRoutes() {
   if (!user) return <AuthPage />;
 
   return (
-    <Routes>
-      <Route element={<AppLayout />}>
+    <>
+      <FloatingAlphaChat />
+      <Routes>
+        <Route element={<AppLayout />}>
         {/* Core routes */}
         <Route path="/" element={<Dashboard />} />
         <Route path="/signals" element={<SignalCenter />} />
@@ -69,10 +71,11 @@ function ProtectedRoutes() {
         <Route path="/advanced/reports" element={<ReportsPage />} />
         <Route path="/advanced/diagnostic" element={<DiagnosticPage />} />
         <Route path="/kelly" element={<KellyDashboard />} />
-        <Route path="/alpha-chat" element={<AlphaChat />} />
+        
       </Route>
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 }
 

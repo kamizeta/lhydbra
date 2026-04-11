@@ -38,7 +38,7 @@ export default function AppLayout() {
     { to: "/portfolio", icon: Briefcase, label: t.nav.portfolio },
     { to: "/allocation", icon: PieChart, label: t.nav.allocation },
     { to: "/kelly", icon: Calculator, label: "Kelly" },
-    { to: "/alpha-chat", icon: BrainCircuit, label: "AlphaLink" },
+    
     { to: "/settings", icon: Settings, label: t.nav.settings },
   ];
 
