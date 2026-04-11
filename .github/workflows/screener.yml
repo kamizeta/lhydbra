@@ -1,0 +1,42 @@
+name: Daily AI Universe Screener
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-screener:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger AI Universe Screener
+        id: screener
+        run: |
+          HTTP_CODE=$(curl -s -o /tmp/response.json -w "%{http_code}" \
+            -X POST \
+            'https://boccgfolfxhkcxflkrqz.supabase.co/functions/v1/ai-universe-screener' \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -d '{"scheduled": true}')
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "Response code: $HTTP_CODE"
+          cat /tmp/response.json || true
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "failed=true" >> $GITHUB_OUTPUT
+          else
+            echo "failed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Telegram alert on failure
+        if: steps.screener.outputs.failed == 'true'
+        run: |
+          BODY=$(cat /tmp/response.json 2>/dev/null || echo "No response body")
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"chat_id\": \"${{ secrets.TELEGRAM_CHAT_ID }}\",
+              \"text\": \"🔍 *LHYDBRA Screener FALLÓ*\n\nHTTP Code: ${{ steps.screener.outputs.http_code }}\nResponse: ${BODY}\",
+              \"parse_mode\": \"Markdown\"
+            }"
