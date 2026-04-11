@@ -132,8 +132,8 @@ export default function ResearchPage() {
     if (!user) return;
     const { error } = await supabase.from("strategies").insert([{
       user_id: user.id, name: tmpl.name, strategy_family: tmpl.strategy_family,
-      description: tmpl.description, entry_logic: tmpl.entry_logic as any,
-      exit_logic: tmpl.exit_logic as any, risk_model: tmpl.risk_model as any,
+      description: tmpl.description, entry_logic: tmpl.entry_logic,
+      exit_logic: tmpl.exit_logic, risk_model: tmpl.risk_model,
       preferred_regime: tmpl.preferred_regime, status: "active",
     }]);
     if (error) { toast.error("Error adopting strategy"); return; }

@@ -122,7 +122,7 @@ export function useNotifications() {
       .eq('user_id', user.id)
       .maybeSingle();
     if (data) {
-      const { id, user_id, created_at, updated_at, ...prefs } = data as any;
+      const { id, user_id, created_at, updated_at, ...prefs } = data;
       setPreferences({ ...defaultPrefs, ...prefs });
     }
   }, [user]);

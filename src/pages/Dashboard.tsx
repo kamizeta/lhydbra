@@ -125,15 +125,15 @@ export default function Dashboard() {
           <span className="text-xs text-muted-foreground font-mono hidden sm:inline">
             · Risk: {metrics.displayRiskUsed.toFixed(1)}%/{metrics.displayMaxRisk}%
           </span>
-          {(operatorStatus as any)?.vix != null && (
+          {operatorStatus?.vix != null && (
             <span className={cn(
               "text-[9px] font-mono uppercase tracking-wider hidden sm:inline",
-              (operatorStatus as any).vix > 30 ? "text-red-400" :
-              (operatorStatus as any).vix > 20 ? "text-yellow-400" : "text-green-400/60"
+              operatorStatus.vix > 30 ? "text-red-400" :
+              operatorStatus.vix > 20 ? "text-yellow-400" : "text-green-400/60"
             )}>
-              VIX {(operatorStatus as any).vix?.toFixed(0)}
-              {(operatorStatus as any)?.thresholds?.adjustment_reason !== "normal" &&
-                ` (${(operatorStatus as any)?.thresholds?.adjustment_reason?.replace(/_/g, " ")})`
+              VIX {operatorStatus.vix.toFixed(0)}
+              {operatorStatus.thresholds?.adjustment_reason !== "normal" &&
+                ` (${operatorStatus.thresholds?.adjustment_reason?.replace(/_/g, " ")})`
               }
             </span>
           )}

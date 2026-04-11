@@ -113,7 +113,7 @@ export default function PortfolioAllocation() {
     if (posRes.data) setPositions(posRes.data as Position[]);
 
     if (planRes.data) {
-      const p = planRes.data as any;
+      const p = planRes.data;
       setPlan({
         id: p.id,
         total_capital: p.total_capital,

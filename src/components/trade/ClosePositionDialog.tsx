@@ -42,11 +42,11 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
     if (!user) return;
     supabase
       .from("user_settings")
-      .select("binance_api_key, binance_api_secret")
+      .select("binance_key_id, binance_secret_id")
       .eq("user_id", user.id)
       .maybeSingle()
       .then(({ data }) => {
-        const has = !!(data as any)?.binance_api_key && !!(data as any)?.binance_api_secret;
+        const has = !!data?.binance_key_id && !!data?.binance_secret_id;
         setHasBinanceKeys(has);
         if (has && position.asset_type === 'crypto') setExecuteOnBinance(true);
       });
@@ -189,8 +189,8 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
         outcome,
         strategy_family: signalData?.strategy_family || position.strategy_family || position.strategy || null,
         market_regime: signalData?.market_regime || position.regime_at_entry || null,
-        score_breakdown: (signalData?.score_breakdown || {}) as any,
-        weight_profile_used: weightProfile as any,
+        score_breakdown: (signalData?.score_breakdown || {}) as Record<string, unknown>,
+        weight_profile_used: weightProfile as Record<string, unknown>,
         resolved_at: new Date().toISOString(),
       });
 
