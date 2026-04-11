@@ -191,17 +191,26 @@ serve(async (req) => {
     const isServiceRole = authHeader === `Bearer ${serviceKey}`;
 
     const body = await req.json();
-    const { action, paper = true, user_id_override } = body;
+    const { action, paper = true } = body;
 
+    // Always authenticate via JWT — no user_id_override
     let userId: string;
-    if (isServiceRole && user_id_override) {
-      userId = user_id_override;
+    if (isServiceRole) {
+      // Service role calls (e.g. from operator-mode) use the supabase client directly
+      // They must pass user_id in the body for audit purposes only after internal auth
+      const bodyUserId = body.authenticated_user_id;
+      if (!bodyUserId) {
+        return jsonRes({ error: "Service role calls must include authenticated_user_id" }, 400);
+      }
+      userId = bodyUserId;
     } else {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
+      const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(
+        authHeader!.replace("Bearer ", "")
+      );
+      if (claimsErr || !claimsData?.claims?.sub) {
         return jsonRes({ error: "Unauthorized" }, 401);
       }
-      userId = user.id;
+      userId = claimsData.claims.sub as string;
     }
     const baseUrl = paper ? ALPACA_PAPER_URL : ALPACA_LIVE_URL;
     const headers = alpacaHeaders();
