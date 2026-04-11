@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import type { OperatorStatus } from "@/hooks/useOperatorMode";
 
 interface Position {
   id: string;
@@ -24,18 +25,6 @@ interface Settings {
   initial_capital: number;
   max_daily_risk: number;
   max_trades_per_day: number;
-}
-
-interface OperatorStatus {
-  daily_risk_used?: number;
-  max_daily_risk?: number;
-  max_trades_per_day?: number;
-  trades_today?: number;
-  cooldown_active?: boolean;
-  today_pnl?: number;
-  vix?: number;
-  thresholds?: { adjustment_reason?: string };
-  preflight_warnings?: string[];
 }
 
 interface UseDashboardMetricsParams {

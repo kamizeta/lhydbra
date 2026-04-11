@@ -2,7 +2,23 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-interface OperatorStatus {
+export interface OperatorThresholds {
+  min_score: number;
+  min_r: number;
+  min_confidence: number;
+  vix: number;
+  adjustment_reason: 'calm_market' | 'normal' | 'elevated_volatility' | 'high_volatility' | 'extreme_volatility' | 'crisis';
+}
+
+export interface OperatorGoal {
+  monthly_target: number;
+  daily_target: number;
+  required_r_per_day: number;
+  required_trades_per_day: number;
+  automation_level: string;
+}
+
+export interface OperatorStatus {
   status: string;
   capital: number;
   positions_open: number;
@@ -25,6 +41,10 @@ interface OperatorStatus {
   today_wins: number;
   auto_execute: boolean;
   preflight_warnings: string[];
+  vix?: number;
+  thresholds?: OperatorThresholds;
+  goal?: OperatorGoal;
+  circuit_breaker_active?: boolean;
 }
 
 interface OperatorTrade {

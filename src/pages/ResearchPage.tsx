@@ -14,10 +14,15 @@ import { toast } from "sonner";
 
 // ─── Types ───
 
+interface StrategyLogic {
+  conditions?: string[];
+  [key: string]: string | number | boolean | string[] | undefined;
+}
+
 interface StrategyTemplate {
   id: string; name: string; strategy_family: string; description: string | null;
-  entry_logic: Record<string, unknown>; exit_logic: Record<string, unknown>;
-  risk_model: Record<string, unknown>; preferred_regime: string[];
+  entry_logic: StrategyLogic; exit_logic: StrategyLogic;
+  risk_model: StrategyLogic; preferred_regime: string[];
 }
 
 interface BacktestResult {
@@ -132,8 +137,9 @@ export default function ResearchPage() {
     if (!user) return;
     const { error } = await supabase.from("strategies").insert([{
       user_id: user.id, name: tmpl.name, strategy_family: tmpl.strategy_family,
-      description: tmpl.description, entry_logic: tmpl.entry_logic as any,
-      exit_logic: tmpl.exit_logic as any, risk_model: tmpl.risk_model as any,
+      description: tmpl.description, entry_logic: tmpl.entry_logic as Record<string, string | number | boolean>,
+      exit_logic: tmpl.exit_logic as Record<string, string | number | boolean>,
+      risk_model: tmpl.risk_model as Record<string, string | number | boolean>,
       preferred_regime: tmpl.preferred_regime, status: "active",
     }]);
     if (error) { toast.error("Error adopting strategy"); return; }
@@ -417,11 +423,11 @@ export default function ResearchPage() {
                     <div className="space-y-2 pt-2 border-t border-border">
                       <h3 className="text-xs font-bold text-muted-foreground uppercase">Entry Logic</h3>
                       <div className="text-[10px] font-mono text-foreground/80 space-y-0.5">
-                        {(selectedTemplate.entry_logic as any)?.conditions?.map((c: string, i: number) => <div key={i}>• {c}</div>) || <div>—</div>}
+                        {selectedTemplate.entry_logic.conditions?.map((c, i) => <div key={i}>• {c}</div>) || <div>—</div>}
                       </div>
                       <h3 className="text-xs font-bold text-muted-foreground uppercase">Exit Logic</h3>
                       <div className="text-[10px] font-mono text-foreground/80 space-y-0.5">
-                        {(selectedTemplate.exit_logic as any)?.conditions?.map((c: string, i: number) => <div key={i}>• {c}</div>) || <div>—</div>}
+                        {selectedTemplate.exit_logic.conditions?.map((c, i) => <div key={i}>• {c}</div>) || <div>—</div>}
                       </div>
                       <h3 className="text-xs font-bold text-muted-foreground uppercase">Risk Model</h3>
                       <div className="text-[10px] font-mono text-foreground/80">
@@ -659,7 +665,7 @@ export default function ResearchPage() {
               <div key={key}>
                 <label className="text-[10px] text-muted-foreground font-mono block mb-1">{label}</label>
                 <input type="number" step={step}
-                  value={(simConfig as any)[key]}
+                  value={simConfig[key as keyof typeof simConfig]}
                   onChange={e => setSimConfig(prev => ({ ...prev, [key]: parseFloat(e.target.value) }))}
                   className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono focus:ring-1 focus:ring-primary focus:outline-none" />
               </div>

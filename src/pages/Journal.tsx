@@ -93,7 +93,7 @@ export default function Journal() {
       exit_reasoning: editForm.exit_reasoning || null,
       lessons_learned: editForm.lessons_learned || null,
       mistake_tags: editForm.mistake_tags,
-    } as any).eq('id', editingId);
+    }).eq('id', editingId);
     if (error) { toast.error('Error saving'); return; }
     toast.success('Journal entry updated');
     setEntries(prev => prev.map(e => e.id === editingId ? { ...e, ...editForm } : e));

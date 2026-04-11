@@ -42,11 +42,11 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
     if (!user) return;
     supabase
       .from("user_settings")
-      .select("binance_api_key, binance_api_secret")
+      .select("binance_key_id, binance_secret_id")
       .eq("user_id", user.id)
       .maybeSingle()
       .then(({ data }) => {
-        const has = !!(data as any)?.binance_api_key && !!(data as any)?.binance_api_secret;
+        const has = !!data?.binance_key_id && !!data?.binance_secret_id;
         setHasBinanceKeys(has);
         if (has && position.asset_type === 'crypto') setExecuteOnBinance(true);
       });
@@ -146,7 +146,7 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
 
     // Generate signal_outcome for the adaptive feedback loop
     try {
-      let signalData: { opportunity_score?: number; score_breakdown?: unknown; confidence?: number; strategy_family?: string; market_regime?: string } | null = null;
+      let signalData: { opportunity_score?: number; score_breakdown?: Record<string, number>; confidence?: number; strategy_family?: string; market_regime?: string } | null = null;
       
       if (position.signal_id) {
         const { data } = await supabase.from('trade_signals')
@@ -157,7 +157,7 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
       }
 
       // Get current scoring weights for weight_profile_used
-      let weightProfile: Record<string, unknown> = {};
+      let weightProfile: Record<string, number> = {};
       const { data: weights } = await supabase.from('scoring_weights')
         .select('*')
         .eq('user_id', user.id)
@@ -178,7 +178,7 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
 
       const outcome = pnl >= 0 ? 'win' : 'loss';
 
-      await supabase.from('signal_outcomes').insert({
+      await supabase.from('signal_outcomes').insert([{
         user_id: user.id,
         signal_id: position.signal_id || null,
         symbol: position.symbol,
@@ -189,10 +189,10 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
         outcome,
         strategy_family: signalData?.strategy_family || position.strategy_family || position.strategy || null,
         market_regime: signalData?.market_regime || position.regime_at_entry || null,
-        score_breakdown: (signalData?.score_breakdown || {}) as any,
-        weight_profile_used: weightProfile as any,
+        score_breakdown: signalData?.score_breakdown || {},
+        weight_profile_used: weightProfile,
         resolved_at: new Date().toISOString(),
-      });
+      }]);
 
       console.log(`[FeedbackLoop] Signal outcome recorded: ${position.symbol} → ${outcome}, R: ${actualRMultiple?.toFixed(2) ?? 'N/A'}`);
     } catch (outcomeErr) {

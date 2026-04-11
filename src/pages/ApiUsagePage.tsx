@@ -79,8 +79,7 @@ export default function ApiUsagePage() {
   const { data: usageLogs, isLoading, refetch } = useQuery({
     queryKey: ["api-usage-logs"],
     queryFn: async () => {
-      // Table may not be in generated types yet, cast to any
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("api_usage_log")
         .select("*")
         .order("created_at", { ascending: false })

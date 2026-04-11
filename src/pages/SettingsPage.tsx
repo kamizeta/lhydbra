@@ -100,7 +100,7 @@ export default function SettingsPage() {
         .maybeSingle();
       if (data) {
         setFullName(data.full_name || '');
-        setAvatarUrl((data as any).avatar_url || '');
+        setAvatarUrl(data.avatar_url || '');
       }
       setProfileLoading(false);
     };
@@ -117,18 +117,18 @@ export default function SettingsPage() {
         .eq('user_id', user.id)
         .maybeSingle();
       if (data) {
-        const hasKeys = !!(data as any).binance_key_id && !!(data as any).binance_secret_id;
+        const hasKeys = !!data.binance_key_id && !!data.binance_secret_id;
         setBinanceConfigured(hasKeys);
         if (hasKeys) {
           setMaskedKey('••••••••••••');
           setMaskedSecret('••••••••••••');
         }
-        setNotifyEmail((data as any).notify_email || '');
-        setNotifyTelegramChatId((data as any).notify_telegram_chat_id || '');
-        setNotifyOnTradeExecuted((data as any).notify_on_trade_executed ?? true);
-        setNotifyOnStopLoss((data as any).notify_on_stop_loss ?? true);
-        setNotifyOnTakeProfit((data as any).notify_on_take_profit ?? true);
-        setNotifyOnCooldown((data as any).notify_on_cooldown ?? true);
+        setNotifyEmail(data.notify_email || '');
+        setNotifyTelegramChatId(data.notify_telegram_chat_id || '');
+        setNotifyOnTradeExecuted(data.notify_on_trade_executed ?? true);
+        setNotifyOnStopLoss(data.notify_on_stop_loss ?? true);
+        setNotifyOnTakeProfit(data.notify_on_take_profit ?? true);
+        setNotifyOnCooldown(data.notify_on_cooldown ?? true);
       }
     };
     loadBinance();
@@ -381,7 +381,7 @@ export default function SettingsPage() {
                 onClick={async () => {
                   if (!user) return;
                   const { error } = await supabase.from('user_settings')
-                    .update({ watchlist: localWatchlist } as any)
+                    .update({ watchlist: localWatchlist })
                     .eq('user_id', user.id);
                   if (error) { toast.error('Error saving watchlist: ' + error.message); return; }
                   toast.success('Watchlist saved');
@@ -1057,7 +1057,7 @@ export default function SettingsPage() {
                   notify_on_take_profit: notifyOnTakeProfit,
                   notify_on_cooldown: notifyOnCooldown,
                   updated_at: new Date().toISOString(),
-                } as any, { onConflict: 'user_id' });
+                }, { onConflict: 'user_id' });
                 if (error) toast.error('Error saving alert settings');
                 else toast.success('Alert settings saved ✓');
                 setSaving(false);
