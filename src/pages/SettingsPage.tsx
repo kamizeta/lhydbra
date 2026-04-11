@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2, User, Key, Target, RotateCcw, Bell, Volume2, VolumeX, Activity, Upload, Loader2, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSettings, type UserSettings } from '@/hooks/useUserSettings';
+import { useKellyStats } from '@/hooks/useKellyStats';
 import { useGoalProfile } from '@/hooks/useGoalProfile';
 import { useNotifications, type NotificationPreferences } from '@/hooks/useNotifications';
 import { useI18n } from '@/i18n';
@@ -393,20 +394,32 @@ export default function SettingsPage() {
               </button>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {[...localWatchlist].sort((a, b) => a.localeCompare(b)).map(sym => (
-                <span
-                  key={sym}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-accent/50 border border-border rounded text-[11px] font-mono text-foreground"
-                >
-                  {sym}
-                  <button
-                    onClick={() => setLocalWatchlist(prev => prev.filter(s => s !== sym))}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
+              {[...localWatchlist].sort((a, b) => a.localeCompare(b)).map(sym => {
+                const isKellyProtected = kellyProtectedSymbols.has(sym);
+                return (
+                  <span
+                    key={sym}
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2 py-1 border rounded text-[11px] font-mono",
+                      isKellyProtected
+                        ? "bg-primary/10 border-primary/30 text-primary"
+                        : "bg-accent/50 border-border text-foreground"
+                    )}
+                    title={isKellyProtected ? `Kelly protegido (K:${kellyStats?.find(k => k.symbol === sym)?.kelly_pct.toFixed(1)}%)` : undefined}
                   >
-                    ×
-                  </button>
-                </span>
-              ))}
+                    {isKellyProtected && <span className="text-[9px]">🛡</span>}
+                    {sym}
+                    {!isKellyProtected && (
+                      <button
+                        onClick={() => setLocalWatchlist(prev => prev.filter(s => s !== sym))}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </span>
+                );
+              })}
             </div>
             <div className="flex gap-2">
               <input
