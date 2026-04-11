@@ -350,6 +350,80 @@ async function fetchVIXScore(alpacaKeyId: string, alpacaSecret: string): Promise
   }
 }
 
+// ─── AI Grading via Anthropic Claude ───
+
+async function gradeSignalWithAI(
+  symbol: string,
+  direction: string,
+  strategyFamily: string,
+  regime: string,
+  subscores: Record<string, number>,
+  finalScore: number,
+  expectedR: number,
+  features: Record<string, unknown>,
+): Promise<{ grade: string; rationale: string } | null> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) return null; // No key → skip AI filter
+
+  const context = {
+    symbol, direction, strategy: strategyFamily, regime,
+    final_score: finalScore, expected_r: expectedR,
+    rsi_14: features.rsi_14, macd: features.macd, macd_histogram: features.macd_histogram,
+    atr_14: features.atr_14, trend_strength: features.trend_strength,
+    trend_direction: features.trend_direction, volatility_regime: features.volatility_regime,
+    sma_20: features.sma_20, sma_50: features.sma_50, sma_200: features.sma_200,
+    momentum_score: features.momentum_score, regime_confidence: features.regime_confidence,
+    volume_ratio: features.volume_ratio,
+    subscores,
+  };
+
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-3-5-haiku-latest",
+        max_tokens: 300,
+        messages: [{
+          role: "user",
+          content: `You are a Senior Quantitative Analyst. Evaluate this trading signal and respond ONLY with pure JSON (no markdown, no code blocks):
+{"grade": "A|B|C", "rationale": "your reasoning"}
+
+Grades: A = High conviction setup, B = Acceptable but watch closely, C = Risky / likely false breakout — reject.
+
+Signal data:
+${JSON.stringify(context, null, 2)}
+
+Respond with JSON only.`,
+        }],
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!resp.ok) {
+      console.warn(`[signal-engine] Anthropic API ${resp.status} — bypassing AI filter`);
+      return null;
+    }
+
+    const result = await resp.json();
+    const text = result?.content?.[0]?.text || "";
+    const cleaned = text.replace(/```json\s*/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    const grade = String(parsed.grade || "B").toUpperCase();
+    const rationale = String(parsed.rationale || "No rationale provided");
+
+    if (!["A", "B", "C"].includes(grade)) return { grade: "B", rationale };
+    return { grade, rationale };
+  } catch (err) {
+    console.warn("[signal-engine] AI grading failed, bypassing:", err instanceof Error ? err.message : "unknown");
+    return null; // Fail-open: approve mathematically
+  }
+}
+
 // ─── Main Handler ───
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -837,6 +911,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
         continue;
       }
 
+      // ─── AI Grading Filter (Anthropic Claude 3.5 Haiku) ───
+      const aiResult = await gradeSignalWithAI(
+        symbol, direction, strategyFamily, regime,
+        subscores, finalScore, expectedR, enriched,
+      );
+
+      let aiGrade: string | null = null;
+      let aiRationale: string | null = null;
+
+      if (aiResult) {
+        aiGrade = aiResult.grade;
+        aiRationale = aiResult.rationale;
+
+        if (aiResult.grade === "C") {
+          rejections.push({ asset: symbol, reason: `AI Rejection (Grade C): ${aiResult.rationale}` });
+          continue;
+        }
+      }
+      // If aiResult is null (API down/no key), fail-open: approve mathematically
+
       // Build explanation
       const sortedSubscores = Object.entries(subscores).sort((a, b) => b[1] - a[1]);
       const explanation = {
@@ -869,6 +963,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         reasoning: explanation.summary,
         explanation,
         status: "active",
+        ai_grade: aiGrade,
+        ai_rationale: aiRationale,
       };
 
       candidates.push({ signal, finalScore, confidenceScore });
