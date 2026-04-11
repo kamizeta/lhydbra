@@ -490,53 +490,87 @@ Deno.serve(async (req) => {
       }
     } catch { /* fallback to currentCapital */ }
 
-    // ─── Fetch recent performance per symbol for adaptive sizing ───
-    const symbolMultiplier: Record<string, number> = {};
+    // ─── Half-Kelly Criterion: calculate optimal position sizing per symbol ───
+    const kellyRisk: Record<string, { kelly_pct: number; W: number; R: number; trades: number }> = {};
     try {
       const { data: recentTrades } = await supabase
         .from("positions")
-        .select("symbol, pnl")
+        .select("symbol, pnl, avg_entry, stop_loss, direction, quantity")
         .eq("user_id", user.id)
         .eq("status", "closed")
         .order("closed_at", { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (recentTrades && recentTrades.length > 0) {
-        const bySymbol: Record<string, { wins: number; losses: number }> = {};
+        const bySymbol: Record<string, { wins: number; total: number; totalProfit: number; totalLoss: number }> = {};
         for (const t of recentTrades) {
           const sym = String(t.symbol);
-          if (!bySymbol[sym]) bySymbol[sym] = { wins: 0, losses: 0 };
-          if (Number(t.pnl || 0) > 0) bySymbol[sym].wins++;
-          else bySymbol[sym].losses++;
+          if (!bySymbol[sym]) bySymbol[sym] = { wins: 0, total: 0, totalProfit: 0, totalLoss: 0 };
+          bySymbol[sym].total++;
+          const pnl = Number(t.pnl || 0);
+          if (pnl > 0) {
+            bySymbol[sym].wins++;
+            bySymbol[sym].totalProfit += pnl;
+          } else {
+            bySymbol[sym].totalLoss += Math.abs(pnl);
+          }
         }
+
         for (const [sym, data] of Object.entries(bySymbol)) {
-          const total = data.wins + data.losses;
-          if (total < 3) { symbolMultiplier[sym] = 1.0; continue; }
-          const recentWR = data.wins / total;
-          if (recentWR >= 0.6) symbolMultiplier[sym] = 1.4;
-          else if (recentWR >= 0.5) symbolMultiplier[sym] = 1.2;
-          else if (recentWR >= 0.4) symbolMultiplier[sym] = 1.0;
-          else if (recentWR >= 0.3) symbolMultiplier[sym] = 0.7;
-          else symbolMultiplier[sym] = 0.5;
+          // W = Win Rate, R = Avg Profit / Avg Loss
+          const W = data.total >= 3 ? data.wins / data.total : 0.45;
+          const avgProfit = data.wins > 0 ? data.totalProfit / data.wins : 0;
+          const avgLoss = (data.total - data.wins) > 0 ? data.totalLoss / (data.total - data.wins) : 0;
+          const R = avgLoss > 0 ? avgProfit / avgLoss : 1.5;
+
+          // Kelly formula: f* = W - (1 - W) / R
+          const kelly = W - ((1 - W) / R);
+
+          // Half-Kelly for conservative sizing
+          const halfKelly = kelly * 0.5;
+
+          // Clamp: min 0.5%, max half of daily risk limit
+          const kellyPct = Math.max(0.5, Math.min(halfKelly * 100, maxDailyRisk * 0.5));
+
+          kellyRisk[sym] = { kelly_pct: kellyPct, W, R, trades: data.total };
         }
       }
-    } catch { /* no recent trades, all multipliers default to 1.0 */ }
+    } catch { /* no recent trades, defaults will be used */ }
 
-    // ─── Size positions with adaptive risk ───
+    // Default Kelly for symbols without history: W=0.45, R=1.5
+    const defaultW = 0.45;
+    const defaultR = 1.5;
+    const defaultKelly = defaultW - ((1 - defaultW) / defaultR);
+    const defaultHalfKellyPct = Math.max(0.5, Math.min((defaultKelly * 0.5) * 100, maxDailyRisk * 0.5));
+
+    console.log(`[operator-mode] Half-Kelly defaults: W=${defaultW}, R=${defaultR}, kelly=${defaultKelly.toFixed(4)}, half-kelly=${defaultHalfKellyPct.toFixed(2)}%`);
+    for (const [sym, k] of Object.entries(kellyRisk)) {
+      console.log(`[operator-mode] Half-Kelly ${sym}: W=${k.W.toFixed(2)}, R=${k.R.toFixed(2)}, risk=${k.kelly_pct.toFixed(2)}% (${k.trades} trades)`);
+    }
+
+    // ─── Size positions with Half-Kelly risk ───
     const sized = signals.map((sig: Record<string, unknown>) => {
       const entryPrice = Number(sig.entry_price);
       const stopLoss = Number(sig.stop_loss);
       const stopDist = Math.abs(entryPrice - stopLoss);
-      const effectiveRisk = Math.min(riskPerTrade, remainingRisk / signals.length);
-      const symMult = symbolMultiplier[String(sig.asset)] ?? 1.0;
-      const adjustedRisk = effectiveRisk * symMult;
-      const cappedRisk = Math.min(adjustedRisk, maxDailyRisk * 0.5);
-      const riskDollars = liveCapital * (cappedRisk / 100);
+      const symbol = String(sig.asset);
+
+      // Use per-symbol Kelly or default
+      const symKelly = kellyRisk[symbol];
+      const kellyPct = symKelly ? symKelly.kelly_pct : defaultHalfKellyPct;
+
+      // Cap by remaining daily risk budget
+      const effectiveRisk = Math.min(kellyPct, remainingRisk / signals.length);
+      // Final cap: never exceed half of max daily risk
+      const cappedRisk = Math.min(effectiveRisk, maxDailyRisk * 0.5);
+      // Also respect the adaptive loss-based riskPerTrade
+      const finalRisk = Math.max(0.5, Math.min(cappedRisk, riskPerTrade));
+      const riskDollars = liveCapital * (finalRisk / 100);
 
       const isFractional = ['crypto'].includes(String(sig.asset_class || 'stock'));
       const quantity = calcPositionSize({
         capital: liveCapital,
-        riskPct: cappedRisk,
+        riskPct: finalRisk,
         entryPrice,
         stopLoss,
         maxSingleAssetPct: Number(settings.max_single_asset || 25),
@@ -546,13 +580,23 @@ Deno.serve(async (req) => {
 
       if (quantity <= 0) {
         return { ...sig, quantity: 0, skip: true,
-          skip_reason: `Sizing returned 0: entry=${entryPrice}, sl=${stopLoss}, risk=${cappedRisk.toFixed(2)}%` };
+          skip_reason: `Sizing returned 0: entry=${entryPrice}, sl=${stopLoss}, risk=${finalRisk.toFixed(2)}%` };
       }
 
       const targets = (sig.targets as number[]) || [];
       const takeProfit = targets.length > 1 ? targets[1] : targets.length > 0 ? targets[0] : entryPrice + stopDist * 2;
 
-      return { ...sig, quantity, risk_pct: cappedRisk, risk_dollars: riskDollars, position_value: quantity * entryPrice, take_profit: takeProfit, symbol_multiplier: symMult, adjusted_risk_pct: cappedRisk.toFixed(2) };
+      return {
+        ...sig, quantity,
+        risk_pct: finalRisk,
+        risk_dollars: riskDollars,
+        position_value: quantity * entryPrice,
+        take_profit: takeProfit,
+        kelly_W: symKelly?.W ?? defaultW,
+        kelly_R: symKelly?.R ?? defaultR,
+        kelly_pct: kellyPct,
+        adjusted_risk_pct: finalRisk.toFixed(2),
+      };
     });
 
     // ─── Execute based on automation level ───
@@ -772,7 +816,9 @@ Deno.serve(async (req) => {
         quantity: t.quantity, entry: t.entry_price,
         stop_loss: t.stop_loss, take_profit: t.take_profit,
         risk_pct: Number(t.risk_pct).toFixed(2),
-        symbol_multiplier: t.symbol_multiplier,
+        kelly_W: t.kelly_W,
+        kelly_R: t.kelly_R,
+        kelly_pct: t.kelly_pct,
         adjusted_risk_pct: t.adjusted_risk_pct,
         strategy: t.strategy_family, regime: t.market_regime,
       })),
