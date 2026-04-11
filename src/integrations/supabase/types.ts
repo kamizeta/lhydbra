@@ -1384,6 +1384,8 @@ export type Database = {
       }
       signals: {
         Row: {
+          ai_grade: string | null
+          ai_rationale: string | null
           asset: string
           asset_class: string
           confidence_score: number
@@ -1409,6 +1411,8 @@ export type Database = {
           weight_profile_used: Json
         }
         Insert: {
+          ai_grade?: string | null
+          ai_rationale?: string | null
           asset: string
           asset_class?: string
           confidence_score?: number
@@ -1434,6 +1438,8 @@ export type Database = {
           weight_profile_used?: Json
         }
         Update: {
+          ai_grade?: string | null
+          ai_rationale?: string | null
           asset?: string
           asset_class?: string
           confidence_score?: number
