@@ -74,6 +74,18 @@ export default function SettingsPage() {
     ['AAPL','MSFT','NVDA','TSLA','SPY','QQQ','BTC/USD','ETH/USD','EUR/USD','GBP/USD','XAU/USD']
   );
 
+  // Kelly protection - symbols with positive Kelly can't be removed
+  const { data: kellyStats } = useKellyStats();
+  const kellyProtectedSymbols = useMemo(() => {
+    const set = new Set<string>();
+    if (kellyStats) {
+      for (const k of kellyStats) {
+        if (k.kelly_pct > 0 && k.total_trades >= 3) set.add(k.symbol);
+      }
+    }
+    return set;
+  }, [kellyStats]);
+
   // Load watchlist directly from DB (useUserSettings strips it)
   useEffect(() => {
     if (!user) return;
