@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Play, Loader2, AlertTriangle,
-  Briefcase, Target, Shield, Activity,
+  Briefcase, Target, Shield, Activity, TrendingUp,
 } from "lucide-react";
 import MetricCard from "@/components/shared/MetricCard";
 import GoalSetup from "@/components/operator/GoalSetup";
@@ -13,6 +13,7 @@ import { useOperatorMode } from "@/hooks/useOperatorMode";
 import { useGoalProfile } from "@/hooks/useGoalProfile";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { useKellyStats } from "@/hooks/useKellyStats";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,18 @@ export default function Dashboard() {
   const { data: marketAssets } = useMarketData();
   const { status: operatorStatus, loading: opLoading, error: opError, fetchStatus, runOperator } = useOperatorMode();
   const [showGoalSetup, setShowGoalSetup] = useState(false);
+  const { data: kellyStats } = useKellyStats();
+
+  // Build kelly map: symbol → kelly_pct
+  const kellyMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!kellyStats) return map;
+    for (const s of kellyStats) {
+      map.set(s.symbol, s.kelly_pct);
+      map.set(s.symbol.replace("/", ""), s.kelly_pct);
+    }
+    return map;
+  }, [kellyStats]);
 
   // ── Data from react-query (independent queries) ──
   const {
@@ -171,13 +184,19 @@ export default function Dashboard() {
       )}
 
       {/* ── 3 KPI Cards ── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard label="Portfolio" value={formatCurrency(metrics.portfolioValue)} icon={Briefcase} />
         <MetricCard
           label="Today P&L"
           value={`${(operatorStatus?.today_pnl ?? 0) >= 0 ? "+" : ""}${formatCurrency(operatorStatus?.today_pnl ?? 0)}`}
           changeType={(operatorStatus?.today_pnl ?? 0) >= 0 ? "positive" : "negative"}
           icon={Activity}
+        />
+        <MetricCard
+          label="Open PnL"
+          value={`${metrics.unrealizedPnl >= 0 ? "+" : ""}${formatCurrency(metrics.unrealizedPnl)}`}
+          changeType={metrics.unrealizedPnl >= 0 ? "positive" : "negative"}
+          icon={TrendingUp}
         />
         <MetricCard
           label="Drawdown"
@@ -212,6 +231,7 @@ export default function Dashboard() {
                 ? (pos.direction === "long" ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice) * qty
                 : 0;
               const pnl = pos.pnl ?? fallbackPnl;
+              const kelly = kellyMap.get(pos.symbol) ?? kellyMap.get(pos.symbol.replace("/", ""));
               return (
                 <div key={pos.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
                   <div className="flex items-center gap-2">
@@ -219,9 +239,19 @@ export default function Dashboard() {
                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-mono uppercase",
                       pos.direction === "long" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
                     )}>{pos.direction}</span>
+                    {kelly !== undefined && (
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded text-[9px] font-mono",
+                        kelly >= 8 ? "bg-primary/10 text-primary" :
+                        kelly >= 4 ? "bg-yellow-500/10 text-yellow-400" :
+                        "bg-muted text-muted-foreground"
+                      )}>
+                        K:{kelly.toFixed(1)}%
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-muted-foreground font-mono">
-                    <span>Entry: {formatCurrency(pos.avg_entry)}</span>
+                    <span className="hidden sm:inline">Entry: {formatCurrency(pos.avg_entry)}</span>
                     {pos.stop_loss && <span className="hidden sm:inline text-destructive/70">SL: {formatCurrency(pos.stop_loss)}</span>}
                     <span className={cn("font-medium", pnl >= 0 ? "text-green-400" : "text-red-400")}>
                       {pnl >= 0 ? "+" : ""}{formatCurrency(pnl)}
