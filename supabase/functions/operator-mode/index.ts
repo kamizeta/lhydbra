@@ -588,6 +588,7 @@ Deno.serve(async (req) => {
       const riskDollars = liveCapital * (finalRisk / 100);
 
       const isFractional = ['crypto'].includes(String(sig.asset_class || 'stock'));
+      const existingExposure = exposureBySymbol[String(sig.asset)] || 0;
       const quantity = calcPositionSize({
         capital: liveCapital,
         riskPct: finalRisk,
@@ -596,6 +597,7 @@ Deno.serve(async (req) => {
         maxSingleAssetPct: Number(settings.max_single_asset || 25),
         maxLeverage: Number(settings.max_leverage || 2.0),
         isFractional,
+        existingExposure,
       });
 
       if (quantity <= 0) {
