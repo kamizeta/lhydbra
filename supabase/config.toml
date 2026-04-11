@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.market-data-hybrid]
 verify_jwt = false
+
+[functions.ai-universe-screener]
+verify_jwt = false
