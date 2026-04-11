@@ -9,8 +9,12 @@ const corsHeaders = {
 const PROTECTED_SYMBOLS = new Set(["BTC/USD", "ETH/USD"]);
 const MAX_WATCHLIST = 50;
 
-async function discoverHighMomentumTickers(apiKey: string): Promise<string[]> {
+async function discoverHighMomentumTickers(apiKey: string, alphaContext?: string): Promise<string[]> {
   const today = new Date().toISOString().slice(0, 10);
+
+  const macroBlock = alphaContext
+    ? `\n\nCONTEXTO MACROECONÓMICO DE LA DIRECCIÓN DEL FONDO (Aplica fuertemente este contexto para sesgar, aprobar o descartar oportunidades en tus operaciones matemáticas):\n${alphaContext}\n`
+    : "";
 
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -24,7 +28,7 @@ async function discoverHighMomentumTickers(apiKey: string): Promise<string[]> {
       max_tokens: 300,
       messages: [{
         role: "user",
-        content: `Today is ${today}. You are a Wall Street asset screener. Identify 5 to 10 US stock tickers (NASDAQ/NYSE only) that are exhibiting the highest real-world momentum narratives RIGHT NOW — earnings beats, sector rotation catalysts, institutional accumulation, breakout setups, or macro tailwinds.
+        content: `Today is ${today}. You are a Wall Street asset screener. Identify 5 to 10 US stock tickers (NASDAQ/NYSE only) that are exhibiting the highest real-world momentum narratives RIGHT NOW — earnings beats, sector rotation catalysts, institutional accumulation, breakout setups, or macro tailwinds.${macroBlock}
 
 Return ONLY a valid JSON array of ticker strings. No markdown, no explanation, no code blocks. Example: ["NVDA","PLTR","SOFI"]`,
       }],
