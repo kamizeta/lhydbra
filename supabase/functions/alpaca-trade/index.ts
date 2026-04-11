@@ -467,7 +467,10 @@ serve(async (req) => {
               }),
             });
             protectionResult = { success: tpRes.ok, error: tpRes.ok ? undefined : await tpRes.text() };
-          } catch {}
+          } catch (tpErr) {
+            console.error(`[alpaca-trade] TP-only fallback exception:`, tpErr);
+            protectionResult = { success: false, error: "TP submission failed" };
+          }
         } else {
           console.warn(`[alpaca-trade] ⚠ No SL/TP provided for ${symbol}. Position UNPROTECTED.`);
           protectionResult = { success: false, error: "No SL/TP values provided" };
