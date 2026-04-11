@@ -27,6 +27,7 @@ import PerformancePage from "@/pages/PerformancePage";
 import ResearchPage from "@/pages/ResearchPage";
 import ReportsPage from "@/pages/ReportsPage";
 import DiagnosticPage from "@/pages/DiagnosticPage";
+import KellyDashboard from "@/pages/KellyDashboard";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +67,7 @@ function ProtectedRoutes() {
         <Route path="/advanced/radar" element={<OpportunityRadar />} />
         <Route path="/advanced/reports" element={<ReportsPage />} />
         <Route path="/advanced/diagnostic" element={<DiagnosticPage />} />
+        <Route path="/kelly" element={<KellyDashboard />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
