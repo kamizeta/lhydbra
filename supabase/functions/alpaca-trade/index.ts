@@ -525,11 +525,11 @@ serve(async (req) => {
           const cleanSym = String(symbol).replace("/", "").toUpperCase();
           for (const ord of openOrders) {
             if (ord.symbol === cleanSym && (ord.type === "stop" || ord.type === "limit" || ord.type === "trailing_stop" || ord.order_class === "oco")) {
-              try { await fetch(`${baseUrl}/v2/orders/${ord.id}`, { method: "DELETE", headers }); } catch {}
+              try { await fetch(`${baseUrl}/v2/orders/${ord.id}`, { method: "DELETE", headers }); } catch (cancelErr) { console.error(`[alpaca-trade] Failed to cancel order ${ord.id}:`, cancelErr); }
             }
           }
         }
-      } catch {}
+      } catch (cancelBlockErr) { console.error(`[alpaca-trade] Error cancelling protective orders:`, cancelBlockErr); }
 
       const absQty = qty ? Math.abs(Number(qty)) : null;
       const url = absQty
