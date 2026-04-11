@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, BarChart3, Bot, Briefcase,
-  ChevronLeft, ChevronRight, Activity, Settings, LogOut, Menu, X,
-  Zap, Brain, PieChart, Shield, FileSpreadsheet,
+  ChevronLeft, ChevronRight, ChevronDown, Activity, Settings, LogOut, Menu, X,
+  Zap, Brain, PieChart, Shield, FileSpreadsheet, Target, Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
@@ -18,6 +18,7 @@ import { usePositionAlerts } from "@/hooks/usePositionAlerts";
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const { t } = useI18n();
   const { user, signOut } = useAuth();
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -40,11 +41,12 @@ export default function AppLayout() {
   ];
 
   const advancedNavItems = [
+    { to: "/signals", icon: Target, label: "Signals" },
+    { to: "/trade-ideas", icon: Lightbulb, label: "Trade Ideas" },
     { to: "/advanced/agents", icon: Bot, label: t.nav.agents },
     { to: "/advanced/performance", icon: BarChart3, label: "Performance" },
     { to: "/advanced/research", icon: Brain, label: "Research" },
     { to: "/advanced/market", icon: BarChart3, label: t.nav.market },
-    
     { to: "/advanced/risk", icon: Shield, label: "Risk" },
     { to: "/advanced/reports", icon: FileSpreadsheet, label: "Reports" },
     { to: "/advanced/diagnostic", icon: Activity, label: "Diag" },
@@ -101,15 +103,28 @@ export default function AppLayout() {
         <nav className="flex-1 space-y-0.5 p-2 overflow-y-auto">
           {coreNavItems.map((item) => renderNavItem(item))}
 
-          {/* Divider */}
+          {/* Advanced section with collapsible toggle */}
           <div className={cn("my-2", collapsed && !mobileOpen ? "mx-2" : "mx-3")}>
             <div className="h-px bg-border" />
-            {(!collapsed || mobileOpen) && (
-              <span className="block text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider mt-2 mb-1 px-1">Advanced</span>
+            {(!collapsed || mobileOpen) ? (
+              <button
+                onClick={() => setAdvancedOpen(!advancedOpen)}
+                className="flex items-center justify-between w-full text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider mt-2 mb-1 px-1 hover:text-muted-foreground transition-colors"
+              >
+                <span>Advanced</span>
+                <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", advancedOpen && "rotate-180")} />
+              </button>
+            ) : (
+              <button
+                onClick={() => setAdvancedOpen(!advancedOpen)}
+                className="flex w-full justify-center mt-2 mb-1 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              >
+                <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", advancedOpen && "rotate-180")} />
+              </button>
             )}
           </div>
 
-          {advancedNavItems.map((item) => renderNavItem(item, true))}
+          {advancedOpen && advancedNavItems.map((item) => renderNavItem(item, true))}
         </nav>
 
         <div className="hidden md:block border-t border-border p-2">
