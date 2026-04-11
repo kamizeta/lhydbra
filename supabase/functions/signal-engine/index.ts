@@ -396,7 +396,7 @@ async function gradeSignalWithAI(
 
 Grades: A = High conviction setup, B = Acceptable but watch closely, C = Risky / likely false breakout — reject.
 
-Signal data:
+${alphaContext ? `CONTEXTO MACROECONÓMICO DE LA DIRECCIÓN DEL FONDO (Aplica fuertemente este contexto para sesgar, aprobar o descartar oportunidades en tus operaciones matemáticas):\n${alphaContext}\n\n` : ""}Signal data:
 ${JSON.stringify(context, null, 2)}
 
 Respond with JSON only.`,
