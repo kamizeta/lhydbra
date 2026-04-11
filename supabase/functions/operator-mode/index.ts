@@ -391,37 +391,39 @@ Deno.serve(async (req) => {
 
     // ─── ACTION: run ───
 
-    // ─── Fire-and-forget: sync and data refresh run in background ───
-    // Don't await — let signals run immediately with existing data
-    // The cron handles sync automatically every 15 min
+    // ─── Sync data BEFORE signal generation to avoid stale data ───
     const watchlistSymbols = Array.isArray((settings as any).watchlist) && (settings as any).watchlist.length > 0
       ? (settings as any).watchlist
       : ["AAPL", "MSFT", "NVDA", "TSLA", "SPY", "QQQ", "BTC/USD", "ETH/USD"];
 
+    // ─── Await data refresh before signal generation ───
     try {
-      // Non-blocking sync — just trigger, don't wait
-      fetch(`${supabaseUrl}/functions/v1/alpaca-sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
-        body: JSON.stringify({ paper, user_id_override: user.id }),
-      }).catch(e => console.warn("Background sync failed:", e));
+      const [syncResult, marketResult, indicatorsResult] = await Promise.allSettled([
+        fetch(`${supabaseUrl}/functions/v1/alpaca-sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+          body: JSON.stringify({ paper, user_id_override: user.id }),
+        }),
+        fetch(`${supabaseUrl}/functions/v1/market-data-normalized`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+          body: JSON.stringify({ symbols: watchlistSymbols, timeframe: "1d" }),
+        }),
+        fetch(`${supabaseUrl}/functions/v1/compute-indicators`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+          body: JSON.stringify({ symbols: watchlistSymbols, timeframe: "1d" }),
+        }),
+      ]);
 
-      // Non-blocking data refresh
-      fetch(`${supabaseUrl}/functions/v1/market-data-normalized`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
-        body: JSON.stringify({ symbols: watchlistSymbols, timeframe: "1d" }),
-      }).catch(e => console.warn("Background market-data failed:", e));
+      // Log failures but continue
+      for (const r of [syncResult, marketResult, indicatorsResult]) {
+        if (r.status === 'rejected') console.warn('[operator] Background task failed:', r.reason);
+      }
 
-      fetch(`${supabaseUrl}/functions/v1/compute-indicators`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
-        body: JSON.stringify({ symbols: watchlistSymbols, timeframe: "1d" }),
-      }).catch(e => console.warn("Background compute failed:", e));
-
-      console.log("[operator-mode] Background refresh triggered (non-blocking)");
+      console.log("[operator-mode] Data refresh completed before signal generation");
     } catch (e) {
-      console.warn("[operator-mode] Background trigger error:", e);
+      console.warn("[operator-mode] Data refresh error:", e);
     }
 
     // Calculate remaining capacity before signal generation
