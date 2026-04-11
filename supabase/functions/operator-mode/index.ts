@@ -658,7 +658,7 @@ Deno.serve(async (req) => {
               // Update existing position instead of creating duplicate
               await supabase.from("positions").update({
                 quantity: actualQty,
-                avg_entry: actualEntry,
+                avg_entry: filledPrice,
                 stop_loss: adjustedStop,
                 take_profit: Number(trade.take_profit),
                 updated_at: new Date().toISOString(),
@@ -672,7 +672,7 @@ Deno.serve(async (req) => {
                 asset_type: String(trade.asset_class || "stock"),
                 direction: String(trade.direction),
                 quantity: actualQty,
-                avg_entry: actualEntry,
+                avg_entry: filledPrice,
                 stop_loss: adjustedStop,
                 take_profit: Number(trade.take_profit),
                 strategy: String(trade.strategy_family || "operator"),
