@@ -137,8 +137,35 @@ Deno.serve(async (req) => {
 
     let updatedCount = 0;
     for (const setting of allSettings) {
+      // Compute Kelly-protected symbols for this user
+      const kellyProtected = new Set<string>();
+      const { data: trades } = await admin
+        .from("trade_journal")
+        .select("symbol, pnl")
+        .eq("user_id", setting.user_id)
+        .limit(500);
+      if (trades && trades.length > 0) {
+        const grouped: Record<string, { wins: number; losses: number; avgWin: number; avgLoss: number }> = {};
+        for (const t of trades) {
+          const pnl = t.pnl ?? 0;
+          if (pnl === 0) continue;
+          if (!grouped[t.symbol]) grouped[t.symbol] = { wins: 0, losses: 0, avgWin: 0, avgLoss: 0 };
+          const g = grouped[t.symbol];
+          if (pnl > 0) { g.wins++; g.avgWin += pnl; }
+          else { g.losses++; g.avgLoss += Math.abs(pnl); }
+        }
+        for (const [sym, g] of Object.entries(grouped)) {
+          const total = g.wins + g.losses;
+          if (total < 3) continue;
+          const W = g.wins / total;
+          const R = g.losses > 0 ? (g.avgWin / g.wins) / (g.avgLoss / g.losses) : 0;
+          const kelly = R > 0 ? (W - (1 - W) / R) * 0.5 * 100 : 0;
+          if (kelly > 0) kellyProtected.add(sym);
+        }
+      }
+
       const oldWatchlist: string[] = Array.isArray(setting.watchlist) ? setting.watchlist : [];
-      const merged = mergeWatchlists(oldWatchlist, newTickers);
+      const merged = mergeWatchlists(oldWatchlist, newTickers, kellyProtected);
 
       if (JSON.stringify(merged) === JSON.stringify(oldWatchlist)) continue;
 
