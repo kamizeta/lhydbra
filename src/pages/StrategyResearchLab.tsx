@@ -207,13 +207,13 @@ export default function StrategyResearchLab() {
                 <div className="space-y-2 pt-2 border-t border-border">
                   <h3 className="text-xs font-bold text-muted-foreground uppercase">Entry Logic</h3>
                   <div className="text-[10px] font-mono text-foreground/80 space-y-0.5">
-                    {(selectedTemplate.entry_logic as any)?.conditions?.map((c: string, i: number) => (
+                    {selectedTemplate.entry_logic.conditions?.map((c, i) => (
                       <div key={i}>• {c}</div>
                     )) || <div>—</div>}
                   </div>
                   <h3 className="text-xs font-bold text-muted-foreground uppercase">Exit Logic</h3>
                   <div className="text-[10px] font-mono text-foreground/80 space-y-0.5">
-                    {(selectedTemplate.exit_logic as any)?.conditions?.map((c: string, i: number) => (
+                    {selectedTemplate.exit_logic.conditions?.map((c, i) => (
                       <div key={i}>• {c}</div>
                     )) || <div>—</div>}
                   </div>
