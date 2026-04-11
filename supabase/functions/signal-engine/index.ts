@@ -129,7 +129,7 @@ function computeStrategyConfluence(features: Record<string, unknown>, strategyFa
   };
   if ((affinities[strategyFamily] || []).includes(regime)) score += 25;
   else score -= 10;
-  if (strategyFamily === "momentum" && trendDir === "up") score += 10;
+  if (strategyFamily === "momentum" && trendDir === "uptrend") score += 10;
   if (strategyFamily === "mean_reversion" && trendDir === "sideways") score += 10;
   return clamp(score, 0, 100);
 }
@@ -280,7 +280,7 @@ function determineDirection(features: Record<string, unknown>): string | null {
   const trendStrength = Number(features.trend_strength || 0);
   if (trendStrength < 0.2) return null;
   let longScore = 0, shortScore = 0;
-  if (trend === "up") longScore += 2; else if (trend === "down") shortScore += 2;
+  if (trend === "uptrend") longScore += 2; else if (trend === "downtrend") shortScore += 2;
   if (rsi > 55) longScore += 1; else if (rsi < 45) shortScore += 1;
   if (macdHist > 0) longScore += 1; else if (macdHist < 0) shortScore += 1;
   if (Math.abs(longScore - shortScore) < 2) return null;
