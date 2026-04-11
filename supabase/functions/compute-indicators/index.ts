@@ -226,6 +226,30 @@ serve(async (req) => {
         .limit(250);
       const bars = barsDesc ? [...barsDesc].reverse() : [];
 
+      // Remove incomplete current candle for daily timeframe
+      if (timeframe === '1d' && bars.length > 0) {
+        const lastBar = bars[bars.length - 1];
+        const barDate = new Date(String(lastBar.timestamp));
+        const now = new Date();
+
+        if (barDate.toISOString().slice(0, 10) === now.toISOString().slice(0, 10)) {
+          const nyParts = new Intl.DateTimeFormat("en-US", {
+            timeZone: "America/New_York",
+            hour12: false,
+            hour: "2-digit",
+            minute: "2-digit",
+          }).formatToParts(now);
+          const hour = Number(nyParts.find(p => p.type === "hour")?.value ?? "0");
+          const minute = Number(nyParts.find(p => p.type === "minute")?.value ?? "0");
+          const mins = hour * 60 + minute;
+
+          if (mins < 960) { // Before 4:00 PM ET = market still open
+            bars.pop();
+            console.log(`[compute-indicators] Removed incomplete bar for ${symbol} (market still open)`);
+          }
+        }
+      }
+
       if (!bars || bars.length < 20) {
         results[symbol] = { error: 'insufficient_data', bars_found: bars?.length || 0 };
         continue;
