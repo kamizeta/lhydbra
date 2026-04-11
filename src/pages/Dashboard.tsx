@@ -231,6 +231,7 @@ export default function Dashboard() {
                 ? (pos.direction === "long" ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice) * qty
                 : 0;
               const pnl = pos.pnl ?? fallbackPnl;
+              const kelly = kellyMap.get(pos.symbol) ?? kellyMap.get(pos.symbol.replace("/", ""));
               return (
                 <div key={pos.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
                   <div className="flex items-center gap-2">
@@ -238,9 +239,19 @@ export default function Dashboard() {
                     <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-mono uppercase",
                       pos.direction === "long" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
                     )}>{pos.direction}</span>
+                    {kelly !== undefined && (
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded text-[9px] font-mono",
+                        kelly >= 8 ? "bg-primary/10 text-primary" :
+                        kelly >= 4 ? "bg-yellow-500/10 text-yellow-400" :
+                        "bg-muted text-muted-foreground"
+                      )}>
+                        K:{kelly.toFixed(1)}%
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-muted-foreground font-mono">
-                    <span>Entry: {formatCurrency(pos.avg_entry)}</span>
+                    <span className="hidden sm:inline">Entry: {formatCurrency(pos.avg_entry)}</span>
                     {pos.stop_loss && <span className="hidden sm:inline text-destructive/70">SL: {formatCurrency(pos.stop_loss)}</span>}
                     <span className={cn("font-medium", pnl >= 0 ? "text-green-400" : "text-red-400")}>
                       {pnl >= 0 ? "+" : ""}{formatCurrency(pnl)}
