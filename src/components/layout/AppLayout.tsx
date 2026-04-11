@@ -37,12 +37,12 @@ export default function AppLayout() {
     { to: "/", icon: LayoutDashboard, label: t.nav.operator },
     { to: "/portfolio", icon: Briefcase, label: t.nav.portfolio },
     { to: "/allocation", icon: PieChart, label: t.nav.allocation },
-    { to: "/kelly", icon: Calculator, label: "Kelly" },
     
     { to: "/settings", icon: Settings, label: t.nav.settings },
   ];
 
   const advancedNavItems = [
+    { to: "/kelly", icon: Calculator, label: "Kelly" },
     { to: "/signals", icon: Target, label: "Signals" },
     { to: "/trade-ideas", icon: Lightbulb, label: "Trade Ideas" },
     { to: "/advanced/agents", icon: Bot, label: t.nav.agents },
