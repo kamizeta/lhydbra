@@ -109,11 +109,18 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const isServiceRole = authHeader === `Bearer ${serviceKey}`;
+
     const body = await req.json().catch(() => ({}));
     const { scheduled = false } = body;
 
     // ─── Scheduled run: iterate all full_operator users ───
     if (scheduled) {
+      if (!isServiceRole) {
+        return jsonRes({ error: "Forbidden: scheduled requires service role" }, 403);
+      }
       const adminSupabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -146,11 +153,9 @@ Deno.serve(async (req) => {
     }
 
     // ─── Standard auth flow ───
-    const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return jsonRes({ error: "Unauthorized" }, 401);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     // Support user_id_override for scheduled per-user calls
@@ -158,7 +163,6 @@ Deno.serve(async (req) => {
 
     let user: { id: string } | null = null;
     if (user_id_override) {
-      const isServiceRole = authHeader === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
       if (!isServiceRole) {
         return jsonRes({ error: "Forbidden: user_id_override requires service role" }, 403);
       }
