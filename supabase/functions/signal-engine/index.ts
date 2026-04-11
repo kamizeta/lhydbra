@@ -927,7 +927,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // ─── AI Grading Filter (Anthropic Claude 3.5 Haiku) ───
       const aiResult = await gradeSignalWithAI(
         symbol, direction, strategyFamily, regime,
-        subscores, finalScore, expectedR, enriched,
+        subscores, finalScore, expectedR, enriched, alphaContext,
       );
 
       let aiGrade: string | null = null;
