@@ -47,26 +47,42 @@ function rsi(closes: number[], period = 14): number | null {
 
 function macd(closes: number[]): { macd: number; signal: number; histogram: number } | null {
   if (closes.length < 35) return null;
-  const macdValues: number[] = [];
-  for (let i = 0; i <= closes.length - 26; i++) {
-    const slice = closes.slice(i, closes.length);
-    const e12 = ema(slice, 12);
-    const e26 = ema(slice, 26);
-    if (e12 !== null && e26 !== null) {
-      macdValues.push(e12 - e26);
-    }
+
+  const k12 = 2 / (12 + 1);
+  const k26 = 2 / (26 + 1);
+  const kSignal = 2 / (9 + 1);
+
+  // Seed EMA12 with SMA of first 12 values
+  let ema12 = closes.slice(0, 12).reduce((a, b) => a + b, 0) / 12;
+  // Seed EMA26 with SMA of first 26 values
+  let ema26 = closes.slice(0, 26).reduce((a, b) => a + b, 0) / 26;
+
+  // Advance EMA12 from bar 12 to bar 25 (EMA26 hasn't started yet)
+  for (let i = 12; i < 26; i++) {
+    ema12 = closes[i] * k12 + ema12 * (1 - k12);
   }
+
+  // From bar 26 onward, compute both EMAs and the MACD line
+  const macdValues: number[] = [];
+  for (let i = 26; i < closes.length; i++) {
+    ema12 = closes[i] * k12 + ema12 * (1 - k12);
+    ema26 = closes[i] * k26 + ema26 * (1 - k26);
+    macdValues.push(ema12 - ema26);
+  }
+
   if (macdValues.length < 9) return null;
-  const k = 2 / (9 + 1);
+
+  // Signal line = EMA(9) of the MACD series
   let signalLine = macdValues.slice(0, 9).reduce((a, b) => a + b, 0) / 9;
   for (let i = 9; i < macdValues.length; i++) {
-    signalLine = macdValues[i] * k + signalLine * (1 - k);
+    signalLine = macdValues[i] * kSignal + signalLine * (1 - kSignal);
   }
-  const currentMacd = macdValues[macdValues.length - 1];
+
+  const lastMacd = macdValues[macdValues.length - 1];
   return {
-    macd: currentMacd,
+    macd: lastMacd,
     signal: signalLine,
-    histogram: currentMacd - signalLine,
+    histogram: lastMacd - signalLine,
   };
 }
 
