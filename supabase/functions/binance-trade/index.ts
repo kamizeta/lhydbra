@@ -10,15 +10,26 @@ async function hmacSha256(secret: string, message: string): Promise<string> {
   return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://lhydbra.lovable.app",
+  "https://id-preview--cfc6c4be-124b-47d1-b6e8-26dbf563d3b8.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : "",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 const BINANCE_API_URL = "https://api.binance.com";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -43,7 +54,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         error: 'Short selling not supported on Binance spot. Use Alpaca for short positions.',
         supported_sides: ['buy']
-      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }), { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
     }
 
     // Retrieve keys from vault using service role
@@ -63,7 +74,7 @@ serve(async (req) => {
     if (!apiKey || !apiSecret) {
       return new Response(JSON.stringify({ error: "Binance API keys not configured. Go to Settings → Binance API." }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -81,7 +92,7 @@ serve(async (req) => {
       if (!response.ok) {
         return new Response(JSON.stringify({ error: `Binance error: ${data.msg || JSON.stringify(data)}` }), {
           status: response.status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         });
       }
 
@@ -89,7 +100,7 @@ serve(async (req) => {
         success: true,
         balances: data.balances?.filter((b: any) => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0),
       }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -97,7 +108,7 @@ serve(async (req) => {
       if (!symbol || !side || !quantity) {
         return new Response(JSON.stringify({ error: "Missing required fields: symbol, side, quantity" }), {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         });
       }
 
@@ -120,7 +131,7 @@ serve(async (req) => {
       if (!response.ok) {
         return new Response(JSON.stringify({ error: `Binance order error: ${data.msg || JSON.stringify(data)}` }), {
           status: response.status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         });
       }
 
@@ -136,19 +147,19 @@ serve(async (req) => {
       });
 
       return new Response(JSON.stringify({ success: true, order: data }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
     return new Response(JSON.stringify({ error: "Invalid action. Use: test_connection, place_order" }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("Binance function error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

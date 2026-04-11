@@ -1,17 +1,27 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://lhydbra.lovable.app",
+  "https://id-preview--cfc6c4be-124b-47d1-b6e8-26dbf563d3b8.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : "",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return jsonRes({ error: "Unauthorized" }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return jsonRes(req, { error: "Unauthorized" }, 401);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -21,7 +31,7 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: uErr } = await userSb.auth.getUser();
-    if (uErr || !user) return jsonRes({ error: "Unauthorized" }, 401);
+    if (uErr || !user) return jsonRes(req, { error: "Unauthorized" }, 401);
 
     const sb = createClient(supabaseUrl, serviceKey);
     const body = await req.json();
@@ -121,7 +131,7 @@ Deno.serve(async (req) => {
       const consecutiveLosses = settings?.consecutive_losses || 0;
       const cooldownActive = consecutiveLosses >= (settings?.loss_cooldown_count || 2);
 
-      return jsonRes({
+      return jsonRes(req, {
         phase: "pre_market",
         date: today,
         briefing: {
@@ -194,10 +204,10 @@ Deno.serve(async (req) => {
       },
     });
 
-    return jsonRes(coaching);
+    return jsonRes(req, coaching);
   } catch (e) {
     console.error("Performance coach error:", e);
-    return jsonRes({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return jsonRes(req, { error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });
 
@@ -211,9 +221,9 @@ function generateCoachMessage(grade: string, pnl: number, target: number, pace: 
   return `Tough day. ${mistakeCount} issue(s) detected. Review your trades and adjust. The goal is consistency, not perfection.`;
 }
 
-function jsonRes(data: unknown, status = 200) {
+function jsonRes(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
   });
 }

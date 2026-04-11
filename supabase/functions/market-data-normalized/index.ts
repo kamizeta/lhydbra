@@ -1,15 +1,25 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://lhydbra.lovable.app",
+  "https://id-preview--cfc6c4be-124b-47d1-b6e8-26dbf563d3b8.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
 
-function jsonRes(data: unknown, status = 200) {
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : "",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
+
+function jsonRes(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -19,14 +29,14 @@ function classifySymbol(sym: string): string {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
   try {
     const body = await req.json().catch(() => ({}));
     const { symbols = [], timeframe = "1d" } = body;
 
     if (!Array.isArray(symbols) || symbols.length === 0) {
-      return jsonRes({ error: "symbols array required" }, 400);
+      return jsonRes(req, { error: "symbols array required" }, 400);
     }
 
     const apiKeyId = Deno.env.get("ALPACA_API_KEY_ID") || "";
@@ -166,9 +176,9 @@ Deno.serve(async (req) => {
 
     console.log(`[market-data-normalized] Fetched ${Object.keys(quotes).length}/${symbols.length} quotes`);
 
-    return jsonRes({ quotes, fetched: Object.keys(quotes).length, requested: symbols.length });
+    return jsonRes(req, { quotes, fetched: Object.keys(quotes).length, requested: symbols.length });
   } catch (e) {
     console.error("market-data-normalized error:", e);
-    return jsonRes({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
+    return jsonRes(req, { error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });

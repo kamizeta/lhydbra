@@ -1,15 +1,25 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://lhydbra.lovable.app",
+  "https://id-preview--cfc6c4be-124b-47d1-b6e8-26dbf563d3b8.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
+];
 
-function jsonRes(data: unknown, status = 200): Response {
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "Access-Control-Allow-Origin": ALLOWED_ORIGINS.includes(origin) ? origin : "",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
+
+function jsonRes(req: Request, data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -428,7 +438,7 @@ Respond with JSON only.`,
 // ─── Main Handler ───
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
 
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -470,7 +480,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (authError || !authUser) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
         });
       }
       user_id = authUser.id;
@@ -479,7 +489,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (!user_id) {
       return new Response(JSON.stringify({ error: "user_id required" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -508,7 +518,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.warn('[signal-engine][rate-limit] RPC error:', rlError.message);
     }
     if (currentCount && currentCount > 10) {
-      return jsonRes({ error: "Rate limit exceeded. Try again in a minute." }, 429);
+      return jsonRes(req, { error: "Rate limit exceeded. Try again in a minute." }, 429);
     }
 
     // ─── Load symbol sectors from DB ───
@@ -578,13 +588,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const trades = userSettings.last_trade_date === today ? Number(userSettings.trades_today || 0) : 0;
 
         if (consLosses >= cooldownLimit) {
-          return jsonRes({
+          return jsonRes(req, {
             signals: [], count: 0, rejected: 0, blocked: true,
             reason: `Loss cooldown active: ${consLosses} consecutive losses (limit: ${cooldownLimit}).`,
           });
         }
         if (trades >= maxTrades) {
-          return jsonRes({
+          return jsonRes(req, {
             signals: [], count: 0, rejected: 0, blocked: true,
             reason: `Daily trade cap reached: ${trades}/${maxTrades}`,
           });
@@ -612,10 +622,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     if (featErr) {
       console.error("[signal-engine] Features query error:", featErr.message);
-      return jsonRes({ signals: [], count: 0, rejected: 0, error: featErr.message });
+      return jsonRes(req, { signals: [], count: 0, rejected: 0, error: featErr.message });
     }
     if (!allFeaturesData || allFeaturesData.length === 0) {
-      return jsonRes({ signals: [], count: 0, rejected: 0, message: "No market features available. Run compute-indicators first." });
+      return jsonRes(req, { signals: [], count: 0, rejected: 0, message: "No market features available. Run compute-indicators first." });
     }
 
     // Filter stale features (> 4h old)
@@ -628,7 +638,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.warn(`[signal-engine] Filtered ${staleCount} stale features. ${featuresData.length} fresh remaining.`);
     }
     if (featuresData.length === 0) {
-      return jsonRes({
+      return jsonRes(req, {
         signals: [], count: 0, rejected: 0,
         message: `All ${staleCount} features are stale (>4h). Run compute-indicators first.`,
       });
@@ -1014,7 +1024,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (insertError) {
         console.error("[signal-engine] Insert error:", insertError.message);
         // Return signals anyway even if insert fails
-        return jsonRes({
+        return jsonRes(req, {
           signals: generatedSignals,
           count: generatedSignals.length,
           rejected: rejections.length,
@@ -1031,7 +1041,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     console.log(`[signal-engine] Generated ${generatedSignals.length} signals, rejected ${rejections.length}`);
 
-    return jsonRes({
+    return jsonRes(req, {
       signals: generatedSignals,
       count: generatedSignals.length,
       rejected: rejections.length,
@@ -1047,6 +1057,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[signal-engine] Fatal error:", message);
-    return jsonRes({ error: message, signals: [], count: 0, rejected: 0 }, 500);
+    return jsonRes(req, { error: message, signals: [], count: 0, rejected: 0 }, 500);
   }
 });
