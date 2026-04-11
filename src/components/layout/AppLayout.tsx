@@ -89,7 +89,7 @@ export default function AppLayout() {
           <img src={lhydbraLogo} alt="LHYDBRA" className="h-16 w-16 md:h-20 md:w-20 shrink-0" />
           {(!collapsed || mobileOpen) && (
             <div className="flex flex-col flex-1">
-              <span className="text-sm font-bold text-foreground tracking-[0.15em]">LHYDBRA</span>
+              <span className="text-sm font-bold text-foreground tracking-[0.15em]">LHYDBRA<span className="text-primary">7</span></span>
               <span className="text-[8px] font-mono text-primary tracking-wider">OPERATOR MODE</span>
             </div>
           )}
