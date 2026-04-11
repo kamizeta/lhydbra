@@ -393,7 +393,7 @@ export default function SettingsPage() {
               </button>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {localWatchlist.map(sym => (
+              {[...localWatchlist].sort((a, b) => a.localeCompare(b)).map(sym => (
                 <span
                   key={sym}
                   className="inline-flex items-center gap-1 px-2 py-1 bg-accent/50 border border-border rounded text-[11px] font-mono text-foreground"
