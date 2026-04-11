@@ -131,7 +131,25 @@ export default function PositionsPage() {
       toast.error('Error loading positions');
       setPositions([]);
     } else {
-      setPositions((data as Position[]) || []);
+      const positions = (data as Position[]) || [];
+      // Enrich names from symbol_mapping where name equals symbol
+      const needsName = positions.filter(p => !p.name || p.name === p.symbol);
+      if (needsName.length > 0) {
+        const symbols = [...new Set(needsName.map(p => p.symbol))];
+        const { data: mappings } = await supabase
+          .from('symbol_mapping')
+          .select('internal_symbol, display_name')
+          .in('internal_symbol', symbols);
+        if (mappings) {
+          const nameMap = new Map(mappings.map(m => [m.internal_symbol, m.display_name]));
+          for (const p of positions) {
+            if ((!p.name || p.name === p.symbol) && nameMap.has(p.symbol)) {
+              p.name = nameMap.get(p.symbol)!;
+            }
+          }
+        }
+      }
+      setPositions(positions);
     }
 
     setLoading(false);
