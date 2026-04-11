@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   LayoutDashboard, BarChart3, Bot, Briefcase,
   ChevronLeft, ChevronRight, ChevronDown, Activity, Settings, LogOut, Menu, X,
-  Zap, Brain, PieChart, Shield, FileSpreadsheet, Target, Lightbulb, Calculator, BrainCircuit,
+  Zap, Brain, PieChart, Shield, FileSpreadsheet, Target, Lightbulb, Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/i18n";
