@@ -306,7 +306,7 @@ serve(async (req) => {
 
     // Store results
     const result = {
-      user_id,
+      user_id: userId,
       strategy_id: strategy_id || null,
       variant_id: variant_id || null,
       symbol,
