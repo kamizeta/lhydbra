@@ -184,13 +184,19 @@ export default function Dashboard() {
       )}
 
       {/* ── 3 KPI Cards ── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricCard label="Portfolio" value={formatCurrency(metrics.portfolioValue)} icon={Briefcase} />
         <MetricCard
           label="Today P&L"
           value={`${(operatorStatus?.today_pnl ?? 0) >= 0 ? "+" : ""}${formatCurrency(operatorStatus?.today_pnl ?? 0)}`}
           changeType={(operatorStatus?.today_pnl ?? 0) >= 0 ? "positive" : "negative"}
           icon={Activity}
+        />
+        <MetricCard
+          label="Open PnL"
+          value={`${metrics.unrealizedPnl >= 0 ? "+" : ""}${formatCurrency(metrics.unrealizedPnl)}`}
+          changeType={metrics.unrealizedPnl >= 0 ? "positive" : "negative"}
+          icon={TrendingUp}
         />
         <MetricCard
           label="Drawdown"
