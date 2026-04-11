@@ -391,9 +391,7 @@ Deno.serve(async (req) => {
 
     // ─── ACTION: run ───
 
-    // ─── Fire-and-forget: sync and data refresh run in background ───
-    // Don't await — let signals run immediately with existing data
-    // The cron handles sync automatically every 15 min
+    // ─── Sync data BEFORE signal generation to avoid stale data ───
     const watchlistSymbols = Array.isArray((settings as any).watchlist) && (settings as any).watchlist.length > 0
       ? (settings as any).watchlist
       : ["AAPL", "MSFT", "NVDA", "TSLA", "SPY", "QQQ", "BTC/USD", "ETH/USD"];
