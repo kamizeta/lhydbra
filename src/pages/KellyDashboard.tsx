@@ -22,6 +22,7 @@ function getRiskBadge(kellyPct: number) {
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
+  const { t } = useI18n();
   if (!active || !payload?.length) return null;
   const data = payload[0].payload as KellySymbolStats;
   return (
