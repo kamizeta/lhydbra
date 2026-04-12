@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import MetricCard from "@/components/shared/MetricCard";
 import GoalSetup from "@/components/operator/GoalSetup";
+import CapitalLedger from "@/components/dashboard/CapitalLedger";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAuth } from "@/hooks/useAuth";
 import { useI18n } from "@/i18n";
@@ -303,6 +304,9 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* ── Capital Ledger ── */}
+      <CapitalLedger />
 
       {/* ── Journal error banner (non-blocking) ── */}
       {journalError && <SectionError label="trade journal" />}
