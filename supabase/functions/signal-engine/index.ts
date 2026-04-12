@@ -508,6 +508,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // ─── Feature flag check ───
+    const { data: flagRows } = await supabase.from("feature_flags").select("id, enabled");
+    const flagMap: Record<string, boolean> = {};
+    for (const f of (flagRows || [])) { flagMap[f.id] = f.enabled; }
+    if (flagMap.signal_generation === false) {
+      return jsonRes(req, { status: "disabled", reason: "Signal generation feature flag is off" });
+    }
+
     // ─── Atomic rate limit: max 10 calls per minute per user ───
     const rateLimitKey = `signal-engine:${user_id}:${Math.floor(Date.now() / 60000)}`;
     const { data: currentCount, error: rlError } = await supabase.rpc('check_and_increment_rate_limit', {
