@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
 
       // Daily risk status
       lines.push("", "⚙️ *ESTADO DEL SISTEMA*");
-      lines.push(`• Riesgo diario usado: ${Number(settings.daily_risk_used || 0).toFixed(1)}% / ${settings.max_daily_risk}%`);
+      lines.push(`• Riesgo diario usado: ${riskPct.toFixed(1)}% / ${settings.max_daily_risk}%`);
       lines.push(`• Trades hoy: ${settings.trades_today || 0}`);
       lines.push(`• Posiciones: ${openPositions.length} / ${settings.max_positions}`);
 
