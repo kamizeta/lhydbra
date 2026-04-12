@@ -54,6 +54,7 @@ type Tab = "strategy" | "score" | "log";
 
 export default function PerformancePage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [perf, setPerf] = useState<StratPerf[]>([]);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);

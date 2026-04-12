@@ -18,6 +18,7 @@ const categories = [
 ];
 
 export default function NotificationsPage() {
+  const { t } = useI18n();
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, clearAll } = useNotifications();
   const [filter, setFilter] = useState('all');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
