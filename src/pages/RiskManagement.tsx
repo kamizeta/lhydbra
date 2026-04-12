@@ -100,18 +100,22 @@ export default function RiskManagement() {
     ? Math.max(0, ...Object.values(exposureByType).map(v => (v / totalCapital) * 100))
     : 0;
 
+  const initialCapital = settings.initial_capital;
+  const currentDrawdown = initialCapital > 0 ? Math.max(0, ((initialCapital - totalCapital) / initialCapital) * 100) : 0;
+  const weeklyRiskUsedPct = totalCapital > 0 ? (weeklyLossPnl / totalCapital) * 100 : 0;
+
   const rm = {
     totalExposure: Math.min(totalExposurePct, 100),
     maxExposureLimit: 100,
     dailyRiskUsed: parseFloat(dailyRiskUsed.toFixed(1)),
     dailyRiskLimit: settings.max_daily_risk,
-    weeklyRiskUsed: parseFloat(dailyRiskUsed.toFixed(1)),
+    weeklyRiskUsed: parseFloat(weeklyRiskUsedPct.toFixed(1)),
     weeklyRiskLimit: settings.max_weekly_risk,
-    currentDrawdown: 0,
+    currentDrawdown: parseFloat(currentDrawdown.toFixed(1)),
     maxDrawdownLimit: settings.max_drawdown,
     openPositions: openCount,
     maxPositions: settings.max_positions,
-    correlationRisk: 0,
+    correlationRisk: parseFloat(correlationMax.toFixed(1)),
     leverageUsed: totalCapital > 0 ? parseFloat((totalExposureValue / totalCapital).toFixed(2)) : 0,
     maxLeverage: settings.max_leverage,
   };
