@@ -230,7 +230,7 @@ export type Database = {
             foreignKeyName: "allocation_items_signal_id_fkey"
             columns: ["signal_id"]
             isOneToOne: false
-            referencedRelation: "trade_signals"
+            referencedRelation: "signals"
             referencedColumns: ["id"]
           },
         ]
@@ -1881,7 +1881,7 @@ export type Database = {
           },
         ]
       }
-      trade_signals: {
+      trade_signals_deprecated: {
         Row: {
           agent_analysis: string | null
           asset_type: string
