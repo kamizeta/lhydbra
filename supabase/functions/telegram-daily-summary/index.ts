@@ -101,6 +101,19 @@ Deno.serve(async (req) => {
         return s + Math.abs(Number(p.avg_entry) - Number(p.stop_loss)) * Math.abs(Number(p.quantity));
       }, 0);
 
+      // Calculate unrealized PnL per position
+      const positionPnls = openPositions.map(p => {
+        const qty = Number(p.quantity);
+        const entry = Number(p.avg_entry);
+        const currentPrice = priceMap[p.symbol] || 0;
+        const isLong = p.direction === "long";
+        const unrealizedPnl = currentPrice > 0
+          ? (isLong ? (currentPrice - entry) : (entry - currentPrice)) * Math.abs(qty)
+          : 0;
+        return { ...p, currentPrice, unrealizedPnl };
+      });
+      const totalUnrealizedPnl = positionPnls.reduce((s, p) => s + p.unrealizedPnl, 0);
+
       const closedPnl = closedTrades.reduce((s, t) => s + (Number(t.pnl) || 0), 0);
       const winCount = closedTrades.filter(t => (Number(t.pnl) || 0) > 0).length;
       const lossCount = closedTrades.filter(t => (Number(t.pnl) || 0) < 0).length;
@@ -109,39 +122,48 @@ Deno.serve(async (req) => {
       const initialCapital = Number(settings.initial_capital) || 0;
       const drawdown = initialCapital > 0 ? ((initialCapital - capital) / initialCapital * 100) : 0;
       const exposurePct = capital > 0 ? (totalExposure / capital * 100) : 0;
+      const dailyRiskUsed = Number(settings.daily_risk_used) || 0;
       const riskPct = capital > 0 ? (totalOpenRisk / capital * 100) : 0;
 
       // Build message
       const isMorning = summaryType === "morning";
       const emoji = isMorning ? "☀️" : "📊";
       const title = isMorning ? "BRIEFING PRE-MARKET" : "RESUMEN DE CIERRE";
-      const time = isMorning ? "5:30 AM COT" : "2:00 PM COT";
+
+      const openPnlEmoji = totalUnrealizedPnl >= 0 ? "🟢" : "🔴";
 
       const lines: string[] = [
         `${emoji} *${title}*`,
         `📅 ${new Date().toLocaleDateString("es-CO", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Bogota" })}`,
         "",
         "💰 *CAPITAL*",
-        `• Capital actual: $${capital.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `• Capital: $${capital.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `• ${openPnlEmoji} Open PnL: $${totalUnrealizedPnl.toFixed(2)}`,
         `• Drawdown: ${drawdown.toFixed(1)}%`,
-        `• Exposición: $${totalExposure.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} (${exposurePct.toFixed(1)}%)`,
-        `• Riesgo abierto: $${totalOpenRisk.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} (${riskPct.toFixed(1)}%)`,
+        `• Exposición: ${exposurePct.toFixed(1)}% ($${totalExposure.toFixed(0)})`,
+        `• Riesgo diario: ${dailyRiskUsed.toFixed(1)}% / ${settings.max_daily_risk}%`,
+        `• Riesgo abierto: ${riskPct.toFixed(1)}% ($${totalOpenRisk.toFixed(0)})`,
       ];
 
-      // Open positions section
+      // Open positions section with PnL
       lines.push("", `📈 *POSICIONES ABIERTAS (${openPositions.length})*`);
-      if (openPositions.length === 0) {
+      if (positionPnls.length === 0) {
         lines.push("• Sin posiciones abiertas");
       } else {
-        for (const p of openPositions) {
-          const dir = p.direction === "long" ? "🟢 LONG" : "🔴 SHORT";
+        for (const p of positionPnls) {
+          const dir = p.direction === "long" ? "🟢" : "🔴";
           const qty = Math.abs(Number(p.quantity));
           const entry = Number(p.avg_entry).toFixed(2);
-          const sl = p.stop_loss ? `SL: $${Number(p.stop_loss).toFixed(2)}` : "⚠️ Sin SL";
-          const riskPerUnit = p.stop_loss ? Math.abs(Number(p.avg_entry) - Number(p.stop_loss)) : 0;
-          const posRisk = riskPerUnit * qty;
-          lines.push(`• \`${p.symbol}\` ${dir} × ${qty} @ $${entry} | ${sl} | Riesgo: $${posRisk.toFixed(0)}`);
+          const pnlStr = p.currentPrice > 0
+            ? `${p.unrealizedPnl >= 0 ? "+" : ""}$${p.unrealizedPnl.toFixed(2)}`
+            : "N/A";
+          const pnlPct = p.currentPrice > 0 && Number(p.avg_entry) > 0
+            ? ((p.unrealizedPnl / (Math.abs(Number(p.quantity)) * Number(p.avg_entry))) * 100).toFixed(1)
+            : "0";
+          const priceStr = p.currentPrice > 0 ? `→ $${p.currentPrice.toFixed(2)}` : "";
+          lines.push(`• ${dir} \`${p.symbol}\` ×${qty} @ $${entry} ${priceStr} | PnL: ${pnlStr} (${pnlPct}%)`);
         }
+        lines.push(`• *Open PnL Total: ${openPnlEmoji} $${totalUnrealizedPnl.toFixed(2)}*`);
       }
 
       // Today's closed trades
