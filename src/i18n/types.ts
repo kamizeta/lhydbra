@@ -48,6 +48,31 @@ export interface Translations {
     score: string;
     direction: string;
     logout: string;
+    apply: string;
+    cancel: string;
+    confirm: string;
+    delete: string;
+    deleteAll: string;
+    yes: string;
+    no: string;
+    unknown: string;
+    win: string;
+    loss: string;
+    symbol: string;
+    exit: string;
+    advanced: string;
+    urgent: string;
+    ok: string;
+    excess: string;
+    noSL: string;
+    high: string;
+    rejected: string;
+    optimizing: string;
+    adapting: string;
+    runSimulation: string;
+    runningSimulation: string;
+    allStatus: string;
+    allDir: string;
   };
   // Nav
   nav: {
@@ -90,6 +115,9 @@ export interface Translations {
     recentOutputs: string;
     alloc: string;
     pnl: string;
+    runOperator: string;
+    todayPnl: string;
+    openPnl: string;
   };
   // Operator Mode
   operator: {
@@ -252,6 +280,7 @@ export interface Translations {
     required: string;
     positions: string;
     lossStreak: string;
+    idealSizeNote: string;
   };
   // Agents
   agents: {
@@ -275,6 +304,7 @@ export interface Translations {
     portfolioManagerDesc: string;
     learningAgent: string;
     learningAgentDesc: string;
+    pipelineNote: string;
   };
   // Trade Ideas
   tradeIdeas: {
@@ -290,6 +320,7 @@ export interface Translations {
     rrRatio: string;
     units: string;
     steps: string[];
+    approveAndOpen: string;
   };
   // Journal
   journal: {
@@ -319,5 +350,87 @@ export interface Translations {
     reasoning: string;
     agentAnalysis: string;
     created: string;
+  };
+  // Notifications
+  notifications: {
+    deleteAllTitle: string;
+    deleteAllDesc: string;
+    noTrades: string;
+    loadingTrades: string;
+  };
+  // Portfolio / Allocation
+  portfolio: {
+    riskUsed: string;
+    portfolioScore: string;
+    opportunityScore: string;
+    allocationPriority: string;
+    adjustedPriority: string;
+    portfolioWeight: string;
+    runOptimizer: string;
+  };
+  // Reports
+  reports: {
+    totalTrades: string;
+    allStrategies: string;
+    allOutcomes: string;
+  };
+  // Performance
+  performance: {
+    calibration: string;
+    byStrategy: string;
+    scoreAnalysis: string;
+    tradeLog: string;
+  };
+  // Capital Ledger
+  ledger: {
+    tradeOpen: string;
+    tradeClose: string;
+    fee: string;
+    adjustment: string;
+    deposit: string;
+    withdrawal: string;
+    reconciliation: string;
+  };
+  // Settings
+  settings: {
+    tradingActive: string;
+    tradingStopped: string;
+    manualStop: string;
+    addSymbolPlaceholder: string;
+    apiKeyWarning: string;
+    killSwitch: string;
+  };
+  // Research / Backtest
+  research: {
+    finalCapital: string;
+    totalReturn: string;
+    months: string;
+    exitReason: string;
+    minScore: string;
+  };
+  // Opportunity Radar
+  radar: {
+    structure: string;
+    macro: string;
+    sentiment: string;
+    historical: string;
+  };
+  // Kelly Dashboard
+  kelly: {
+    symbol: string;
+    trades: string;
+    wins: string;
+    losses: string;
+    winPct: string;
+    avgWin: string;
+    avgLoss: string;
+    rRatio: string;
+    kellyRaw: string;
+    halfKelly: string;
+    edge: string;
+  };
+  // Learning
+  learning: {
+    runAdaptation: string;
   };
 }
