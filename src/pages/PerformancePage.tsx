@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
+import { useI18n } from "@/i18n";
 
 interface StratPerf {
   strategy_family: string;

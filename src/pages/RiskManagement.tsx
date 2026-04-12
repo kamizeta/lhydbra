@@ -21,7 +21,7 @@ interface Position {
 }
 
 export default function RiskManagement() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { user } = useAuth();
   const { settings } = useUserSettings();
   const [positions, setPositions] = useState<Position[]>([]);
