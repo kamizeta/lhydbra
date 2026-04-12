@@ -128,7 +128,7 @@ serve(async (req) => {
     const [{ data: features }, { data: scores }, { data: existingSignals }] = await Promise.all([
       db.from('market_features').select('*').eq('timeframe', '1d'),
       db.from('opportunity_scores').select('*').eq('timeframe', '1d').gte('total_score', min_score).order('total_score', { ascending: false }),
-      db.from('trade_signals').select('symbol, status').eq('user_id', user.id).in('status', ['pending', 'approved']),
+      db.from('signals').select('asset, status').eq('user_id', user.id).in('status', ['active', 'approved']),
     ]);
 
     if (!features || !scores) {
