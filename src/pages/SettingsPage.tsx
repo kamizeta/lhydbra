@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2, User, Key, Target, RotateCcw, Bell, Volume2, VolumeX, Activity, Upload, Loader2, Send } from 'lucide-react';
+import { Settings, Save, DollarSign, Shield, AlertTriangle, Trash2, User, Key, Target, RotateCcw, Bell, Volume2, VolumeX, Activity, Upload, Loader2, Send, Power } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSettings, type UserSettings } from '@/hooks/useUserSettings';
@@ -66,6 +66,11 @@ export default function SettingsPage() {
   const [maskedSecret, setMaskedSecret] = useState('');
   const [binanceConfigured, setBinanceConfigured] = useState(false);
 
+  // Kill switch state
+  const [tradingEnabled, setTradingEnabled] = useState(true);
+  const [killSwitchReason, setKillSwitchReason] = useState<string | null>(null);
+  const [killSwitchLoading, setKillSwitchLoading] = useState(false);
+
   // Scoring weights state
   const [weights, setWeights] = useState<ScoringWeights>(defaultWeights);
   const [weightsLoading, setWeightsLoading] = useState(true);
@@ -101,6 +106,17 @@ export default function SettingsPage() {
     setSettings(savedSettings);
   }, [savedSettings]);
   useEffect(() => { setLocalNotifPrefs(notifPrefs); }, [notifPrefs]);
+
+  // Load system config (kill switch)
+  useEffect(() => {
+    supabase.from('system_config').select('trading_enabled, kill_switch_reason').eq('id', 'global').maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setTradingEnabled(data.trading_enabled);
+          setKillSwitchReason(data.kill_switch_reason);
+        }
+      });
+  }, []);
 
   // Load profile
   useEffect(() => {
@@ -327,6 +343,61 @@ export default function SettingsPage() {
       {/* Risk Tab */}
       {activeTab === 'risk' && (
         <div className="space-y-6">
+          {/* Emergency Kill Switch */}
+          <div className={cn(
+            "rounded-lg border p-4 space-y-3",
+            tradingEnabled ? "border-border bg-card" : "border-destructive/50 bg-destructive/5"
+          )}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Power className={cn("h-4 w-4", tradingEnabled ? "text-green-400" : "text-destructive")} />
+                <div>
+                  <h3 className="text-sm font-mono font-medium text-foreground">Emergency Kill Switch</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {tradingEnabled ? "Trading is active" : `Trading STOPPED${killSwitchReason ? `: ${killSwitchReason}` : ""}`}
+                  </p>
+                </div>
+              </div>
+              <span className={cn(
+                "px-2 py-1 rounded text-[10px] font-mono font-bold uppercase",
+                tradingEnabled
+                  ? "bg-green-500/10 text-green-400 border border-green-500/30"
+                  : "bg-destructive/10 text-destructive border border-destructive/30"
+              )}>
+                {tradingEnabled ? "ACTIVE" : "KILLED"}
+              </span>
+            </div>
+            <button
+              disabled={killSwitchLoading}
+              onClick={async () => {
+                setKillSwitchLoading(true);
+                const newState = !tradingEnabled;
+                const { error } = await supabase.from('system_config').update({
+                  trading_enabled: newState,
+                  kill_switch_reason: newState ? null : "Manual emergency stop",
+                  updated_at: new Date().toISOString(),
+                  updated_by: user?.id,
+                }).eq('id', 'global');
+                if (error) {
+                  toast.error('Failed to toggle kill switch: ' + error.message);
+                } else {
+                  setTradingEnabled(newState);
+                  setKillSwitchReason(newState ? null : "Manual emergency stop");
+                  toast[newState ? 'success' : 'warning'](newState ? 'Trading reactivated' : 'Trading STOPPED — all execution halted');
+                }
+                setKillSwitchLoading(false);
+              }}
+              className={cn(
+                "w-full py-2.5 rounded text-xs font-mono font-bold uppercase tracking-wider transition-colors",
+                tradingEnabled
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : "bg-green-600 text-white hover:bg-green-700"
+              )}
+            >
+              {killSwitchLoading ? "..." : tradingEnabled ? "⚠ STOP ALL TRADING" : "✓ REACTIVATE TRADING"}
+            </button>
+          </div>
+
           {/* Operator Mode Card */}
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">

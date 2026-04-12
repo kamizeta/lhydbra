@@ -1764,6 +1764,33 @@ export type Database = {
         }
         Relationships: []
       }
+      system_config: {
+        Row: {
+          id: string
+          kill_switch_reason: string | null
+          max_daily_loss_pct: number
+          trading_enabled: boolean
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          kill_switch_reason?: string | null
+          max_daily_loss_pct?: number
+          trading_enabled?: boolean
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          kill_switch_reason?: string | null
+          max_daily_loss_pct?: number
+          trading_enabled?: boolean
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       trade_journal: {
         Row: {
           asset_type: string

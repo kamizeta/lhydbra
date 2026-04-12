@@ -203,6 +203,15 @@ Deno.serve(async (req) => {
       return jsonRes(req, { error: "Rate limit exceeded. Try again in a minute." }, 429);
     }
 
+    // ─── KILL SWITCH CHECK ───
+    const { data: sysConfig } = await supabase.from("system_config").select("*").eq("id", "global").maybeSingle();
+    if (sysConfig && !sysConfig.trading_enabled) {
+      return jsonRes({
+        status: "killed",
+        reason: sysConfig.kill_switch_reason || "System kill switch active",
+      });
+    }
+
     // ─── Load user settings & goal ───
     const [settingsRes, goalRes] = await Promise.all([
       supabase.from("user_settings").select("*").eq("user_id", user.id).maybeSingle(),
@@ -226,6 +235,22 @@ Deno.serve(async (req) => {
     let tradesToday = settings.last_trade_date === today ? Number(settings.trades_today || 0) : 0;
     const autoExecute = Boolean(settings.auto_execute);
     let currentCapital = Number(settings.current_capital || 10000);
+
+    // ─── DAILY LOSS GUARD ───
+    const { data: todayJournal } = await supabase
+      .from("trade_journal")
+      .select("pnl")
+      .eq("user_id", user.id)
+      .gte("exited_at", today);
+    const dailyPnl = (todayJournal || []).reduce((sum: number, t: any) => sum + (Number(t.pnl) || 0), 0);
+    const maxDailyLossPct = sysConfig?.max_daily_loss_pct || 3;
+    const maxDailyLoss = (maxDailyLossPct / 100) * currentCapital;
+    if (dailyPnl < -maxDailyLoss) {
+      return jsonRes({
+        status: "blocked",
+        reason: `Daily loss limit reached: $${dailyPnl.toFixed(2)} exceeds max -$${maxDailyLoss.toFixed(2)}`,
+      });
+    }
     const baseRiskPerTrade = Number(settings.risk_per_trade || 1);
     const maxDailyRisk = Number(settings.max_daily_risk || 2);
     const maxDrawdown = Number(settings.max_drawdown || 15);
