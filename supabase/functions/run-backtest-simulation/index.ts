@@ -349,23 +349,30 @@ Deno.serve(async (req) => {
         let exitPrice = 0;
         let outcome = "";
 
+        // Stop loss with gap-through modeling
         if (pos.direction === "long") {
-          if (bar.low <= pos.sl) { exitPrice = pos.sl; outcome = "stop_loss"; }
+          if (bar.low <= pos.sl) { exitPrice = Math.min(pos.sl, bar.open); outcome = "stop_loss"; }
           else if (bar.high >= pos.tp) { exitPrice = pos.tp; outcome = "take_profit"; }
         } else {
-          if (bar.high >= pos.sl) { exitPrice = pos.sl; outcome = "stop_loss"; }
+          if (bar.high >= pos.sl) { exitPrice = Math.max(pos.sl, bar.open); outcome = "stop_loss"; }
           else if (bar.low <= pos.tp) { exitPrice = pos.tp; outcome = "take_profit"; }
         }
 
         if (outcome) {
+          const slippagePct = 0.001;
+          const feeRate = 0.0002;
           const stopDist = Math.abs(pos.entry - pos.sl);
-          const rawPnl = pos.direction === "long"
+          const grossPnl = pos.direction === "long"
             ? exitPrice - pos.entry
             : pos.entry - exitPrice;
-          const rActual = outcome === "take_profit" ? 2.0 : -1.0;
+          const entryFee = pos.entry * pos.qty * feeRate;
+          const exitFee = exitPrice * pos.qty * feeRate;
+          const netPnl = grossPnl * pos.qty - entryFee - exitFee;
+          const rActual = stopDist > 0
+            ? (exitPrice - pos.entry) * (pos.direction === "long" ? 1 : -1) / stopDist
+            : 0;
 
-          const pnlDollars = rawPnl * pos.qty;
-          totalCapital += pnlDollars;
+          totalCapital += netPnl;
 
           allTrades.push({
             date_entry: pos.entryDate,
@@ -378,8 +385,8 @@ Deno.serve(async (req) => {
             exit_price: +exitPrice.toFixed(4),
             stop_loss: +pos.sl.toFixed(4),
             take_profit: +pos.tp.toFixed(4),
-            r_actual: rActual,
-            pnl_dollars: +pnlDollars.toFixed(2),
+            r_actual: +rActual.toFixed(2),
+            pnl_dollars: +netPnl.toFixed(2),
             outcome,
             capital_after: +totalCapital.toFixed(2),
             macro_regime: pos.regime,
@@ -434,12 +441,15 @@ Deno.serve(async (req) => {
 
       candidates.sort((a, b) => b.score - a.score);
       for (const c of candidates.slice(0, availableSlots)) {
-        const entryStopDist = Math.abs(c.entry - c.sl);
+        // Apply slippage to entry
+        const slippagePct = 0.001;
+        const slippedEntry = c.entry * (1 + slippagePct * (c.direction === "long" ? 1 : -1));
+        const entryStopDist = Math.abs(slippedEntry - c.sl);
         const entrySlotCapital = Math.min(capitalPerSlot, totalCapital / max_concurrent_trades);
         const entryRiskDollars = entrySlotCapital * (risk_pct / 100);
         const entryQty = entryStopDist > 0 ? entryRiskDollars / entryStopDist : 0;
         openPositions[c.sym] = {
-          entry: c.entry, sl: c.sl, tp: c.tp, direction: c.direction,
+          entry: slippedEntry, sl: c.sl, tp: c.tp, direction: c.direction,
           entryDate: date, score: c.score, regime: c.regime,
           macd_momentum: c.macd_momentum, volume_ratio: c.volume_ratio,
           sr_score: c.sr_score,
@@ -453,12 +463,18 @@ Deno.serve(async (req) => {
       const symBars = allBars[sym];
       if (!symBars || symBars.length === 0) continue;
       const lastBar = symBars[symBars.length - 1];
-      const rawPnl = pos.direction === "long"
+      const feeRate = 0.0002;
+      const grossPnl = pos.direction === "long"
         ? lastBar.close - pos.entry
         : pos.entry - lastBar.close;
       const stopDist = Math.abs(pos.entry - pos.sl);
-      const pnlDollars = rawPnl * pos.qty;
-      totalCapital += pnlDollars;
+      const entryFee = pos.entry * pos.qty * feeRate;
+      const exitFee = lastBar.close * pos.qty * feeRate;
+      const netPnl = grossPnl * pos.qty - entryFee - exitFee;
+      const rActual = stopDist > 0
+        ? (lastBar.close - pos.entry) * (pos.direction === "long" ? 1 : -1) / stopDist
+        : 0;
+      totalCapital += netPnl;
 
       allTrades.push({
         date_entry: pos.entryDate,
@@ -471,8 +487,8 @@ Deno.serve(async (req) => {
         exit_price: +lastBar.close.toFixed(4),
         stop_loss: +pos.sl.toFixed(4),
         take_profit: +pos.tp.toFixed(4),
-        r_actual: rawPnl > 0 ? 1 : -1,
-        pnl_dollars: +pnlDollars.toFixed(2),
+        r_actual: +rActual.toFixed(2),
+        pnl_dollars: +netPnl.toFixed(2),
         outcome: "timeout",
         capital_after: +totalCapital.toFixed(2),
         macro_regime: pos.regime,
@@ -495,7 +511,7 @@ Deno.serve(async (req) => {
         symbol: sym, trades: symTrades.length,
         wins: wins.length, losses: losses.length,
         win_rate: symTrades.length > 0 ? +((wins.length / symTrades.length) * 100).toFixed(1) : 0,
-        profit_factor: gl > 0 ? +(gp / gl).toFixed(2) : gp > 0 ? 999 : 0,
+        profit_factor: gl > 0 ? +(gp / gl).toFixed(2) : gp > 0 ? 99.0 : 0,
         total_pnl: +totalPnl.toFixed(2),
         avg_r: symTrades.length > 0
           ? +(symTrades.reduce((s, t) => s + Number(t.r_actual), 0) / symTrades.length).toFixed(2)
@@ -559,7 +575,7 @@ Deno.serve(async (req) => {
         wins: allWins.length,
         losses: allLosses.length,
         win_rate: allTrades.length > 0 ? +((allWins.length / allTrades.length) * 100).toFixed(1) : 0,
-        profit_factor: gl2 > 0 ? +(gp2 / gl2).toFixed(2) : gp2 > 0 ? 999 : 0,
+        profit_factor: gl2 > 0 ? +(gp2 / gl2).toFixed(2) : gp2 > 0 ? 99.0 : 0,
         max_drawdown_pct: +maxDD.toFixed(2),
         avg_r: allTrades.length > 0
           ? +(allTrades.reduce((s, t) => s + Number(t.r_actual), 0) / allTrades.length).toFixed(2)
