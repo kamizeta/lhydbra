@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
       const initialCapital = Number(settings.initial_capital) || 0;
       const drawdown = initialCapital > 0 ? ((initialCapital - capital) / initialCapital * 100) : 0;
       const exposurePct = capital > 0 ? (totalExposure / capital * 100) : 0;
-      const dailyRiskUsed = Number(settings.daily_risk_used) || 0;
+      // Use real open risk % (same as dashboard) instead of stale DB field
       const riskPct = capital > 0 ? (totalOpenRisk / capital * 100) : 0;
 
       // Build message
