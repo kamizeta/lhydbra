@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
         `• ${openPnlEmoji} Open PnL: $${totalUnrealizedPnl.toFixed(2)}`,
         `• Drawdown: ${drawdown.toFixed(1)}%`,
         `• Exposición: ${exposurePct.toFixed(1)}% ($${totalExposure.toFixed(0)})`,
-        `• Riesgo diario: ${dailyRiskUsed.toFixed(1)}% / ${settings.max_daily_risk}%`,
+        `• Riesgo diario: ${riskPct.toFixed(1)}% / ${settings.max_daily_risk}%`,
         `• Riesgo abierto: ${riskPct.toFixed(1)}% ($${totalOpenRisk.toFixed(0)})`,
       ];
 
