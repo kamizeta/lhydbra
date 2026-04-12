@@ -96,7 +96,7 @@ export default function CapitalLedger() {
                     })}
                   </td>
                   <td className={cn("px-4 py-2 whitespace-nowrap", EVENT_COLORS[e.event_type] || "text-foreground")}>
-                    {EVENT_LABELS[e.event_type] || e.event_type}
+                    {eventLabels[e.event_type] || e.event_type}
                   </td>
                   <td className="px-4 py-2 text-foreground font-bold">
                     {e.symbol || "—"}
