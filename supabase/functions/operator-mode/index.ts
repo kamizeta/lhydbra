@@ -697,6 +697,8 @@ Deno.serve(async (req) => {
 
           if (orderInsertErr) {
             log("error", "order_insert_failed", { user_id: user.id, symbol: String(trade.asset), error: orderInsertErr.message });
+            execResults.push({ symbol: String(trade.asset), success: false, error: `Order record failed: ${orderInsertErr.message}` });
+            continue; // SKIP this trade - do NOT call Alpaca without DB record
           }
 
           // ─── Submit to Alpaca ───
