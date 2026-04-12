@@ -41,18 +41,19 @@ function getTier(score: number) {
 }
 
 const SUB_SCORE_LABELS: { key: string; label: string }[] = [
-  { key: "structure_score", label: "Structure" },
-  { key: "momentum_score", label: "Momentum" },
-  { key: "volatility_score", label: "Volatility" },
-  { key: "strategy_score", label: "Strategy" },
-  { key: "rr_score", label: "R:R" },
-  { key: "macro_score", label: "Macro" },
-  { key: "sentiment_score", label: "Sentiment" },
-  { key: "historical_score", label: "Historical" },
+  { key: "structure_score", labelKey: "structure" as const },
+  { key: "momentum_score", labelKey: "momentum" as const },
+  { key: "volatility_score", labelKey: "volatility" as const },
+  { key: "strategy_score", labelKey: "strategy" as const },
+  { key: "rr_score", labelKey: "riskReward" as const },
+  { key: "macro_score", labelKey: "macro" as const },
+  { key: "sentiment_score", labelKey: "sentiment" as const },
+  { key: "historical_score", labelKey: "historical" as const },
 ];
 
 export default function OpportunityRadar() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [scores, setScores] = useState<OpScore[]>([]);
   const [features, setFeatures] = useState<MarketFeature[]>([]);
   const [loading, setLoading] = useState(true);

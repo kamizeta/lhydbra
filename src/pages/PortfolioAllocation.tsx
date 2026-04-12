@@ -80,6 +80,7 @@ interface PlanData {
 
 export default function PortfolioAllocation() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const { settings } = useUserSettings();
   const [positions, setPositions] = useState<Position[]>([]);
   const [plan, setPlan] = useState<PlanData | null>(null);
@@ -223,7 +224,7 @@ export default function PortfolioAllocation() {
             <PieChart className="h-5 w-5 md:h-6 md:w-6 text-primary" /> Portfolio Optimizer
           </h1>
           <p className="text-xs md:text-sm text-muted-foreground font-mono">
-            Risk-aware • Correlation-adjusted • Score-driven allocation
+            {t.allocationPage.subtitle}
           </p>
         </div>
         <button
@@ -232,24 +233,24 @@ export default function PortfolioAllocation() {
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 self-start sm:self-auto"
         >
           {running ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-          {running ? "Optimizing..." : "Run Optimizer"}
+          {running ? t.common.optimizing : t.portfolio.runOptimizer}
         </button>
       </div>
 
       {/* Top Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
-        <MetricCard label="Total Capital" value={formatCurrency(totalCapital)} icon={DollarSign} />
-        <MetricCard label="Invested" value={formatCurrency(investedCapital)} icon={Briefcase} />
-        <MetricCard label="Free Capital" value={formatCurrency(freeCapital)} changeType={freeCapital > 0 ? "positive" : "negative"} icon={TrendingUp} />
+        <MetricCard label={t.allocationPage.totalCapital} value={formatCurrency(totalCapital)} icon={DollarSign} />
+        <MetricCard label={t.allocationPage.invested} value={formatCurrency(investedCapital)} icon={Briefcase} />
+        <MetricCard label={t.allocationPage.freeCapital} value={formatCurrency(freeCapital)} changeType={freeCapital > 0 ? "positive" : "negative"} icon={TrendingUp} />
         <MetricCard
-          label="Risk Used"
+          label={t.portfolio.riskUsed}
           value={`${formatNumber(riskBudgetUsed)}%`}
           change={`of ${settings.max_daily_risk}%`}
           changeType={riskBudgetUsed < settings.max_daily_risk ? "positive" : "negative"}
           icon={Shield}
         />
         <MetricCard
-          label="Portfolio Score"
+          label={t.portfolio.portfolioScore}
           value={portfolioScore > 0 ? portfolioScore.toFixed(1) : "—"}
           changeType={portfolioScore >= 70 ? "positive" : portfolioScore >= 50 ? "neutral" : "negative"}
           icon={Target}
@@ -477,14 +478,14 @@ export default function PortfolioAllocation() {
                   {expandedItem === item.id && (
                     <div className="px-3 md:px-4 pb-3 border-t border-border/50 pt-3">
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                        <ExplainBox label="Opportunity Score" value={item.opportunity_score.toFixed(0)} color={item.opportunity_score >= 70 ? "text-profit" : "text-foreground"} />
-                        <ExplainBox label="Confidence" value={item.confidence_score.toFixed(0)} color={item.confidence_score >= 70 ? "text-profit" : "text-foreground"} />
-                        <ExplainBox label="R:R Expected" value={item.expected_r_multiple.toFixed(2)} color={item.expected_r_multiple >= 2 ? "text-profit" : "text-foreground"} />
-                        <ExplainBox label="Allocation Priority" value={item.allocation_priority.toFixed(2)} />
-                        <ExplainBox label="Correlation Penalty" value={`${(item.correlation_penalty * 100).toFixed(1)}%`} color={item.correlation_penalty > 0.3 ? "text-loss" : "text-muted-foreground"} />
-                        <ExplainBox label="Adjusted Priority" value={item.adjusted_priority.toFixed(2)} color={item.adjusted_priority >= 50 ? "text-profit" : "text-foreground"} />
-                        <ExplainBox label="Score Multiplier" value={`${item.score_multiplier}x`} color={item.score_multiplier >= 1.2 ? "text-profit" : "text-foreground"} />
-                        <ExplainBox label="Portfolio Weight" value={`${(item.final_weight * 100).toFixed(2)}%`} />
+                        <ExplainBox label={t.allocationPage.opportunityScore} value={item.opportunity_score.toFixed(0)} color={item.opportunity_score >= 70 ? "text-profit" : "text-foreground"} />
+                        <ExplainBox label={t.allocationPage.confidence} value={item.confidence_score.toFixed(0)} color={item.confidence_score >= 70 ? "text-profit" : "text-foreground"} />
+                        <ExplainBox label={t.allocationPage.rrExpected} value={item.expected_r_multiple.toFixed(2)} color={item.expected_r_multiple >= 2 ? "text-profit" : "text-foreground"} />
+                        <ExplainBox label={t.portfolio.allocationPriority} value={item.allocation_priority.toFixed(2)} />
+                        <ExplainBox label={t.allocationPage.correlationPenalty} value={`${(item.correlation_penalty * 100).toFixed(1)}%`} color={item.correlation_penalty > 0.3 ? "text-loss" : "text-muted-foreground"} />
+                        <ExplainBox label={t.portfolio.adjustedPriority} value={item.adjusted_priority.toFixed(2)} color={item.adjusted_priority >= 50 ? "text-profit" : "text-foreground"} />
+                        <ExplainBox label={t.allocationPage.scoreMultiplier} value={`${item.score_multiplier}x`} color={item.score_multiplier >= 1.2 ? "text-profit" : "text-foreground"} />
+                        <ExplainBox label={t.portfolio.portfolioWeight} value={`${(item.final_weight * 100).toFixed(2)}%`} />
                       </div>
 
                       {item.status === "allocated" && (
