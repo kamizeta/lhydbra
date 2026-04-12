@@ -118,14 +118,14 @@ export default function LearningDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Brain className="h-6 w-6 text-primary" /> Learning Dashboard
+            <Brain className="h-6 w-6 text-primary" /> {t.learning.title}
           </h1>
-          <p className="text-sm text-muted-foreground font-mono">Adaptive scoring • Performance feedback • Weight calibration</p>
+          <p className="text-sm text-muted-foreground font-mono">{t.learning.subtitle}</p>
         </div>
         <button onClick={runAdaptation} disabled={adapting}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
           {adapting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          {adapting ? "Adapting..." : "Run Adaptation"}
+          {adapting ? t.common.adapting : t.learning.runAdaptation}
         </button>
       </div>
 
