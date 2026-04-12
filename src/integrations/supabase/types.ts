@@ -1039,6 +1039,90 @@ export type Database = {
         }
         Relationships: []
       }
+      orders: {
+        Row: {
+          broker_order_id: string | null
+          created_at: string | null
+          direction: string
+          error_message: string | null
+          filled_price: number | null
+          id: string
+          idempotency_key: string | null
+          metadata: Json | null
+          position_id: string | null
+          protection_confirmed: boolean | null
+          quantity: number | null
+          signal_id: string | null
+          slippage_pct: number | null
+          status: string
+          stop_loss: number | null
+          submitted_price: number | null
+          symbol: string
+          take_profit: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          broker_order_id?: string | null
+          created_at?: string | null
+          direction: string
+          error_message?: string | null
+          filled_price?: number | null
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json | null
+          position_id?: string | null
+          protection_confirmed?: boolean | null
+          quantity?: number | null
+          signal_id?: string | null
+          slippage_pct?: number | null
+          status?: string
+          stop_loss?: number | null
+          submitted_price?: number | null
+          symbol: string
+          take_profit?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          broker_order_id?: string | null
+          created_at?: string | null
+          direction?: string
+          error_message?: string | null
+          filled_price?: number | null
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json | null
+          position_id?: string | null
+          protection_confirmed?: boolean | null
+          quantity?: number | null
+          signal_id?: string | null
+          slippage_pct?: number | null
+          status?: string
+          stop_loss?: number | null
+          submitted_price?: number | null
+          symbol?: string
+          take_profit?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       positions: {
         Row: {
           actual_r_multiple: number | null
