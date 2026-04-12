@@ -474,6 +474,11 @@ Deno.serve(async (req) => {
     const remainingSlots = Math.max(0, maxTradesPerDay - tradesToday);
     const remainingRisk = Math.max(0, maxDailyRisk - dailyRiskUsed);
 
+    // ─── Feature flag: signal_generation ───
+    if (flagMap.signal_generation === false) {
+      return jsonRes(req, { status: "disabled", reason: "Signal generation feature flag is off" });
+    }
+
     // Now run signal engine with VIX-adjusted thresholds
     const signalResponse = await fetch(`${supabaseUrl}/functions/v1/signal-engine`, {
       method: "POST",
@@ -797,19 +802,25 @@ Deno.serve(async (req) => {
             await supabase.from("orders").update({ status: "submitted", updated_at: new Date().toISOString() }).eq("id", newOrder.id);
           }
 
-          const orderRes = await fetch(`${supabaseUrl}/functions/v1/alpaca-trade`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
-            body: JSON.stringify({
+          const alpacaPayload: Record<string, unknown> = {
               action: "place_order", paper,
               signal_id: String(trade.id || ""),
               symbol: String(trade.asset).replace("/", ""),
               qty: trade.quantity,
               side: trade.direction === "long" ? "buy" : "sell",
               type: "market", time_in_force: "day",
-              take_profit: trade.take_profit, stop_loss: trade.stop_loss,
               authenticated_user_id: user.id,
-            }),
+          };
+          // Only attach bracket legs if feature flag allows
+          if (flagMap.bracket_orders !== false) {
+            alpacaPayload.take_profit = trade.take_profit;
+            alpacaPayload.stop_loss = trade.stop_loss;
+          }
+
+          const orderRes = await fetch(`${supabaseUrl}/functions/v1/alpaca-trade`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+            body: JSON.stringify(alpacaPayload),
           });
           const orderResult = await orderRes.json();
           execResults.push({ symbol: trade.asset, success: orderResult.success || false, order: orderResult.order || null, error: orderResult.error || null, fail_safe_triggered: orderResult.fail_safe_triggered || false, critical: orderResult.critical || false });
