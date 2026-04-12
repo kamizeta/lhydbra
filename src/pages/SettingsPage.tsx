@@ -66,6 +66,11 @@ export default function SettingsPage() {
   const [maskedSecret, setMaskedSecret] = useState('');
   const [binanceConfigured, setBinanceConfigured] = useState(false);
 
+  // Kill switch state
+  const [tradingEnabled, setTradingEnabled] = useState(true);
+  const [killSwitchReason, setKillSwitchReason] = useState<string | null>(null);
+  const [killSwitchLoading, setKillSwitchLoading] = useState(false);
+
   // Scoring weights state
   const [weights, setWeights] = useState<ScoringWeights>(defaultWeights);
   const [weightsLoading, setWeightsLoading] = useState(true);
