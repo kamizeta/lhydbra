@@ -160,7 +160,7 @@ export default function ReportsPage() {
         </div>
         <Button size="sm" onClick={loadTrades} disabled={loading} className="h-8 gap-1.5">
           <Search className="h-3.5 w-3.5" />
-          {loading ? "Loading..." : "Apply"}
+          {loading ? t.common.loading : t.common.apply}
         </Button>
       </div>
 
