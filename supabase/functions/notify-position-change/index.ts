@@ -135,6 +135,7 @@ Deno.serve(async (req) => {
     // Send Telegram message
     const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
     if (!token) {
+      console.error("TELEGRAM_BOT_TOKEN not found in env");
       return new Response(JSON.stringify({ ok: false, reason: "no bot token" }), {
         headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
