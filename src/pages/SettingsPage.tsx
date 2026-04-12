@@ -701,7 +701,6 @@ export default function SettingsPage() {
                 <button
                   onClick={async () => {
                     if (!user || !confirm('¿Eliminar todas las señales de trade?')) return;
-                    await supabase.from('trade_signals').delete().eq('user_id', user.id);
                     await supabase.from('signals').delete().eq('user_id', user.id);
                     toast.success('Señales eliminadas ✓');
                   }}
@@ -714,7 +713,6 @@ export default function SettingsPage() {
                     if (!user || !confirm('⚠️ ¿BORRAR TODO? Posiciones, señales y resetear capital. Esta acción no se puede deshacer.')) return;
                     await Promise.all([
                       supabase.from('positions').delete().eq('user_id', user.id),
-                      supabase.from('trade_signals').delete().eq('user_id', user.id),
                       supabase.from('signals').delete().eq('user_id', user.id),
                     ]);
                     toast.success('Todo reseteado ✓');

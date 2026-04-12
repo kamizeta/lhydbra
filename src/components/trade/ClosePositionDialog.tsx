@@ -149,11 +149,11 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
       let signalData: { opportunity_score?: number; score_breakdown?: Record<string, number>; confidence?: number; strategy_family?: string; market_regime?: string } | null = null;
       
       if (position.signal_id) {
-        const { data } = await supabase.from('trade_signals')
-          .select('opportunity_score, score_breakdown, confidence, strategy_family, market_regime')
+        const { data } = await supabase.from('signals')
+          .select('opportunity_score, score_breakdown, confidence_score, strategy_family, market_regime')
           .eq('id', position.signal_id)
           .maybeSingle();
-        signalData = data as typeof signalData;
+        signalData = data ? { ...data, confidence: data.confidence_score } as typeof signalData : null;
       }
 
       // Get current scoring weights for weight_profile_used

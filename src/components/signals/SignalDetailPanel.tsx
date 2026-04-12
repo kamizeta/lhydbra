@@ -172,32 +172,10 @@ export default function SignalDetailPanel({ signal, onSignalSent }: Props) {
               if (!user) return;
               setSending(true);
               try {
-                const primaryTarget = signal.targets?.[0] ?? signal.entry_price * (signal.direction === "long" ? 1.05 : 0.95);
-                const rr = Math.abs(signal.entry_price - signal.stop_loss) > 0
-                  ? Math.abs(primaryTarget - signal.entry_price) / Math.abs(signal.entry_price - signal.stop_loss)
-                  : signal.expected_r_multiple;
-
-                // Signal is already in the 'signals' table with status 'active',
-                // which is what Trade Ideas reads. Just sync a copy to trade_signals for legacy.
-                const { error } = await supabase.from("trade_signals").insert([{
-                  user_id: user.id,
-                  symbol: signal.asset,
-                  name: `${signal.strategy_family?.toUpperCase() || "SIGNAL"} — ${signal.asset}`,
-                  asset_type: signal.asset_class,
-                  direction: signal.direction,
-                  strategy: signal.strategy_family || "hybrid",
-                  strategy_family: signal.strategy_family,
-                  entry_price: signal.entry_price,
-                  stop_loss: signal.stop_loss,
-                  take_profit: primaryTarget,
-                  risk_reward: +rr.toFixed(2),
-                  confidence: Math.round(signal.confidence_score),
-                  opportunity_score: signal.opportunity_score,
-                  score_breakdown: signal.score_breakdown as unknown as Record<string, number>,
-                  market_regime: signal.market_regime,
-                  reasoning: signal.reasoning || signal.explanation?.summary || null,
-                  status: "pending",
-                }]);
+                // Update this signal's status to 'pending' so Trade Ideas picks it up
+                const { error } = await supabase.from("signals")
+                  .update({ status: "pending", updated_at: new Date().toISOString() } as Record<string, unknown>)
+                  .eq("id", signal.id);
                 if (error) throw error;
 
                 toast.success(`Señal enviada a Trade Ideas: ${signal.asset}`);
