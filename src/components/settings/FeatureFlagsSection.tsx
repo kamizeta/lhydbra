@@ -28,12 +28,13 @@ export default function FeatureFlagsSection() {
 
   const toggle = async (flagId: string, current: boolean) => {
     setToggling(flagId);
-    const { error } = await supabase
-      .from("feature_flags")
-      .update({ enabled: !current, updated_at: new Date().toISOString() })
-      .eq("id", flagId);
-    if (error) {
-      toast.error("Error: " + error.message);
+    const newValue = !current;
+    const { data: { session } } = await supabase.auth.getSession();
+    const resp = await supabase.functions.invoke("toggle-feature-flag", {
+      body: { flagId, enabled: newValue },
+    });
+    if (resp.error) {
+      toast.error("Error: " + (resp.error.message || "Unknown error"));
     } else {
       setFlags((prev) =>
         prev.map((f) => (f.id === flagId ? { ...f, enabled: !current } : f))
