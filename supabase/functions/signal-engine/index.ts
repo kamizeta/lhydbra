@@ -613,7 +613,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .eq("timeframe", "1d");
       const dbSymbols = (allFeatureSymbols || []).map((r: { symbol: string }) => r.symbol);
       querySymbols = [...new Set([...targetSymbols, ...dbSymbols])];
-      console.log(`[signal-engine] Expanded universe: ${targetSymbols.length} watchlist → ${querySymbols.length} total (all DB features)`);
+      log("info", "universe_expanded", { watchlist_size: targetSymbols.length, total_size: querySymbols.length });
     }
 
     // ─── Fetch market features ───
@@ -1040,7 +1040,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    console.log(`[signal-engine] Generated ${generatedSignals.length} signals, rejected ${rejections.length}`);
+    log("info", "signals_generated", { count: generatedSignals.length, rejected: rejections.length, operator_mode });
 
     return jsonRes(req, {
       signals: generatedSignals,
@@ -1057,7 +1057,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[signal-engine] Fatal error:", message);
+    log("error", "signal_engine_fatal", { error: message });
+    return jsonRes(req, { error: message, signals: [], count: 0, rejected: 0 }, 500);
     return jsonRes(req, { error: message, signals: [], count: 0, rejected: 0 }, 500);
   }
 });

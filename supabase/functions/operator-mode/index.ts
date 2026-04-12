@@ -701,6 +701,7 @@ Deno.serve(async (req) => {
 
           // ─── Submit to Alpaca ───
           if (newOrder) {
+            tradeLog("order_submitted", { user_id: user.id, symbol: String(trade.asset), qty: trade.quantity, entry: Number(trade.entry_price), direction: String(trade.direction), order_id: newOrder.id });
             await supabase.from("orders").update({ status: "submitted", updated_at: new Date().toISOString() }).eq("id", newOrder.id);
           }
 
@@ -759,6 +760,7 @@ Deno.serve(async (req) => {
             const expectedEntry = Number(trade.entry_price);
             const filledPrice = parseFloat(orderResult.order.filled_avg_price || "0") || expectedEntry;
             const slippage = Math.abs(filledPrice - expectedEntry) / expectedEntry;
+            tradeLog("order_filled", { user_id: user.id, symbol: String(trade.asset), filled_price: filledPrice, slippage_pct: +(slippage * 100).toFixed(4), direction: String(trade.direction) });
 
             const rawStop = Number(trade.stop_loss);
             let adjustedStop = rawStop;
