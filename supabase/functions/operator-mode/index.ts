@@ -528,9 +528,10 @@ Deno.serve(async (req) => {
         if (alpacaEquity > 0) {
           liveCapital = alpacaEquity; // use equity for operator risk calculations
           // Store cash (not equity) as current_capital to avoid double-counting unrealized PnL in dashboard
-          if (Math.abs(liveCapital - currentCapital) / currentCapital > 0.01) {
+          const capitalToStore = alpacaCash > 0 ? alpacaCash : alpacaEquity;
+          if (Math.abs(capitalToStore - currentCapital) / currentCapital > 0.01) {
             await supabase.from("user_settings")
-              .update({ current_capital: liveCapital, updated_at: new Date().toISOString() })
+              .update({ current_capital: capitalToStore, updated_at: new Date().toISOString() })
               .eq("user_id", user.id);
           }
         }
