@@ -35,7 +35,7 @@ export default function PositionSignalDetail({ signalId, onClose }: Props) {
 
   useEffect(() => {
     supabase
-      .from('trade_signals')
+      .from('signals')
       .select('*')
       .eq('id', signalId)
       .maybeSingle()
