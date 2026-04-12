@@ -33,14 +33,14 @@ interface Session {
   analyses: AnalysisRow[];
 }
 
-const AGENT_LABELS: Record<string, string> = {
-  'market-analyst': 'Market Analyst',
-  'asset-selector': 'Asset Selector',
-  'strategy-engine': 'Strategy Engine',
-  'risk-manager': 'Risk Manager',
-  'order-preparator': 'Order Preparator',
-  'portfolio-manager': 'Portfolio Manager',
-  'learning-agent': 'Learning Agent',
+const AGENT_LABEL_KEYS: Record<string, keyof typeof import("@/i18n/en").en.agents> = {
+  'market-analyst': 'marketAnalyst',
+  'asset-selector': 'assetSelector',
+  'strategy-engine': 'strategyEngine',
+  'risk-manager': 'riskManager',
+  'order-preparator': 'orderPreparator',
+  'portfolio-manager': 'portfolioManager',
+  'learning-agent': 'learningAgent',
 };
 
 export default function AgentsPanel() {
