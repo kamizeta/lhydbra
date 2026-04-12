@@ -662,6 +662,47 @@ Deno.serve(async (req) => {
     if (shouldExecute && action === "run") {
       for (const trade of executableTrades) {
         try {
+          // ─── Idempotency: check if order already exists ───
+          const idempotencyKey = `${user.id}|${trade.id || trade.asset}|${String(trade.asset)}|${today}`;
+          const { data: existingOrder } = await supabase
+            .from("orders")
+            .select("id, status")
+            .eq("idempotency_key", idempotencyKey)
+            .maybeSingle();
+
+          if (existingOrder) {
+            console.log(`[operator] Order already exists for ${trade.asset}: ${existingOrder.status}`);
+            execResults.push({ symbol: trade.asset, success: false, error: `Duplicate order (${existingOrder.status})`, skipped: true });
+            continue;
+          }
+
+          // ─── Create order record with pending status ───
+          const { data: newOrder, error: orderInsertErr } = await supabase
+            .from("orders")
+            .insert({
+              user_id: user.id,
+              signal_id: trade.id || null,
+              symbol: String(trade.asset),
+              direction: String(trade.direction),
+              quantity: trade.quantity,
+              status: "pending",
+              idempotency_key: idempotencyKey,
+              submitted_price: Number(trade.entry_price),
+              stop_loss: Number(trade.stop_loss),
+              take_profit: Number(trade.take_profit),
+            })
+            .select()
+            .single();
+
+          if (orderInsertErr) {
+            console.error(`[operator] Order insert failed for ${trade.asset}:`, orderInsertErr.message);
+          }
+
+          // ─── Submit to Alpaca ───
+          if (newOrder) {
+            await supabase.from("orders").update({ status: "submitted", updated_at: new Date().toISOString() }).eq("id", newOrder.id);
+          }
+
           const orderRes = await fetch(`${supabaseUrl}/functions/v1/alpaca-trade`, {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
@@ -679,14 +720,38 @@ Deno.serve(async (req) => {
           const orderResult = await orderRes.json();
           execResults.push({ symbol: trade.asset, success: orderResult.success || false, order: orderResult.order || null, error: orderResult.error || null, fail_safe_triggered: orderResult.fail_safe_triggered || false, critical: orderResult.critical || false });
 
+          // ─── Update order status based on result ───
+          if (newOrder) {
+            if (orderResult.success) {
+              const filledPrice = parseFloat(orderResult.order?.filled_avg_price || "0") || Number(trade.entry_price);
+              const submittedPrice = Number(trade.entry_price);
+              const slippagePct = submittedPrice > 0 ? Math.abs(filledPrice - submittedPrice) / submittedPrice : 0;
+
+              await supabase.from("orders").update({
+                status: orderResult.fail_safe_triggered ? "fail_safe_closed" : "filled",
+                filled_price: filledPrice,
+                slippage_pct: +slippagePct.toFixed(6),
+                broker_order_id: orderResult.order?.id || null,
+                metadata: { fill: orderResult.order },
+                updated_at: new Date().toISOString(),
+              }).eq("id", newOrder.id);
+            } else {
+              await supabase.from("orders").update({
+                status: "failed",
+                error_message: orderResult.error || orderResult.reason || "Unknown failure",
+                updated_at: new Date().toISOString(),
+              }).eq("id", newOrder.id);
+            }
+          }
+
           // ─── HALT: fail-safe or critical from alpaca-trade ───
           if (orderResult.fail_safe_triggered) {
             console.error(`[operator-mode] FAIL-SAFE triggered for ${trade.asset}. Halting execution for this user.`);
-            break; // Stop processing remaining trades
+            break;
           }
           if (orderResult.critical) {
             console.error(`[operator-mode] CRITICAL: Unprotected position for ${trade.asset}. Halting ALL execution immediately.`);
-            break; // Stop processing remaining trades
+            break;
           }
 
           if (orderResult.success && orderResult.order) {
@@ -718,8 +783,10 @@ Deno.serve(async (req) => {
               .eq("status", "open")
               .maybeSingle();
 
+            let newPositionId: string | null = null;
+
             if (existingPos) {
-              // Update existing position instead of creating duplicate
+              newPositionId = existingPos.id;
               await supabase.from("positions").update({
                 quantity: actualQty,
                 avg_entry: filledPrice,
@@ -729,7 +796,7 @@ Deno.serve(async (req) => {
                 notes: `Operator auto-exec (updated). Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}`,
               }).eq("id", existingPos.id);
             } else {
-              await supabase.from("positions").insert({
+              const { data: insertedPos } = await supabase.from("positions").insert({
                 user_id: user.id,
                 symbol: String(trade.asset),
                 name: String(trade.asset),
@@ -744,7 +811,16 @@ Deno.serve(async (req) => {
                 regime_at_entry: String(trade.market_regime || "undefined"),
                 status: "open",
                 notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}${actualQty < trade.quantity ? ` | Partial fill: ${actualQty}/${trade.quantity}` : ""}`,
-              });
+              }).select("id").single();
+              newPositionId = insertedPos?.id || null;
+            }
+
+            // Link position to order
+            if (newOrder && newPositionId) {
+              await supabase.from("orders").update({
+                position_id: newPositionId,
+                updated_at: new Date().toISOString(),
+              }).eq("id", newOrder.id);
             }
           } else if (!orderResult.success && !orderResult.pending) {
             console.error("Order failed for", trade.asset, ":", orderResult.error);
