@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useI18n } from "@/i18n";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { Loader2, BookOpen } from "lucide-react";
@@ -15,15 +16,18 @@ interface LedgerEntry {
   created_at: string;
 }
 
-const EVENT_LABELS: Record<string, string> = {
-  trade_open: "Trade Open",
-  trade_close: "Trade Close",
-  fee: "Fee",
-  adjustment: "Adjustment",
-  deposit: "Deposit",
-  withdrawal: "Withdrawal",
-  reconciliation: "Reconciliation",
-};
+function useEventLabels() {
+  const { t } = useI18n();
+  return {
+    trade_open: t.ledger.tradeOpen,
+    trade_close: t.ledger.tradeClose,
+    fee: t.ledger.fee,
+    adjustment: t.ledger.adjustment,
+    deposit: t.ledger.deposit,
+    withdrawal: t.ledger.withdrawal,
+    reconciliation: t.ledger.reconciliation,
+  } as Record<string, string>;
+}
 
 const EVENT_COLORS: Record<string, string> = {
   trade_open: "text-yellow-400",
