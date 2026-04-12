@@ -136,23 +136,23 @@ export default function ReportsPage() {
           <Select value={assetTypeFilter} onValueChange={setAssetTypeFilter}>
             <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="stock">Stock</SelectItem>
-              <SelectItem value="etf">ETF</SelectItem>
-              <SelectItem value="crypto">Crypto</SelectItem>
-              <SelectItem value="forex">Forex</SelectItem>
-              <SelectItem value="commodity">Commodity</SelectItem>
+              <SelectItem value="all">{t.common.all}</SelectItem>
+              <SelectItem value="stock">{t.common.stocks}</SelectItem>
+              <SelectItem value="etf">{t.common.etfs}</SelectItem>
+              <SelectItem value="crypto">{t.common.crypto}</SelectItem>
+              <SelectItem value="forex">{t.common.forex}</SelectItem>
+              <SelectItem value="commodity">{t.common.commodities}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-mono text-muted-foreground uppercase">Result</label>
+          <label className="text-[10px] font-mono text-muted-foreground uppercase">{t.common.result}</label>
           <Select value={resultFilter} onValueChange={setResultFilter}>
             <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="win">Win</SelectItem>
-              <SelectItem value="loss">Loss</SelectItem>
+              <SelectItem value="all">{t.common.all}</SelectItem>
+              <SelectItem value="win">{t.common.win}</SelectItem>
+              <SelectItem value="loss">{t.common.loss}</SelectItem>
             </SelectContent>
           </Select>
         </div>
