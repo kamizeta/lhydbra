@@ -13,18 +13,17 @@ interface Props {
 
 interface TradeSignal {
   id: string;
-  symbol: string;
-  name: string;
+  asset: string;
   direction: string;
-  strategy: string;
+  strategy_family: string | null;
   entry_price: number;
   stop_loss: number;
-  take_profit: number;
-  risk_reward: number;
-  confidence: number;
+  targets: number[] | any;
+  expected_r_multiple: number;
+  confidence_score: number;
   status: string;
   reasoning: string | null;
-  agent_analysis: string | null;
+  ai_rationale: string | null;
   created_at: string;
 }
 
@@ -40,28 +39,7 @@ export default function PositionSignalDetail({ signalId, onClose }: Props) {
       .eq('id', signalId)
       .maybeSingle()
       .then(({ data }) => {
-        if (data) {
-          // Map signals table fields to TradeSignal interface
-          const mapped: TradeSignal = {
-            id: data.id,
-            symbol: data.asset,
-            name: data.strategy_family || data.asset,
-            direction: data.direction,
-            strategy: data.strategy_family || 'hybrid',
-            entry_price: data.entry_price,
-            stop_loss: data.stop_loss,
-            take_profit: Array.isArray(data.targets) && data.targets.length > 0 ? Number(data.targets[0]) : data.entry_price,
-            risk_reward: data.expected_r_multiple,
-            confidence: data.confidence_score,
-            status: data.status,
-            reasoning: data.reasoning,
-            agent_analysis: null,
-            created_at: data.created_at,
-          };
-          setSignal(mapped);
-        } else {
-          setSignal(null);
-        }
+        setSignal(data as TradeSignal | null);
         setLoading(false);
       });
   }, [signalId]);
@@ -90,7 +68,7 @@ export default function PositionSignalDetail({ signalId, onClose }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="font-mono text-lg font-bold text-foreground">{signal.symbol}</span>
+          <span className="font-mono text-lg font-bold text-foreground">{signal.asset}</span>
           <StatusBadge variant={signal.direction === 'long' ? 'profit' : 'loss'}>
             {signal.direction === 'long' ? t.common.long : t.common.short}
           </StatusBadge>
@@ -106,10 +84,10 @@ export default function PositionSignalDetail({ signalId, onClose }: Props) {
           {[
             [t.common.entry, formatCurrency(signal.entry_price), ''],
             [t.common.stopLoss, formatCurrency(signal.stop_loss), 'text-loss'],
-            [t.common.takeProfit, formatCurrency(signal.take_profit), 'text-profit'],
-            [t.tradeIdeas.rrRatio, signal.risk_reward.toFixed(2), ''],
-            [t.common.confidence, `${signal.confidence}%`, signal.confidence > 70 ? 'text-profit' : ''],
-            [t.common.strategy, signal.strategy, 'text-primary'],
+            [t.common.takeProfit, formatCurrency(Array.isArray(signal.targets) ? signal.targets[0] : 0), 'text-profit'],
+            [t.tradeIdeas.rrRatio, signal.expected_r_multiple.toFixed(2), ''],
+            [t.common.confidence, `${signal.confidence_score}%`, signal.confidence_score > 70 ? 'text-profit' : ''],
+            [t.common.strategy, signal.strategy_family || 'hybrid', 'text-primary'],
           ].map(([label, value, color]) => (
             <div key={label as string} className="flex justify-between">
               <span className="text-muted-foreground">{label}</span>
@@ -127,12 +105,12 @@ export default function PositionSignalDetail({ signalId, onClose }: Props) {
           </div>
         )}
 
-        {signal.agent_analysis && (
+        {signal.ai_rationale && (
           <div>
             <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
               <Shield className="h-3 w-3" /> {t.signalDetail.agentAnalysis}
             </h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">{signal.agent_analysis}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">{signal.ai_rationale}</p>
           </div>
         )}
 

@@ -139,14 +139,10 @@ Deno.serve(async (req) => {
 
     for (let i = startIdx; i < numericBars.length - 1; i++) {
       const window = numericBars.slice(0, i + 1);
-      const { score, direction, entry: rawEntry, sl, tp, r } = scoreSignal(window);
+      const { score, direction, entry, sl, tp, r } = scoreSignal(window);
 
       if (score < min_score || !direction || r < min_r) continue;
-      if (Math.abs(rawEntry - sl) / rawEntry > 0.10) continue;
-
-      // Apply slippage
-      const slippagePct = 0.001;
-      const entry = rawEntry * (1 + slippagePct * (direction === "long" ? 1 : -1));
+      if (Math.abs(entry - sl) / entry > 0.10) continue;
 
       // Simulate next 10 bars for outcome
       let outcome = "open";
@@ -156,10 +152,10 @@ Deno.serve(async (req) => {
       for (let j = i + 1; j < Math.min(i + 11, numericBars.length); j++) {
         const bar = numericBars[j];
         if (direction === "long") {
-          if (bar.low <= sl) { exitPrice = Math.min(sl, bar.open); outcome = "stop_loss"; exitBar = j; break; }
+          if (bar.low <= sl) { exitPrice = sl; outcome = "stop_loss"; exitBar = j; break; }
           if (bar.high >= tp) { exitPrice = tp; outcome = "take_profit"; exitBar = j; break; }
         } else {
-          if (bar.high >= sl) { exitPrice = Math.max(sl, bar.open); outcome = "stop_loss"; exitBar = j; break; }
+          if (bar.high >= sl) { exitPrice = sl; outcome = "stop_loss"; exitBar = j; break; }
           if (bar.low <= tp) { exitPrice = tp; outcome = "take_profit"; exitBar = j; break; }
         }
       }
@@ -169,18 +165,11 @@ Deno.serve(async (req) => {
         outcome = "timeout";
       }
 
-      // Apply fees
-      const feeRate = 0.0002;
-      const entryFee = entry * feeRate;
-      const exitFee = exitPrice * feeRate;
-      const grossPnlPct = direction === "long"
+      const pnlPct = direction === "long"
         ? (exitPrice - entry) / entry * 100
         : (entry - exitPrice) / entry * 100;
-      const feePct = (entryFee + exitFee) / entry * 100;
-      const pnlPct = grossPnlPct - feePct;
-
       const stopDist = Math.abs(entry - sl);
-      const rActual = stopDist > 0 ? (exitPrice - entry) * (direction === "long" ? 1 : -1) / stopDist : 0;
+      const rActual = stopDist > 0 ? (direction === "long" ? exitPrice - entry : entry - exitPrice) / stopDist : 0;
 
       trades.push({
         date: numericBars[i].timestamp,
@@ -198,7 +187,7 @@ Deno.serve(async (req) => {
     const winRate = trades.length > 0 ? (wins.length / trades.length) * 100 : 0;
     const grossProfit = wins.reduce((s, t) => s + t.pnl_pct, 0);
     const grossLoss = Math.abs(losses.reduce((s, t) => s + t.pnl_pct, 0));
-    const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 99.0 : 0;
+    const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 0;
     const avgR = trades.length > 0 ? trades.reduce((s, t) => s + t.r_actual, 0) / trades.length : 0;
     let maxDD = 0, peak = 0, equity = 0;
     for (const t of trades) {

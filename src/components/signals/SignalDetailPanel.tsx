@@ -172,10 +172,15 @@ export default function SignalDetailPanel({ signal, onSignalSent }: Props) {
               if (!user) return;
               setSending(true);
               try {
-                // Update this signal's status to 'pending' so Trade Ideas picks it up
-                const { error } = await supabase.from("signals")
-                  .update({ status: "pending", updated_at: new Date().toISOString() } as Record<string, unknown>)
-                  .eq("id", signal.id);
+                const primaryTarget = signal.targets?.[0] ?? signal.entry_price * (signal.direction === "long" ? 1.05 : 0.95);
+                const rr = Math.abs(signal.entry_price - signal.stop_loss) > 0
+                  ? Math.abs(primaryTarget - signal.entry_price) / Math.abs(signal.entry_price - signal.stop_loss)
+                  : signal.expected_r_multiple;
+
+                // Signal already exists in 'signals' table — just update status to pending
+                const { error } = await supabase.from("signals").update({
+                  status: "pending",
+                }).eq("id", signal.id);
                 if (error) throw error;
 
                 toast.success(`Señal enviada a Trade Ideas: ${signal.asset}`);

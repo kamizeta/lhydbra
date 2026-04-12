@@ -128,7 +128,7 @@ serve(async (req) => {
     const [{ data: features }, { data: scores }, { data: existingSignals }] = await Promise.all([
       db.from('market_features').select('*').eq('timeframe', '1d'),
       db.from('opportunity_scores').select('*').eq('timeframe', '1d').gte('total_score', min_score).order('total_score', { ascending: false }),
-      db.from('signals').select('asset, status').eq('user_id', user.id).in('status', ['pending', 'approved']),
+      db.from('trade_signals').select('symbol, status').eq('user_id', user.id).in('status', ['pending', 'approved']),
     ]);
 
     if (!features || !scores) {
@@ -149,7 +149,7 @@ serve(async (req) => {
     for (const f of features) featureMap[f.symbol] = f;
 
     // Existing signal symbols to avoid duplicates
-    const existingSymbols = new Set((existingSignals || []).map((s: any) => s.asset));
+    const existingSymbols = new Set((existingSignals || []).map((s: any) => s.symbol));
 
     const newSignals: any[] = [];
 
@@ -224,15 +224,19 @@ serve(async (req) => {
 
       newSignals.push({
         user_id: user.id,
-        asset: score.symbol,
-        asset_class: score.asset_type || feat.asset_type || 'stock',
+        symbol: score.symbol,
+        name: `${template.strategy} — ${score.symbol}`,
+        asset_type: score.asset_type || feat.asset_type || 'stock',
         direction,
+        strategy: template.strategy,
         strategy_family: template.strategy_family,
         entry_price: parseFloat(entryPrice.toFixed(6)),
         stop_loss: parseFloat(stopLoss.toFixed(6)),
-        targets: [parseFloat(takeProfit.toFixed(6))],
-        expected_r_multiple: parseFloat(riskReward.toFixed(2)),
-        confidence_score: confidence,
+        take_profit: parseFloat(takeProfit.toFixed(6)),
+        risk_reward: parseFloat(riskReward.toFixed(2)),
+        position_size: positionSize,
+        risk_percent: riskPct,
+        confidence,
         opportunity_score: score.total_score,
         market_regime: regime,
         reasoning,
@@ -252,7 +256,7 @@ serve(async (req) => {
 
     // Insert signals
     if (newSignals.length > 0) {
-      const { error: insertError } = await db.from('signals').insert(newSignals);
+      const { error: insertError } = await db.from('trade_signals').insert(newSignals);
       if (insertError) {
         console.error('Insert error:', insertError);
         return new Response(JSON.stringify({ error: insertError.message }), {

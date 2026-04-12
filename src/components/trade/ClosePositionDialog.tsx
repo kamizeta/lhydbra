@@ -153,7 +153,7 @@ export default function ClosePositionDialog({ position, currentPrice, onClose, o
           .select('opportunity_score, score_breakdown, confidence_score, strategy_family, market_regime')
           .eq('id', position.signal_id)
           .maybeSingle();
-        signalData = data ? { ...data, confidence: data.confidence_score } as typeof signalData : null;
+        signalData = data as typeof signalData;
       }
 
       // Get current scoring weights for weight_profile_used

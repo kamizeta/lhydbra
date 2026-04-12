@@ -80,8 +80,7 @@ function evaluateTrendFollowing(bars: OHLCVBar[], params: Record<string, number>
   for (let i = slowPeriod; i < bars.length; i++) {
     if (!inTrade) {
       if (smaFast[i] > smaSlow[i] && smaFast[i - 1] <= smaSlow[i - 1] && atr[i]) {
-        const slippagePct = 0.001;
-        entry = bars[i].close * (1 + slippagePct); // long slippage
+        entry = bars[i].close;
         sl = entry - atr[i] * atrMultiplier;
         const risk = entry - sl;
         tp = entry + risk * targetR;
@@ -89,30 +88,19 @@ function evaluateTrendFollowing(bars: OHLCVBar[], params: Record<string, number>
         inTrade = true;
       }
     } else {
-      const feeRate = 0.0002;
-      const stopDist = Math.abs(entry - sl);
       if (bars[i].low <= sl) {
-        const exitP = Math.min(sl, bars[i].open); // gap through stop
-        const grossPnl = exitP - entry;
-        const fees = entry * feeRate + exitP * feeRate;
-        const netPnl = grossPnl - fees;
-        const rMult = stopDist > 0 ? (exitP - entry) / stopDist : 0;
-        trades.push({ entry_price: entry, exit_price: exitP, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: netPnl, r_multiple: +rMult.toFixed(2), entry_reason: 'SMA crossover', exit_reason: 'Stop Loss' });
+        const pnl = sl - entry;
+        trades.push({ entry_price: entry, exit_price: sl, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: -1, entry_reason: 'SMA crossover', exit_reason: 'Stop Loss' });
         inTrade = false;
       } else if (bars[i].high >= tp) {
-        const grossPnl = tp - entry;
-        const fees = entry * feeRate + tp * feeRate;
-        const netPnl = grossPnl - fees;
-        const rMult = stopDist > 0 ? (tp - entry) / stopDist : 0;
-        trades.push({ entry_price: entry, exit_price: tp, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: netPnl, r_multiple: +rMult.toFixed(2), entry_reason: 'SMA crossover', exit_reason: 'Take Profit' });
+        const pnl = tp - entry;
+        const risk = entry - sl;
+        trades.push({ entry_price: entry, exit_price: tp, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: risk > 0 ? pnl / risk : 0, entry_reason: 'SMA crossover', exit_reason: 'Take Profit' });
         inTrade = false;
       } else if (smaFast[i] < smaSlow[i]) {
-        const exitP = bars[i].close;
-        const grossPnl = exitP - entry;
-        const fees = entry * feeRate + exitP * feeRate;
-        const netPnl = grossPnl - fees;
-        const rMult = stopDist > 0 ? (exitP - entry) / stopDist : 0;
-        trades.push({ entry_price: entry, exit_price: exitP, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: netPnl, r_multiple: +rMult.toFixed(2), entry_reason: 'SMA crossover', exit_reason: 'SMA reverse cross' });
+        const pnl = bars[i].close - entry;
+        const risk = entry - sl;
+        trades.push({ entry_price: entry, exit_price: bars[i].close, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: risk > 0 ? pnl / risk : 0, entry_reason: 'SMA crossover', exit_reason: 'SMA reverse cross' });
         inTrade = false;
       }
     }
@@ -138,8 +126,7 @@ function evaluateBreakout(bars: OHLCVBar[], params: Record<string, number>): Bac
 
     if (!inTrade) {
       if (bars[i].close > high) {
-        const slippagePct = 0.001;
-        entry = bars[i].close * (1 + slippagePct);
+        entry = bars[i].close;
         sl = entry - avgRange * atrMult;
         const risk = entry - sl;
         tp = entry + risk * targetR;
@@ -147,20 +134,13 @@ function evaluateBreakout(bars: OHLCVBar[], params: Record<string, number>): Bac
         inTrade = true;
       }
     } else {
-      const feeRate = 0.0002;
-      const stopDist = Math.abs(entry - sl);
       if (bars[i].low <= sl) {
-        const exitP = Math.min(sl, bars[i].open);
-        const grossPnl = exitP - entry;
-        const fees = entry * feeRate + exitP * feeRate;
-        const rMult = stopDist > 0 ? (exitP - entry) / stopDist : 0;
-        trades.push({ entry_price: entry, exit_price: exitP, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: grossPnl - fees, r_multiple: +rMult.toFixed(2), entry_reason: 'Breakout', exit_reason: 'Stop Loss' });
+        trades.push({ entry_price: entry, exit_price: sl, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: sl - entry, r_multiple: -1, entry_reason: 'Breakout', exit_reason: 'Stop Loss' });
         inTrade = false;
       } else if (bars[i].high >= tp) {
-        const grossPnl = tp - entry;
-        const fees = entry * feeRate + tp * feeRate;
-        const rMult = stopDist > 0 ? (tp - entry) / stopDist : 0;
-        trades.push({ entry_price: entry, exit_price: tp, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: grossPnl - fees, r_multiple: +rMult.toFixed(2), entry_reason: 'Breakout', exit_reason: 'Take Profit' });
+        const pnl = tp - entry;
+        const risk = entry - sl;
+        trades.push({ entry_price: entry, exit_price: tp, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: risk > 0 ? pnl / risk : 0, entry_reason: 'Breakout', exit_reason: 'Take Profit' });
         inTrade = false;
       }
     }
@@ -198,8 +178,7 @@ function evaluateMeanReversion(bars: OHLCVBar[], params: Record<string, number>)
   for (let i = rsiPeriod + 1; i < bars.length; i++) {
     if (!inTrade) {
       if (rsi[i] < oversold && rsi[i - 1] >= oversold) {
-        const slippagePct = 0.001;
-        entry = bars[i].close * (1 + slippagePct);
+        entry = bars[i].close;
         const avgRange = bars.slice(Math.max(0, i - 14), i).reduce((s, b) => s + (b.high - b.low), 0) / 14;
         sl = entry - avgRange * atrMult;
         const risk = entry - sl;
@@ -208,27 +187,18 @@ function evaluateMeanReversion(bars: OHLCVBar[], params: Record<string, number>)
         inTrade = true;
       }
     } else {
-      const feeRate = 0.0002;
-      const stopDist = Math.abs(entry - sl);
       if (bars[i].low <= sl) {
-        const exitP = Math.min(sl, bars[i].open);
-        const grossPnl = exitP - entry;
-        const fees = entry * feeRate + exitP * feeRate;
-        const rMult = stopDist > 0 ? (exitP - entry) / stopDist : 0;
-        trades.push({ entry_price: entry, exit_price: exitP, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: grossPnl - fees, r_multiple: +rMult.toFixed(2), entry_reason: 'RSI oversold', exit_reason: 'Stop Loss' });
+        trades.push({ entry_price: entry, exit_price: sl, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: sl - entry, r_multiple: -1, entry_reason: 'RSI oversold', exit_reason: 'Stop Loss' });
         inTrade = false;
       } else if (bars[i].high >= tp) {
-        const grossPnl = tp - entry;
-        const fees = entry * feeRate + tp * feeRate;
-        const rMult = stopDist > 0 ? (tp - entry) / stopDist : 0;
-        trades.push({ entry_price: entry, exit_price: tp, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: grossPnl - fees, r_multiple: +rMult.toFixed(2), entry_reason: 'RSI oversold', exit_reason: 'Take Profit' });
+        const pnl = tp - entry;
+        const risk = entry - sl;
+        trades.push({ entry_price: entry, exit_price: tp, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: risk > 0 ? pnl / risk : 0, entry_reason: 'RSI oversold', exit_reason: 'Take Profit' });
         inTrade = false;
       } else if (rsi[i] > overbought) {
-        const exitP = bars[i].close;
-        const grossPnl = exitP - entry;
-        const fees = entry * feeRate + exitP * feeRate;
-        const rMult = stopDist > 0 ? (exitP - entry) / stopDist : 0;
-        trades.push({ entry_price: entry, exit_price: exitP, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: grossPnl - fees, r_multiple: +rMult.toFixed(2), entry_reason: 'RSI oversold', exit_reason: 'RSI overbought' });
+        const pnl = bars[i].close - entry;
+        const risk = entry - sl;
+        trades.push({ entry_price: entry, exit_price: bars[i].close, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: risk > 0 ? pnl / risk : 0, entry_reason: 'RSI oversold', exit_reason: 'RSI overbought' });
         inTrade = false;
       }
     }
@@ -278,7 +248,7 @@ function computeMetrics(trades: BacktestTrade[]) {
     win_rate: (wins.length / trades.length) * 100,
     total_pnl: totalPnl,
     expectancy: avgPnl,
-    profit_factor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 99.0 : 0,
+    profit_factor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 0,
     max_drawdown: maxDD,
     sharpe_estimate: sharpe,
     avg_r_multiple: trades.reduce((s, t) => s + t.r_multiple, 0) / trades.length,
