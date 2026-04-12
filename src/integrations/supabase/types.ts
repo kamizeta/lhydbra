@@ -460,6 +460,45 @@ export type Database = {
           },
         ]
       }
+      capital_ledger: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          event_type: string
+          id: string
+          notes: string | null
+          reference_id: string | null
+          reference_type: string | null
+          symbol: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          event_type: string
+          id?: string
+          notes?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          symbol?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          event_type?: string
+          id?: string
+          notes?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          symbol?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       coaching_logs: {
         Row: {
           created_at: string

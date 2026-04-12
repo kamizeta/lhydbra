@@ -827,6 +827,23 @@ Deno.serve(async (req) => {
                 updated_at: new Date().toISOString(),
               }).eq("id", newOrder.id);
             }
+
+            // ── Capital Ledger: record trade_open ──
+            try {
+              const tradeAmount = filledPrice * actualQty;
+              await supabase.from("capital_ledger").insert({
+                user_id: user.id,
+                event_type: "trade_open",
+                symbol: String(trade.asset),
+                amount: -(tradeAmount),
+                balance_after: liveCapital - tradeAmount,
+                reference_id: newOrder?.id || null,
+                reference_type: "order",
+                notes: `${String(trade.direction)} ${actualQty} ${String(trade.asset)} @ ${filledPrice.toFixed(2)}`,
+              });
+            } catch (ledgerErr) {
+              console.warn("[operator-mode] Ledger insert failed:", ledgerErr);
+            }
           } else if (!orderResult.success && !orderResult.pending) {
             log("error", "order_failed", { user_id: user.id, symbol: String(trade.asset), error: orderResult.error });
           } else if (orderResult.pending) {
