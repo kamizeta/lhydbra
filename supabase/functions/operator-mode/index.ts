@@ -213,6 +213,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── FEATURE FLAGS ───
+    const { data: flagRows } = await supabase.from("feature_flags").select("id, enabled");
+    const flagMap: Record<string, boolean> = {};
+    for (const f of (flagRows || [])) { flagMap[f.id] = f.enabled; }
+
+    if (action === "run" && flagMap.auto_trading === false) {
+      return jsonRes(req, { status: "disabled", reason: "Auto-trading feature flag is off" });
+    }
+
     // ─── Load user settings & goal ───
     const [settingsRes, goalRes] = await Promise.all([
       supabase.from("user_settings").select("*").eq("user_id", user.id).maybeSingle(),
@@ -663,6 +672,19 @@ Deno.serve(async (req) => {
     if (shouldExecute && action === "run") {
       for (const trade of executableTrades) {
         try {
+          // ─── Feature flag guards ───
+          const isCrypto = ['crypto'].includes(String(trade.asset_class || ''));
+          if (String(trade.direction) === 'short' && flagMap.short_selling === false) {
+            tradeLog("skipped_short", { user_id: user.id, symbol: String(trade.asset), reason: "short_selling flag disabled" });
+            execResults.push({ symbol: String(trade.asset), success: false, error: "Short selling disabled", skipped: true });
+            continue;
+          }
+          if (isCrypto && flagMap.crypto_trading === false) {
+            tradeLog("skipped_crypto", { user_id: user.id, symbol: String(trade.asset), reason: "crypto_trading flag disabled" });
+            execResults.push({ symbol: String(trade.asset), success: false, error: "Crypto trading disabled", skipped: true });
+            continue;
+          }
+
           // ─── Idempotency: check if order already exists ───
           const idempotencyKey = `${user.id}|${trade.id || trade.asset}|${String(trade.asset)}|${today}`;
           const { data: existingOrder } = await supabase
