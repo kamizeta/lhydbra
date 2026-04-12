@@ -566,7 +566,9 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="flex justify-end">
+          {/* Feature Flags */}
+          <FeatureFlagsSection />
+
             <button
               onClick={saveSettings}
               disabled={saving}
