@@ -28,15 +28,34 @@ jobs:
             echo "failed=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Reconcile positions with broker
+        if: always()
+        id: reconcile
+        run: |
+          HTTP_CODE=$(curl -s -o /tmp/reconcile.json -w "%{http_code}" \
+            -X POST \
+            'https://boccgfolfxhkcxflkrqz.supabase.co/functions/v1/reconcile-positions' \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -d '{}')
+          echo "Response code: $HTTP_CODE"
+          cat /tmp/reconcile.json || true
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "failed=true" >> $GITHUB_OUTPUT
+          else
+            echo "failed=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Send Telegram alert on failure
-        if: steps.operator.outputs.failed == 'true'
+        if: steps.operator.outputs.failed == 'true' || steps.reconcile.outputs.failed == 'true'
         run: |
           BODY=$(cat /tmp/response.json 2>/dev/null || echo "No response body")
+          RECON=$(cat /tmp/reconcile.json 2>/dev/null || echo "No reconcile body")
           curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -H 'Content-Type: application/json' \
             -d "{
               \"chat_id\": \"${{ secrets.TELEGRAM_CHAT_ID }}\",
-              \"text\": \"🚨 *LHYDBRA Operator FALLÓ*\n\nHTTP Code: ${{ steps.operator.outputs.http_code }}\nResponse: ${BODY}\n\nRevisa los logs en GitHub Actions.\",
+              \"text\": \"🚨 *LHYDBRA Operator/Reconcile FALLÓ*\n\nOperator: ${{ steps.operator.outputs.http_code }}\nReconcile: ${{ steps.reconcile.outputs.http_code }}\n\nRevisa los logs en GitHub Actions.\",
               \"parse_mode\": \"Markdown\"
             }"
