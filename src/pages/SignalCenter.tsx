@@ -170,9 +170,6 @@ export default function SignalCenter() {
                       : t.signals.noSignalsMatch}
                   </td></tr>
                 )}
-                      : "No signals match the current filters"}
-                  </td></tr>
-                )}
               </tbody>
             </table>
           </div>
