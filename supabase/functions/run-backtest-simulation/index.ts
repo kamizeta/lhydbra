@@ -118,6 +118,9 @@ function getMacroRegime(
 
 const CRYPTO_SYMBOLS = ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD"];
 
+const SLIPPAGE_PCT = 0.001;
+const FEE_RATE = 0.0002;
+
 function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:number}[]): {
   score: number; direction: string | null; entry: number; sl: number; tp: number; r: number;
   macd_momentum: number; volume_ratio: number; sr_score: number;
@@ -144,24 +147,23 @@ function scoreDay(bars: {open:number;high:number;low:number;close:number;volume:
   else if (direction === "short" && rsiVal < 50 && rsiVal > 30) score += 12;
   score += Math.min(15, strength * 1000);
 
-  // Factor 1: MACD Histogram Confirmation
   const macdMomentum = macdHistogram(closes);
   if (direction === "long" && macdMomentum < -0.01) score -= 15;
   if (direction === "short" && macdMomentum > 0.01) score -= 15;
   if (direction === "long" && macdMomentum > 0.01) score += 10;
   if (direction === "short" && macdMomentum < -0.01) score += 10;
 
-  // Factor 2: Volume Confirmation
   const volRatio = volumeRatio(bars);
   if (volRatio > 1.5) score += 8;
   if (volRatio < 0.7) score -= 12;
   if (volRatio < 0.5) score -= 10;
 
-  // Factor 3: Support/Resistance Proximity
   const srScore = srProximity(bars, direction);
   score += srScore;
 
-  const entry = price;
+  const rawEntry = price;
+  // 1. SLIPPAGE
+  const entry = rawEntry * (1 + SLIPPAGE_PCT * (direction === 'long' ? 1 : -1));
   const sl = direction === "long"
     ? Math.max(sma20 - atrVal * 0.5, entry - atrVal * 1.5)
     : Math.min(sma20 + atrVal * 0.5, entry + atrVal * 1.5);
@@ -196,13 +198,11 @@ Deno.serve(async (req) => {
       "APCA-API-SECRET-KEY": alpacaSecret,
     };
 
-    // Get user's watchlist from user_settings
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get user from JWT
     const userRes = await supabaseClient.auth.getUser(authHeader.replace("Bearer ", ""));
     const userId = userRes.data.user?.id;
 
@@ -226,13 +226,11 @@ Deno.serve(async (req) => {
     }
     console.log(`[backtest] Processing ${SYMBOLS.length} symbols:`, SYMBOLS);
 
-    // Date range: default last 180 days, supports up to 3 years
     const endDate = date_to ? new Date(date_to) : new Date();
     const startDate = date_from
       ? new Date(date_from)
       : new Date(endDate.getTime() - 180 * 24 * 60 * 60 * 1000);
 
-    // Cap at 3 years max
     const maxMs = 3 * 365 * 24 * 60 * 60 * 1000;
     const actualStart = endDate.getTime() - startDate.getTime() > maxMs
       ? new Date(endDate.getTime() - maxMs)
@@ -241,7 +239,6 @@ Deno.serve(async (req) => {
     const startStr = actualStart.toISOString().split('T')[0];
     const endStr = endDate.toISOString().split('T')[0];
 
-    // Fetch macro reference bars (SPY for equities, BTC for crypto)
     const alpacaHdrs = { "APCA-API-KEY-ID": alpacaKeyId, "APCA-API-SECRET-KEY": alpacaSecret, "Accept": "application/json" };
     let spyBars: {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[] = [];
     let btcBars: {open:number;high:number;low:number;close:number;volume:number;timestamp:string}[] = [];
@@ -261,7 +258,6 @@ Deno.serve(async (req) => {
     } catch (e) { console.warn("BTC macro fetch failed:", e); }
     console.log(`[backtest] Macro bars: SPY=${spyBars.length}, BTC=${btcBars.length}`);
 
-    // ─── PHASE 1: Fetch all bars first ───
     const allTrades: Record<string, unknown>[] = [];
     const symbolSummaries: Record<string, unknown>[] = [];
     let totalCapital = initial_capital;
@@ -349,23 +345,28 @@ Deno.serve(async (req) => {
         let exitPrice = 0;
         let outcome = "";
 
+        // 4. GAP THROUGH STOP
         if (pos.direction === "long") {
-          if (bar.low <= pos.sl) { exitPrice = pos.sl; outcome = "stop_loss"; }
+          if (bar.low <= pos.sl) { exitPrice = Math.min(pos.sl, bar.open); outcome = "stop_loss"; }
           else if (bar.high >= pos.tp) { exitPrice = pos.tp; outcome = "take_profit"; }
         } else {
-          if (bar.high >= pos.sl) { exitPrice = pos.sl; outcome = "stop_loss"; }
+          if (bar.high >= pos.sl) { exitPrice = Math.max(pos.sl, bar.open); outcome = "stop_loss"; }
           else if (bar.low <= pos.tp) { exitPrice = pos.tp; outcome = "take_profit"; }
         }
 
         if (outcome) {
+          // 3. R-MULTIPLES (dynamic)
           const stopDist = Math.abs(pos.entry - pos.sl);
-          const rawPnl = pos.direction === "long"
-            ? exitPrice - pos.entry
-            : pos.entry - exitPrice;
-          const rActual = outcome === "take_profit" ? 2.0 : -1.0;
+          const rActual = stopDist > 0 ? ((exitPrice - pos.entry) * (pos.direction === 'long' ? 1 : -1)) / stopDist : 0;
 
-          const pnlDollars = rawPnl * pos.qty;
-          totalCapital += pnlDollars;
+          const grossPnl = pos.direction === "long"
+            ? (exitPrice - pos.entry) * pos.qty
+            : (pos.entry - exitPrice) * pos.qty;
+          // 2. FEES
+          const fees = (pos.entry * pos.qty * FEE_RATE) + (exitPrice * pos.qty * FEE_RATE);
+          const netPnl = grossPnl - fees;
+
+          totalCapital += netPnl;
 
           allTrades.push({
             date_entry: pos.entryDate,
@@ -378,8 +379,9 @@ Deno.serve(async (req) => {
             exit_price: +exitPrice.toFixed(4),
             stop_loss: +pos.sl.toFixed(4),
             take_profit: +pos.tp.toFixed(4),
-            r_actual: rActual,
-            pnl_dollars: +pnlDollars.toFixed(2),
+            r_actual: +rActual.toFixed(2),
+            pnl_dollars: +netPnl.toFixed(2),
+            fees: +fees.toFixed(2),
             outcome,
             capital_after: +totalCapital.toFixed(2),
             macro_regime: pos.regime,
@@ -453,12 +455,14 @@ Deno.serve(async (req) => {
       const symBars = allBars[sym];
       if (!symBars || symBars.length === 0) continue;
       const lastBar = symBars[symBars.length - 1];
-      const rawPnl = pos.direction === "long"
-        ? lastBar.close - pos.entry
-        : pos.entry - lastBar.close;
+      const grossPnl = pos.direction === "long"
+        ? (lastBar.close - pos.entry) * pos.qty
+        : (pos.entry - lastBar.close) * pos.qty;
+      const fees = (pos.entry * pos.qty * FEE_RATE) + (lastBar.close * pos.qty * FEE_RATE);
+      const netPnl = grossPnl - fees;
       const stopDist = Math.abs(pos.entry - pos.sl);
-      const pnlDollars = rawPnl * pos.qty;
-      totalCapital += pnlDollars;
+      const rActual = stopDist > 0 ? ((lastBar.close - pos.entry) * (pos.direction === 'long' ? 1 : -1)) / stopDist : 0;
+      totalCapital += netPnl;
 
       allTrades.push({
         date_entry: pos.entryDate,
@@ -471,8 +475,9 @@ Deno.serve(async (req) => {
         exit_price: +lastBar.close.toFixed(4),
         stop_loss: +pos.sl.toFixed(4),
         take_profit: +pos.tp.toFixed(4),
-        r_actual: rawPnl > 0 ? 1 : -1,
-        pnl_dollars: +pnlDollars.toFixed(2),
+        r_actual: +rActual.toFixed(2),
+        pnl_dollars: +netPnl.toFixed(2),
+        fees: +fees.toFixed(2),
         outcome: "timeout",
         capital_after: +totalCapital.toFixed(2),
         macro_regime: pos.regime,
@@ -495,7 +500,8 @@ Deno.serve(async (req) => {
         symbol: sym, trades: symTrades.length,
         wins: wins.length, losses: losses.length,
         win_rate: symTrades.length > 0 ? +((wins.length / symTrades.length) * 100).toFixed(1) : 0,
-        profit_factor: gl > 0 ? +(gp / gl).toFixed(2) : gp > 0 ? 999 : 0,
+        // 5. PROFIT FACTOR cap 99
+        profit_factor: gl > 0 ? +(gp / gl).toFixed(2) : (gp > 0 ? 99.0 : 0),
         total_pnl: +totalPnl.toFixed(2),
         avg_r: symTrades.length > 0
           ? +(symTrades.reduce((s, t) => s + Number(t.r_actual), 0) / symTrades.length).toFixed(2)
@@ -503,10 +509,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Sort all trades by date
     allTrades.sort((a, b) => String(a.date_entry).localeCompare(String(b.date_entry)));
 
-    // Monthly PnL breakdown
     const monthlyMap: Record<string, { pnl: number; trades: number; wins: number; capital_end: number; bull: number; bear: number }> = {};
     for (const t of allTrades) {
       const month = String(t.month || String(t.date_entry).substring(0, 7));
@@ -531,7 +535,6 @@ Deno.serve(async (req) => {
         bear_trades: d.bear,
       }));
 
-    // Global metrics
     const allWins = allTrades.filter(t => t.outcome === "take_profit");
     const allLosses = allTrades.filter(t => t.outcome === "stop_loss");
     const globalPnl = totalCapital - initial_capital;
@@ -559,7 +562,8 @@ Deno.serve(async (req) => {
         wins: allWins.length,
         losses: allLosses.length,
         win_rate: allTrades.length > 0 ? +((allWins.length / allTrades.length) * 100).toFixed(1) : 0,
-        profit_factor: gl2 > 0 ? +(gp2 / gl2).toFixed(2) : gp2 > 0 ? 999 : 0,
+        // 5. PROFIT FACTOR cap 99
+        profit_factor: gl2 > 0 ? +(gp2 / gl2).toFixed(2) : (gp2 > 0 ? 99.0 : 0),
         max_drawdown_pct: +maxDD.toFixed(2),
         avg_r: allTrades.length > 0
           ? +(allTrades.reduce((s, t) => s + Number(t.r_actual), 0) / allTrades.length).toFixed(2)

@@ -34,9 +34,13 @@ interface BacktestTrade {
   exit_bar: number;
   pnl: number;
   r_multiple: number;
+  fees: number;
   entry_reason: string;
   exit_reason: string;
 }
+
+const SLIPPAGE_PCT = 0.001;
+const FEE_RATE = 0.0002;
 
 // ─── Strategy Logic Evaluators ───
 
@@ -50,7 +54,6 @@ function evaluateTrendFollowing(bars: OHLCVBar[], params: Record<string, number>
 
   if (bars.length < slowPeriod + 10) return trades;
 
-  // Compute SMAs
   const smaFast: number[] = [];
   const smaSlow: number[] = [];
   const atr: number[] = [];
@@ -75,12 +78,16 @@ function evaluateTrendFollowing(bars: OHLCVBar[], params: Record<string, number>
   }
 
   let inTrade = false;
-  let entry = 0, sl = 0, tp = 0, entryBar = 0;
+  let rawEntry = 0, entry = 0, sl = 0, tp = 0, entryBar = 0;
+  const direction = 'long';
+  const qty = 1; // normalized
 
   for (let i = slowPeriod; i < bars.length; i++) {
     if (!inTrade) {
       if (smaFast[i] > smaSlow[i] && smaFast[i - 1] <= smaSlow[i - 1] && atr[i]) {
-        entry = bars[i].close;
+        rawEntry = bars[i].close;
+        // 1. SLIPPAGE
+        entry = rawEntry * (1 + SLIPPAGE_PCT);
         sl = entry - atr[i] * atrMultiplier;
         const risk = entry - sl;
         tp = entry + risk * targetR;
@@ -88,19 +95,30 @@ function evaluateTrendFollowing(bars: OHLCVBar[], params: Record<string, number>
         inTrade = true;
       }
     } else {
+      let exitPrice = 0;
+      let exitReason = '';
+
+      // 4. GAP THROUGH STOP
       if (bars[i].low <= sl) {
-        const pnl = sl - entry;
-        trades.push({ entry_price: entry, exit_price: sl, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: -1, entry_reason: 'SMA crossover', exit_reason: 'Stop Loss' });
-        inTrade = false;
+        exitPrice = Math.min(sl, bars[i].open);
+        exitReason = 'Stop Loss';
       } else if (bars[i].high >= tp) {
-        const pnl = tp - entry;
-        const risk = entry - sl;
-        trades.push({ entry_price: entry, exit_price: tp, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: risk > 0 ? pnl / risk : 0, entry_reason: 'SMA crossover', exit_reason: 'Take Profit' });
-        inTrade = false;
+        exitPrice = tp;
+        exitReason = 'Take Profit';
       } else if (smaFast[i] < smaSlow[i]) {
-        const pnl = bars[i].close - entry;
-        const risk = entry - sl;
-        trades.push({ entry_price: entry, exit_price: bars[i].close, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: risk > 0 ? pnl / risk : 0, entry_reason: 'SMA crossover', exit_reason: 'SMA reverse cross' });
+        exitPrice = bars[i].close;
+        exitReason = 'SMA reverse cross';
+      }
+
+      if (exitPrice > 0) {
+        const grossPnl = exitPrice - entry;
+        // 2. FEES
+        const fees = (entry * qty * FEE_RATE) + (exitPrice * qty * FEE_RATE);
+        const netPnl = grossPnl - fees;
+        // 3. R-MULTIPLES
+        const stopDist = Math.abs(entry - sl);
+        const rMultiple = stopDist > 0 ? ((exitPrice - entry) * 1) / stopDist : 0;
+        trades.push({ entry_price: entry, exit_price: exitPrice, direction, entry_bar: entryBar, exit_bar: i, pnl: netPnl, r_multiple: +rMultiple.toFixed(2), fees: +fees.toFixed(4), entry_reason: 'SMA crossover', exit_reason: exitReason });
         inTrade = false;
       }
     }
@@ -117,7 +135,9 @@ function evaluateBreakout(bars: OHLCVBar[], params: Record<string, number>): Bac
   if (bars.length < period + 10) return trades;
 
   let inTrade = false;
-  let entry = 0, sl = 0, tp = 0, entryBar = 0;
+  let rawEntry = 0, entry = 0, sl = 0, tp = 0, entryBar = 0;
+  const direction = 'long';
+  const qty = 1;
 
   for (let i = period; i < bars.length; i++) {
     const lookback = bars.slice(i - period, i);
@@ -126,7 +146,8 @@ function evaluateBreakout(bars: OHLCVBar[], params: Record<string, number>): Bac
 
     if (!inTrade) {
       if (bars[i].close > high) {
-        entry = bars[i].close;
+        rawEntry = bars[i].close;
+        entry = rawEntry * (1 + SLIPPAGE_PCT);
         sl = entry - avgRange * atrMult;
         const risk = entry - sl;
         tp = entry + risk * targetR;
@@ -134,13 +155,24 @@ function evaluateBreakout(bars: OHLCVBar[], params: Record<string, number>): Bac
         inTrade = true;
       }
     } else {
+      let exitPrice = 0;
+      let exitReason = '';
+
       if (bars[i].low <= sl) {
-        trades.push({ entry_price: entry, exit_price: sl, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: sl - entry, r_multiple: -1, entry_reason: 'Breakout', exit_reason: 'Stop Loss' });
-        inTrade = false;
+        exitPrice = Math.min(sl, bars[i].open);
+        exitReason = 'Stop Loss';
       } else if (bars[i].high >= tp) {
-        const pnl = tp - entry;
-        const risk = entry - sl;
-        trades.push({ entry_price: entry, exit_price: tp, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: risk > 0 ? pnl / risk : 0, entry_reason: 'Breakout', exit_reason: 'Take Profit' });
+        exitPrice = tp;
+        exitReason = 'Take Profit';
+      }
+
+      if (exitPrice > 0) {
+        const grossPnl = exitPrice - entry;
+        const fees = (entry * qty * FEE_RATE) + (exitPrice * qty * FEE_RATE);
+        const netPnl = grossPnl - fees;
+        const stopDist = Math.abs(entry - sl);
+        const rMultiple = stopDist > 0 ? ((exitPrice - entry) * 1) / stopDist : 0;
+        trades.push({ entry_price: entry, exit_price: exitPrice, direction, entry_bar: entryBar, exit_bar: i, pnl: netPnl, r_multiple: +rMultiple.toFixed(2), fees: +fees.toFixed(4), entry_reason: 'Breakout', exit_reason: exitReason });
         inTrade = false;
       }
     }
@@ -158,7 +190,6 @@ function evaluateMeanReversion(bars: OHLCVBar[], params: Record<string, number>)
 
   if (bars.length < rsiPeriod + 10) return trades;
 
-  // Compute RSI
   const rsi: number[] = [];
   for (let i = rsiPeriod; i < bars.length; i++) {
     let gains = 0, losses = 0;
@@ -173,12 +204,15 @@ function evaluateMeanReversion(bars: OHLCVBar[], params: Record<string, number>)
   }
 
   let inTrade = false;
-  let entry = 0, sl = 0, tp = 0, entryBar = 0;
+  let rawEntry = 0, entry = 0, sl = 0, tp = 0, entryBar = 0;
+  const direction = 'long';
+  const qty = 1;
 
   for (let i = rsiPeriod + 1; i < bars.length; i++) {
     if (!inTrade) {
       if (rsi[i] < oversold && rsi[i - 1] >= oversold) {
-        entry = bars[i].close;
+        rawEntry = bars[i].close;
+        entry = rawEntry * (1 + SLIPPAGE_PCT);
         const avgRange = bars.slice(Math.max(0, i - 14), i).reduce((s, b) => s + (b.high - b.low), 0) / 14;
         sl = entry - avgRange * atrMult;
         const risk = entry - sl;
@@ -187,18 +221,27 @@ function evaluateMeanReversion(bars: OHLCVBar[], params: Record<string, number>)
         inTrade = true;
       }
     } else {
+      let exitPrice = 0;
+      let exitReason = '';
+
       if (bars[i].low <= sl) {
-        trades.push({ entry_price: entry, exit_price: sl, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl: sl - entry, r_multiple: -1, entry_reason: 'RSI oversold', exit_reason: 'Stop Loss' });
-        inTrade = false;
+        exitPrice = Math.min(sl, bars[i].open);
+        exitReason = 'Stop Loss';
       } else if (bars[i].high >= tp) {
-        const pnl = tp - entry;
-        const risk = entry - sl;
-        trades.push({ entry_price: entry, exit_price: tp, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: risk > 0 ? pnl / risk : 0, entry_reason: 'RSI oversold', exit_reason: 'Take Profit' });
-        inTrade = false;
+        exitPrice = tp;
+        exitReason = 'Take Profit';
       } else if (rsi[i] > overbought) {
-        const pnl = bars[i].close - entry;
-        const risk = entry - sl;
-        trades.push({ entry_price: entry, exit_price: bars[i].close, direction: 'long', entry_bar: entryBar, exit_bar: i, pnl, r_multiple: risk > 0 ? pnl / risk : 0, entry_reason: 'RSI oversold', exit_reason: 'RSI overbought' });
+        exitPrice = bars[i].close;
+        exitReason = 'RSI overbought';
+      }
+
+      if (exitPrice > 0) {
+        const grossPnl = exitPrice - entry;
+        const fees = (entry * qty * FEE_RATE) + (exitPrice * qty * FEE_RATE);
+        const netPnl = grossPnl - fees;
+        const stopDist = Math.abs(entry - sl);
+        const rMultiple = stopDist > 0 ? ((exitPrice - entry) * 1) / stopDist : 0;
+        trades.push({ entry_price: entry, exit_price: exitPrice, direction, entry_bar: entryBar, exit_bar: i, pnl: netPnl, r_multiple: +rMultiple.toFixed(2), fees: +fees.toFixed(4), entry_reason: 'RSI oversold', exit_reason: exitReason });
         inTrade = false;
       }
     }
@@ -226,7 +269,6 @@ function computeMetrics(trades: BacktestTrade[]) {
   const grossProfit = wins.reduce((s, t) => s + t.pnl, 0);
   const grossLoss = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
 
-  // Max drawdown
   let peak = 0, maxDD = 0, equity = 0;
   for (const t of trades) {
     equity += t.pnl;
@@ -235,7 +277,6 @@ function computeMetrics(trades: BacktestTrade[]) {
     if (dd > maxDD) maxDD = dd;
   }
 
-  // Sharpe estimate (simplified)
   const avgPnl = totalPnl / trades.length;
   const variance = trades.reduce((s, t) => s + Math.pow(t.pnl - avgPnl, 2), 0) / trades.length;
   const stdDev = Math.sqrt(variance);
@@ -248,7 +289,8 @@ function computeMetrics(trades: BacktestTrade[]) {
     win_rate: (wins.length / trades.length) * 100,
     total_pnl: totalPnl,
     expectancy: avgPnl,
-    profit_factor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? 999 : 0,
+    // 5. PROFIT FACTOR cap 99
+    profit_factor: grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? 99.0 : 0),
     max_drawdown: maxDD,
     sharpe_estimate: sharpe,
     avg_r_multiple: trades.reduce((s, t) => s + t.r_multiple, 0) / trades.length,
@@ -267,7 +309,6 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization") || "";
     const isServiceRole = authHeader === `Bearer ${serviceKey}`;
 
-    // Authenticate caller
     let userId: string;
     if (user_id_override && isServiceRole) {
       userId = user_id_override;
@@ -287,7 +328,6 @@ serve(async (req) => {
 
     const db = createClient(supabaseUrl, serviceKey);
 
-    // Fetch OHLCV from cache
     const tf = timeframe || '1d';
     const { data: ohlcvData, error: ohlcvErr } = await db
       .from('ohlcv_cache')
@@ -308,13 +348,11 @@ serve(async (req) => {
       close: Number(d.close), volume: Number(d.volume), timestamp: d.timestamp,
     }));
 
-    // Run backtest
     const family = strategy_family || 'trend_following';
     const params = parameters || {};
     const trades = runBacktest(family, bars, params);
     const metrics = computeMetrics(trades);
 
-    // Store results
     const result = {
       user_id: userId,
       strategy_id: strategy_id || null,
@@ -324,7 +362,7 @@ serve(async (req) => {
       period_start: bars[0]?.timestamp,
       period_end: bars[bars.length - 1]?.timestamp,
       ...metrics,
-      trade_log: trades.slice(0, 100), // cap stored trades
+      trade_log: trades.slice(0, 100),
       status: 'completed',
     };
 
