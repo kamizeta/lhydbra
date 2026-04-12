@@ -13,18 +13,17 @@ interface Props {
 
 interface TradeSignal {
   id: string;
-  symbol: string;
-  name: string;
+  asset: string;
   direction: string;
-  strategy: string;
+  strategy_family: string | null;
   entry_price: number;
   stop_loss: number;
-  take_profit: number;
-  risk_reward: number;
-  confidence: number;
+  targets: number[] | any;
+  expected_r_multiple: number;
+  confidence_score: number;
   status: string;
   reasoning: string | null;
-  agent_analysis: string | null;
+  ai_rationale: string | null;
   created_at: string;
 }
 
