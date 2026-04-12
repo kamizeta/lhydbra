@@ -466,7 +466,7 @@ export default function SettingsPage() {
                     .eq('user_id', user.id);
                   if (error) { toast.error('Error: ' + error.message); return; }
                   toast.success(newVal ? 'Shadow mode ON' : 'Shadow mode OFF');
-                  refetchSettings?.();
+                  setSettings(prev => ({ ...prev, shadow_mode: newVal } as any));
                 }}
                 className={cn(
                   "px-3 py-1.5 rounded text-[10px] font-mono font-bold uppercase border transition-colors",
