@@ -41,6 +41,7 @@ const EVENT_COLORS: Record<string, string> = {
 
 export default function CapitalLedger() {
   const { user } = useAuth();
+  const eventLabels = useEventLabels();
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
