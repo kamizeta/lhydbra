@@ -399,6 +399,66 @@ export interface Translations {
     addSymbolPlaceholder: string;
     apiKeyWarning: string;
     killSwitch: string;
+    killSwitchTitle: string;
+    active: string;
+    killed: string;
+    stopAll: string;
+    reactivate: string;
+    operatorMode: string;
+    operatorModeDesc: string;
+    fullAuto: string;
+    guided: string;
+    signalFilters: string;
+    signalFiltersDesc: string;
+    minScore: string;
+    minRMultiple: string;
+    minConfidence: string;
+    capital: string;
+    currentCapital: string;
+    watchlist: string;
+    add: string;
+    saveWeights: string;
+    saveProfile: string;
+    saveAlerts: string;
+    saveNotifications: string;
+    resetDefaults: string;
+    scoringWeights: string;
+    opportunityScoreWeights: string;
+    opportunityScoreWeightsDesc: string;
+    userProfile: string;
+    binanceApi: string;
+    binanceDesc: string;
+    binanceSecurityNote: string;
+    binanceVaultNote: string;
+    binanceNotConfigured: string;
+    binanceNewKeyLabel: string;
+    binanceNewSecretLabel: string;
+    binanceNewKeyPlaceholder: string;
+    binanceNewSecretPlaceholder: string;
+    apiKey: string;
+    apiSecret: string;
+    notificationPrefs: string;
+    notificationPrefsDesc: string;
+    notifSlTp: string;
+    notifSlTpDesc: string;
+    notifRisk: string;
+    notifRiskDesc: string;
+    notifRegime: string;
+    notifRegimeDesc: string;
+    notifSignals: string;
+    notifSignalsDesc: string;
+    notifPnl: string;
+    notifPnlDesc: string;
+    notifAgents: string;
+    notifAgentsDesc: string;
+    externalAlerts: string;
+    externalAlertsDesc: string;
+    riskTab: string;
+    scoringTab: string;
+    profileTab: string;
+    binanceTab: string;
+    notificationsTab: string;
+    alertsTab: string;
   };
   // Research / Backtest
   research: {
@@ -407,6 +467,7 @@ export interface Translations {
     months: string;
     exitReason: string;
     minScore: string;
+    tradeLog: string;
   };
   // Opportunity Radar
   radar: {
@@ -414,6 +475,10 @@ export interface Translations {
     macro: string;
     sentiment: string;
     historical: string;
+    momentum: string;
+    volatility: string;
+    strategy: string;
+    riskReward: string;
   };
   // Kelly Dashboard
   kelly: {
@@ -432,5 +497,42 @@ export interface Translations {
   // Learning
   learning: {
     runAdaptation: string;
+    title: string;
+    subtitle: string;
+    signalOutcomes: string;
+    adaptations: string;
+  };
+  // Signals
+  signals: {
+    generateSignals: string;
+    noSignalsYet: string;
+    noSignalsMatch: string;
+    calculatingScores: string;
+    featuresOn: string;
+    featuresOff: string;
+    autoIdeas: string;
+    deleteAllTitle: string;
+    deleteAllDesc: string;
+    deleteAllConfirm: string;
+  };
+  // Portfolio Allocation
+  allocationPage: {
+    subtitle: string;
+    totalCapital: string;
+    invested: string;
+    freeCapital: string;
+    opportunityScore: string;
+    confidence: string;
+    rrExpected: string;
+    correlationPenalty: string;
+    scoreMultiplier: string;
+    noOpenPositions: string;
+    noOpenPositionsDesc: string;
+  };
+  // Notifications page
+  notifPage: {
+    deleteAllTitle: string;
+    deleteAllDesc: string;
+    deleteConfirm: string;
   };
 }
