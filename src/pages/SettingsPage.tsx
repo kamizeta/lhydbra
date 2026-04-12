@@ -353,9 +353,9 @@ export default function SettingsPage() {
               <div className="flex items-center gap-2">
                 <Power className={cn("h-4 w-4", tradingEnabled ? "text-green-400" : "text-destructive")} />
                 <div>
-                  <h3 className="text-sm font-mono font-medium text-foreground">Emergency Kill Switch</h3>
+                  <h3 className="text-sm font-mono font-medium text-foreground">{t.settings.killSwitchTitle}</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {tradingEnabled ? "Trading is active" : `Trading STOPPED${killSwitchReason ? `: ${killSwitchReason}` : ""}`}
+                    {tradingEnabled ? t.settings.tradingActive : `${t.settings.tradingStopped}${killSwitchReason ? `: ${killSwitchReason}` : ""}`}
                   </p>
                 </div>
               </div>
@@ -365,7 +365,7 @@ export default function SettingsPage() {
                   ? "bg-green-500/10 text-green-400 border border-green-500/30"
                   : "bg-destructive/10 text-destructive border border-destructive/30"
               )}>
-                {tradingEnabled ? "ACTIVE" : "KILLED"}
+                {tradingEnabled ? t.settings.active : t.settings.killed}
               </span>
             </div>
             <button
@@ -395,7 +395,7 @@ export default function SettingsPage() {
                   : "bg-green-600 text-white hover:bg-green-700"
               )}
             >
-              {killSwitchLoading ? "..." : tradingEnabled ? "⚠ STOP ALL TRADING" : "✓ REACTIVATE TRADING"}
+              {killSwitchLoading ? "..." : tradingEnabled ? t.settings.stopAll : t.settings.reactivate}
             </button>
           </div>
 
@@ -404,10 +404,10 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-mono font-medium text-foreground">
-                  Operator Mode
+                   {t.settings.operatorMode}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Controls whether the system executes trades automatically
+                  {t.settings.operatorModeDesc}
                 </p>
               </div>
               <span className={cn(
@@ -416,7 +416,7 @@ export default function SettingsPage() {
                   ? "bg-green-500/10 text-green-400 border border-green-500/30"
                   : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30"
               )}>
-                {goal?.automation_level === 'full_operator' ? 'FULL AUTO' : 'GUIDED'}
+                {goal?.automation_level === 'full_operator' ? t.settings.fullAuto : t.settings.guided}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -549,7 +549,7 @@ export default function SettingsPage() {
                     setWatchlistInput('');
                   }
                 }}
-                placeholder="Add symbol (e.g. AMZN)"
+                placeholder={t.settings.addSymbolPlaceholder}
                 className="flex-1 px-3 py-1.5 bg-background border border-border rounded-md text-xs text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
               <button
@@ -562,7 +562,7 @@ export default function SettingsPage() {
                 }}
                 className="px-3 py-1.5 border border-border rounded-md text-xs font-medium text-muted-foreground hover:bg-accent transition-colors"
               >
-                Add
+                {t.settings.add}
               </button>
             </div>
           </div>
@@ -577,7 +577,7 @@ export default function SettingsPage() {
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? t.common.saving : t.common.save}
             </button>
           </div>
 
