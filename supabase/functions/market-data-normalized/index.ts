@@ -119,10 +119,17 @@ Deno.serve(async (req) => {
                   if (barsRes.ok) {
                     const barsData = await barsRes.json();
                     const symbolBars = barsData.bars?.[sym];
+                    console.log(`[market-data] Crypto bars for ${sym}: count=${symbolBars?.length ?? 0}`);
                     if (symbolBars && symbolBars.length >= 2) {
                       const prevClose = symbolBars[symbolBars.length - 2].c;
                       changePct = prevClose > 0 ? +((price - prevClose) / prevClose * 100).toFixed(2) : 0;
+                    } else if (symbolBars && symbolBars.length === 1) {
+                      // Only one bar available — use its open as reference
+                      const prevClose = symbolBars[0].o;
+                      changePct = prevClose > 0 ? +((price - prevClose) / prevClose * 100).toFixed(2) : 0;
                     }
+                  } else {
+                    console.warn(`[market-data] Crypto bars HTTP ${barsRes.status} for ${sym}`);
                   }
                 } catch (e) {
                   console.warn(`[market-data] Failed to get crypto change for ${sym}:`, e);
