@@ -40,15 +40,15 @@ function getTier(score: number) {
   return SCORE_TIERS.find(t => score >= t.min) || SCORE_TIERS[SCORE_TIERS.length - 1];
 }
 
-const SUB_SCORE_LABELS: { key: string; label: string }[] = [
-  { key: "structure_score", labelKey: "structure" as const },
-  { key: "momentum_score", labelKey: "momentum" as const },
-  { key: "volatility_score", labelKey: "volatility" as const },
-  { key: "strategy_score", labelKey: "strategy" as const },
-  { key: "rr_score", labelKey: "riskReward" as const },
-  { key: "macro_score", labelKey: "macro" as const },
-  { key: "sentiment_score", labelKey: "sentiment" as const },
-  { key: "historical_score", labelKey: "historical" as const },
+const SUB_SCORE_LABELS: { key: string; labelKey: string }[] = [
+  { key: "structure_score", labelKey: "structure" },
+  { key: "momentum_score", labelKey: "momentum" },
+  { key: "volatility_score", labelKey: "volatility" },
+  { key: "strategy_score", labelKey: "strategy" },
+  { key: "rr_score", labelKey: "riskReward" },
+  { key: "macro_score", labelKey: "macro" },
+  { key: "sentiment_score", labelKey: "sentiment" },
+  { key: "historical_score", labelKey: "historical" },
 ];
 
 export default function OpportunityRadar() {
