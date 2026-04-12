@@ -18,6 +18,7 @@ export interface RiskContext {
   entryPrice: number;
   stopLoss: number;
   capital: number;
+  trading_enabled: boolean;
   settings: {
     max_risk_per_trade: number;
     max_single_asset_pct: number;
@@ -37,6 +38,11 @@ export interface RiskContext {
 }
 
 export function checkAllRiskRules(ctx: RiskContext): RiskCheckResult {
+  // 0. Kill switch
+  if (!ctx.trading_enabled) {
+    return { allowed: false, reason: "Kill switch active" };
+  }
+
   // 1. Daily loss guard
   const maxDailyLoss =
     (ctx.settings.max_daily_loss_pct / 100) * ctx.capital;
