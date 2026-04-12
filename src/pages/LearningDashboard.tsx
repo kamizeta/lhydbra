@@ -43,6 +43,7 @@ interface SignalOutcome {
 
 export default function LearningDashboard() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [adjustments, setAdjustments] = useState<ScoreAdjustment[]>([]);
   const [regimePerf, setRegimePerf] = useState<RegimePerf[]>([]);
   const [outcomes, setOutcomes] = useState<SignalOutcome[]>([]);
