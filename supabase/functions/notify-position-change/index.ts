@@ -150,6 +150,11 @@ Deno.serve(async (req) => {
       }),
     });
 
+    if (!tgResponse.ok) {
+      const tgError = await tgResponse.text();
+      console.error("Telegram API error:", tgResponse.status, tgError);
+    }
+
     // Also persist to notifications table
     const titleMap: Record<string, string> = {
       INSERT: "Posición abierta",
