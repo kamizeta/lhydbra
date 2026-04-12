@@ -202,6 +202,7 @@ export default function SignalDetailPanel({ signal, onSignalSent }: Props) {
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-mono font-medium transition-all bg-loss/10 text-loss hover:bg-loss/20 border border-loss/20"
           >
             <XCircle className="h-3.5 w-3.5" /> Invalidar Señal
+          </button>
         </div>
       )}
     </div>
