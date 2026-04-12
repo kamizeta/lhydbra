@@ -511,7 +511,7 @@ Deno.serve(async (req) => {
         symbol: sym, trades: symTrades.length,
         wins: wins.length, losses: losses.length,
         win_rate: symTrades.length > 0 ? +((wins.length / symTrades.length) * 100).toFixed(1) : 0,
-        profit_factor: gl > 0 ? +(gp / gl).toFixed(2) : gp > 0 ? 999 : 0,
+        profit_factor: gl > 0 ? +(gp / gl).toFixed(2) : gp > 0 ? 99.0 : 0,
         total_pnl: +totalPnl.toFixed(2),
         avg_r: symTrades.length > 0
           ? +(symTrades.reduce((s, t) => s + Number(t.r_actual), 0) / symTrades.length).toFixed(2)
@@ -575,7 +575,7 @@ Deno.serve(async (req) => {
         wins: allWins.length,
         losses: allLosses.length,
         win_rate: allTrades.length > 0 ? +((allWins.length / allTrades.length) * 100).toFixed(1) : 0,
-        profit_factor: gl2 > 0 ? +(gp2 / gl2).toFixed(2) : gp2 > 0 ? 999 : 0,
+        profit_factor: gl2 > 0 ? +(gp2 / gl2).toFixed(2) : gp2 > 0 ? 99.0 : 0,
         max_drawdown_pct: +maxDD.toFixed(2),
         avg_r: allTrades.length > 0
           ? +(allTrades.reduce((s, t) => s + Number(t.r_actual), 0) / allTrades.length).toFixed(2)
