@@ -2119,6 +2119,7 @@ export type Database = {
           operator_mode: boolean
           paper_trading: boolean | null
           risk_per_trade: number
+          shadow_mode: boolean | null
           stop_loss_required: boolean
           trades_today: number
           updated_at: string
@@ -2161,6 +2162,7 @@ export type Database = {
           operator_mode?: boolean
           paper_trading?: boolean | null
           risk_per_trade?: number
+          shadow_mode?: boolean | null
           stop_loss_required?: boolean
           trades_today?: number
           updated_at?: string
@@ -2203,6 +2205,7 @@ export type Database = {
           operator_mode?: boolean
           paper_trading?: boolean | null
           risk_per_trade?: number
+          shadow_mode?: boolean | null
           stop_loss_required?: boolean
           trades_today?: number
           updated_at?: string

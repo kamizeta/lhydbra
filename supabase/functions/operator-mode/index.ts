@@ -701,6 +701,33 @@ Deno.serve(async (req) => {
             continue; // SKIP this trade - do NOT call Alpaca without DB record
           }
 
+          // ─── Shadow Mode: log but don't execute ───
+          const shadowMode = (settings as any).shadow_mode === true;
+          if (shadowMode) {
+            tradeLog("shadow_trade", {
+              user_id: user.id,
+              symbol: String(trade.asset),
+              direction: String(trade.direction),
+              quantity: trade.quantity,
+              entry_price: Number(trade.entry_price),
+              stop_loss: Number(trade.stop_loss),
+              take_profit: Number(trade.take_profit),
+              signal_score: Number(trade.opportunity_score),
+              kelly_fraction: Number(trade.kelly_fraction || 0),
+            });
+
+            if (newOrder) {
+              await supabase.from("orders").update({
+                status: "shadow",
+                metadata: { shadow: true, signal_score: Number(trade.opportunity_score) },
+                updated_at: new Date().toISOString(),
+              }).eq("id", newOrder.id);
+            }
+
+            execResults.push({ symbol: String(trade.asset), success: true, shadow: true });
+            continue; // Skip actual Alpaca execution
+          }
+
           // ─── Submit to Alpaca ───
           if (newOrder) {
             tradeLog("order_submitted", { user_id: user.id, symbol: String(trade.asset), qty: trade.quantity, entry: Number(trade.entry_price), direction: String(trade.direction), order_id: newOrder.id });

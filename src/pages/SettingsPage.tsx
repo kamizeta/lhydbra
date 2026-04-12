@@ -448,9 +448,38 @@ export default function SettingsPage() {
                 </div>
               </button>
             </div>
+
+            {/* Shadow Mode Toggle */}
+            <div className="mt-3 flex items-center justify-between p-3 rounded border border-border">
+              <div>
+                <div className="text-xs font-mono font-medium text-foreground">Shadow Mode</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">
+                  Simulate without executing — logs what would happen
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!user) return;
+                  const newVal = !(settings as any)?.shadow_mode;
+                  const { error } = await supabase.from('user_settings')
+                    .update({ shadow_mode: newVal })
+                    .eq('user_id', user.id);
+                  if (error) { toast.error('Error: ' + error.message); return; }
+                  toast.success(newVal ? 'Shadow mode ON' : 'Shadow mode OFF');
+                  setSettings(prev => ({ ...prev, shadow_mode: newVal } as any));
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded text-[10px] font-mono font-bold uppercase border transition-colors",
+                  (settings as any)?.shadow_mode
+                    ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                    : "bg-muted text-muted-foreground border-border hover:border-purple-500/30"
+                )}
+              >
+                {(settings as any)?.shadow_mode ? "ON" : "OFF"}
+              </button>
+            </div>
           </div>
 
-          {/* Watchlist Editor */}
           <div className="rounded-lg border border-border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
