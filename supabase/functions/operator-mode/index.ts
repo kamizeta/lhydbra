@@ -521,17 +521,14 @@ Deno.serve(async (req) => {
       const acctRes = await fetch(`${alpacaBase}/v2/account`, { headers: alpacaHdrs });
       if (acctRes.ok) {
         const acct = await acctRes.json();
-        // Use equity (cash + unrealized PnL) as the total account value for risk calculations,
-        // but store CASH as current_capital so dashboard formula (cash + unrealizedPnl) is correct
+        // Store equity (= cash + unrealized PnL) as current_capital
+        // Dashboard uses this directly without adding unrealized PnL again
         const alpacaEquity = parseFloat(acct.equity || acct.portfolio_value || "0");
-        const alpacaCash = parseFloat(acct.cash || "0");
         if (alpacaEquity > 0) {
-          liveCapital = alpacaEquity; // use equity for operator risk calculations
-          // Store cash (not equity) as current_capital to avoid double-counting unrealized PnL in dashboard
-          const capitalToStore = alpacaCash > 0 ? alpacaCash : alpacaEquity;
-          if (Math.abs(capitalToStore - currentCapital) / currentCapital > 0.01) {
+          liveCapital = alpacaEquity;
+          if (Math.abs(liveCapital - currentCapital) / currentCapital > 0.01) {
             await supabase.from("user_settings")
-              .update({ current_capital: capitalToStore, updated_at: new Date().toISOString() })
+              .update({ current_capital: liveCapital, updated_at: new Date().toISOString() })
               .eq("user_id", user.id);
           }
         }
