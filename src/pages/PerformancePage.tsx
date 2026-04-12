@@ -390,14 +390,14 @@ export default function PerformancePage() {
           <div className="flex gap-3 items-center flex-wrap">
             <select value={filterStrategy} onChange={e => setFilterStrategy(e.target.value)}
               className="px-3 py-1.5 bg-background border border-border rounded-md text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none">
-              <option value="all">All Strategies</option>
+              <option value="all">{t.reports.allStrategies}</option>
               {stratFamilies.map(s => <option key={s} value={s!}>{s}</option>)}
             </select>
             <select value={filterOutcome} onChange={e => setFilterOutcome(e.target.value)}
               className="px-3 py-1.5 bg-background border border-border rounded-md text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none">
-              <option value="all">All Outcomes</option>
-              <option value="win">Wins</option>
-              <option value="loss">Losses</option>
+              <option value="all">{t.reports.allOutcomes}</option>
+              <option value="win">{t.common.win}</option>
+              <option value="loss">{t.common.loss}</option>
             </select>
             <span className="text-xs text-muted-foreground font-mono">{filteredLog.length} trades</span>
           </div>

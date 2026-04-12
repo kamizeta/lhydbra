@@ -379,9 +379,12 @@ export default function RiskManagement() {
             </table>
           </div>
           {positions.length > 0 && (
-            <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
-              💡 <strong>Tamaño Ideal</strong> = cantidad que deberías tener para arriesgar exactamente {riskPercent}% ({formatCurrency(dollarRiskPerTrade)}) por posición. 
-              Si tu cantidad actual es mayor al ideal, la posición está <span className="text-warning">sobredimensionada</span>.
+             <p className="text-[10px] text-muted-foreground mt-3 leading-relaxed">
+              💡 <strong>{language === 'es' ? 'Tamaño Ideal' : 'Ideal Size'}</strong> = {t.riskMgmt.idealSizeNote.replace('{riskPct}', String(riskPercent)).replace('{dollarRisk}', formatCurrency(dollarRiskPerTrade))}
+              {language === 'es' 
+                ? <> Si tu cantidad actual es mayor al ideal, la posición está <span className="text-warning">sobredimensionada</span>.</>
+                : <> If your current size exceeds the ideal, the position is <span className="text-warning">oversized</span>.</>
+              }
             </p>
           )}
         </div>
@@ -390,7 +393,7 @@ export default function RiskManagement() {
       {openCount === 0 && (
         <div className="terminal-border rounded-lg p-8 text-center">
           <Shield className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No hay posiciones abiertas — abre posiciones para ver el análisis de riesgo detallado</p>
+          <p className="text-sm text-muted-foreground">{t.allocationPage.noOpenPositionsDesc}</p>
         </div>
       )}
     </div>
