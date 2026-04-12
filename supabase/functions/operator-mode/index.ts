@@ -672,7 +672,7 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           if (existingOrder) {
-            console.log(`[operator] Order already exists for ${trade.asset}: ${existingOrder.status}`);
+            tradeLog("order_duplicate_skipped", { user_id: user.id, symbol: String(trade.asset), existing_status: existingOrder.status });
             execResults.push({ symbol: trade.asset, success: false, error: `Duplicate order (${existingOrder.status})`, skipped: true });
             continue;
           }
@@ -696,7 +696,7 @@ Deno.serve(async (req) => {
             .single();
 
           if (orderInsertErr) {
-            console.error(`[operator] Order insert failed for ${trade.asset}:`, orderInsertErr.message);
+            log("error", "order_insert_failed", { user_id: user.id, symbol: String(trade.asset), error: orderInsertErr.message });
           }
 
           // ─── Submit to Alpaca ───
@@ -747,11 +747,11 @@ Deno.serve(async (req) => {
 
           // ─── HALT: fail-safe or critical from alpaca-trade ───
           if (orderResult.fail_safe_triggered) {
-            console.error(`[operator-mode] FAIL-SAFE triggered for ${trade.asset}. Halting execution for this user.`);
-            break;
+            tradeLog("fail_safe_triggered", { user_id: user.id, symbol: String(trade.asset) });
+            log("error", "execution_halted", { user_id: user.id, reason: "fail_safe", symbol: String(trade.asset) });
           }
           if (orderResult.critical) {
-            console.error(`[operator-mode] CRITICAL: Unprotected position for ${trade.asset}. Halting ALL execution immediately.`);
+            log("error", "critical_unprotected_position", { user_id: user.id, symbol: String(trade.asset) });
             break;
           }
 
@@ -824,9 +824,9 @@ Deno.serve(async (req) => {
               }).eq("id", newOrder.id);
             }
           } else if (!orderResult.success && !orderResult.pending) {
-            console.error("Order failed for", trade.asset, ":", orderResult.error);
+            log("error", "order_failed", { user_id: user.id, symbol: String(trade.asset), error: orderResult.error });
           } else if (orderResult.pending) {
-            console.warn("Fill unconfirmed for", trade.asset, "- will reconcile via alpaca-sync");
+            log("warn", "order_fill_unconfirmed", { user_id: user.id, symbol: String(trade.asset) });
           }
         } catch (execErr) {
           execResults.push({ symbol: trade.asset, success: false, error: execErr instanceof Error ? execErr.message : "Execution failed" });
