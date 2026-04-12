@@ -205,14 +205,9 @@ Deno.serve(async (req) => {
       return jsonRes(req, { error: "Rate limit exceeded. Try again in a minute." }, 429);
     }
 
-    // ─── KILL SWITCH CHECK ───
+    // ─── Load system config (kill switch handled by risk engine) ───
     const { data: sysConfig } = await supabase.from("system_config").select("*").eq("id", "global").maybeSingle();
-    if (sysConfig && !sysConfig.trading_enabled) {
-      return jsonRes({
-        status: "killed",
-        reason: sysConfig.kill_switch_reason || "System kill switch active",
-      });
-    }
+    const tradingEnabled = sysConfig ? Boolean(sysConfig.trading_enabled) : true;
 
     // ─── FEATURE FLAGS ───
     const { data: flagRows } = await supabase.from("feature_flags").select("id, enabled");
@@ -247,7 +242,7 @@ Deno.serve(async (req) => {
     const autoExecute = Boolean(settings.auto_execute);
     let currentCapital = Number(settings.current_capital || 10000);
 
-    // ─── DAILY LOSS GUARD ───
+    // ─── DAILY LOSS GUARD (handled by risk engine per-trade) ───
     const { data: todayJournal } = await supabase
       .from("trade_journal")
       .select("pnl")
@@ -255,13 +250,6 @@ Deno.serve(async (req) => {
       .gte("exited_at", today);
     const dailyPnl = (todayJournal || []).reduce((sum: number, t: any) => sum + (Number(t.pnl) || 0), 0);
     const maxDailyLossPct = sysConfig?.max_daily_loss_pct || 3;
-    const maxDailyLoss = (maxDailyLossPct / 100) * currentCapital;
-    if (dailyPnl < -maxDailyLoss) {
-      return jsonRes({
-        status: "blocked",
-        reason: `Daily loss limit reached: $${dailyPnl.toFixed(2)} exceeds max -$${maxDailyLoss.toFixed(2)}`,
-      });
-    }
     const baseRiskPerTrade = Number(settings.risk_per_trade || 1);
     const maxDailyRisk = Number(settings.max_daily_risk || 2);
     const maxDrawdown = Number(settings.max_drawdown || 15);
