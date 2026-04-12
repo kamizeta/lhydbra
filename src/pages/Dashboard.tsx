@@ -130,6 +130,11 @@ export default function Dashboard() {
           )}>
             {metrics.cooldownActive ? "COOLDOWN" : metrics.dailyCapReached ? "CAP REACHED" : "ACTIVE"}
           </span>
+          {(settings as any)?.shadow_mode && (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-widest uppercase bg-purple-500/10 text-purple-400 border border-purple-500/30">
+              SHADOW
+            </span>
+          )}
           <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider hidden sm:inline">
             {goal?.automation_level === "full_operator" ? "● AUTO" : "○ GUIDED"}
           </span>
