@@ -293,7 +293,7 @@ export default function AgentsPanel() {
                         <div key={analysis.id} className="border-b border-border last:border-b-0">
                           <div className="flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-accent/20 transition-colors" onClick={() => setExpandedAgent2(isExpanded ? null : key)}>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-foreground">{AGENT_LABELS[analysis.agent_type] || analysis.agent_type}</span>
+                              <span className="text-xs font-bold text-foreground">{AGENT_LABEL_KEYS[analysis.agent_type] ? t.agents[AGENT_LABEL_KEYS[analysis.agent_type] as keyof typeof t.agents] : analysis.agent_type}</span>
                               <span className="text-[10px] font-mono text-muted-foreground">{new Date(analysis.created_at).toLocaleTimeString()}</span>
                             </div>
                             {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
