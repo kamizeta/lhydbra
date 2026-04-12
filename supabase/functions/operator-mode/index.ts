@@ -702,6 +702,7 @@ Deno.serve(async (req) => {
             entryPrice: Number(trade.entry_price),
             stopLoss: Number(trade.stop_loss),
             capital: liveCapital,
+            trading_enabled: tradingEnabled,
             settings: {
               max_risk_per_trade: Number(settings.risk_per_trade || 1),
               max_single_asset_pct: Number(settings.max_single_asset || 25),
