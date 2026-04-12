@@ -12,6 +12,7 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
+import { useI18n } from "@/i18n";
 
 // ── Types ───────────────────────────────────────────
 

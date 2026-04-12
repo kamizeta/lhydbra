@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/utils";
 import StatusBadge from "@/components/shared/StatusBadge";
 import MetricCard from "@/components/shared/MetricCard";
+import { useI18n } from "@/i18n";
 
 interface OpScore {
   asset: string;
