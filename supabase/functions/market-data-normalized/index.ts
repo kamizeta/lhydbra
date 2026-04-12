@@ -86,6 +86,11 @@ Deno.serve(async (req) => {
     }
 
     // ─── Fetch crypto quotes from Alpaca ───
+    const alpacaHeaders = {
+      "APCA-API-KEY-ID": apiKeyId,
+      "APCA-API-SECRET-KEY": apiSecret,
+      Accept: "application/json",
+    };
     if (cryptos.length > 0 && apiKeyId && apiSecret) {
       for (const sym of cryptos) {
         try {
@@ -93,11 +98,7 @@ Deno.serve(async (req) => {
           const encoded = encodeURIComponent(sym);
           const url = `https://data.alpaca.markets/v1beta3/crypto/us/latest/quotes?symbols=${encoded}`;
           const res = await fetch(url, {
-            headers: {
-              "APCA-API-KEY-ID": apiKeyId,
-              "APCA-API-SECRET-KEY": apiSecret,
-              Accept: "application/json",
-            },
+            headers: alpacaHeaders,
             signal: AbortSignal.timeout(5000),
           });
           if (res.ok) {
@@ -106,7 +107,28 @@ Deno.serve(async (req) => {
             if (quoteData) {
               const price = (quoteData.ap + quoteData.bp) / 2; // midpoint of ask/bid
               if (price > 0) {
-                quotes[sym] = { price: +price.toFixed(2), change_percent: 0, source: "alpaca-crypto" };
+                let changePct = 0;
+
+                // Fetch previous day bar for real change_percent
+                try {
+                  const barsUrl = `https://data.alpaca.markets/v1beta3/crypto/us/bars?symbols=${encoded}&timeframe=1Day&limit=2`;
+                  const barsRes = await fetch(barsUrl, {
+                    headers: alpacaHeaders,
+                    signal: AbortSignal.timeout(5000),
+                  });
+                  if (barsRes.ok) {
+                    const barsData = await barsRes.json();
+                    const symbolBars = barsData.bars?.[sym];
+                    if (symbolBars && symbolBars.length >= 2) {
+                      const prevClose = symbolBars[symbolBars.length - 2].c;
+                      changePct = prevClose > 0 ? +((price - prevClose) / prevClose * 100).toFixed(2) : 0;
+                    }
+                  }
+                } catch (e) {
+                  console.warn(`[market-data] Failed to get crypto change for ${sym}:`, e);
+                }
+
+                quotes[sym] = { price: +price.toFixed(2), change_percent: changePct, source: "alpaca-crypto" };
               }
             }
           }
