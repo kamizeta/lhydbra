@@ -248,7 +248,7 @@ export default function MarketExplorer() {
           <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
             <span className="text-xs font-mono text-muted-foreground">
-              {runIntelligence.isPending ? t.common.analyzing : 'Calculando scores...'}
+              {runIntelligence.isPending ? t.common.analyzing : t.signals.calculatingScores}
             </span>
             <div className="h-1.5 w-24 rounded-full bg-secondary overflow-hidden">
               <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '60%' }} />
@@ -266,7 +266,7 @@ export default function MarketExplorer() {
           )}
         >
           <Activity className="h-3.5 w-3.5" />
-          {showFeatures ? 'Features ON' : 'Features OFF'}
+          {showFeatures ? t.signals.featuresOn : t.signals.featuresOff}
         </button>
 
         <button
@@ -304,7 +304,7 @@ export default function MarketExplorer() {
           )}
         >
           {generatingIdeas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lightbulb className="h-3.5 w-3.5" />}
-          {generatingIdeas ? 'Loading...' : 'Auto-Ideas'}
+          {generatingIdeas ? t.common.loading : t.signals.autoIdeas}
         </button>
       </div>
 

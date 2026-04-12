@@ -9,9 +9,11 @@ import StatusBadge from "@/components/shared/StatusBadge";
 import SignalDetailPanel from "@/components/signals/SignalDetailPanel";
 import { useSignals, useGenerateSignals, type Signal } from "@/hooks/useSignalEngine";
 import { toast } from "sonner";
+import { useI18n } from "@/i18n";
 
 export default function SignalCenter() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [selected, setSelected] = useState<Signal | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dirFilter, setDirFilter] = useState<string>("all");
@@ -164,8 +166,8 @@ export default function SignalCenter() {
                 {filtered.length === 0 && (
                   <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">
                     {signals.length === 0
-                      ? "No signals yet. Click 'Generate Signals' to run the engine."
-                      : "No signals match the current filters"}
+                      ? t.signals.noSignalsYet
+                      : t.signals.noSignalsMatch}
                   </td></tr>
                 )}
               </tbody>

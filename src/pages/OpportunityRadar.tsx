@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/utils";
 import StatusBadge from "@/components/shared/StatusBadge";
 import MetricCard from "@/components/shared/MetricCard";
+import { useI18n } from "@/i18n";
 
 interface OpScore {
   asset: string;
@@ -39,19 +40,20 @@ function getTier(score: number) {
   return SCORE_TIERS.find(t => score >= t.min) || SCORE_TIERS[SCORE_TIERS.length - 1];
 }
 
-const SUB_SCORE_LABELS: { key: string; label: string }[] = [
-  { key: "structure_score", label: "Structure" },
-  { key: "momentum_score", label: "Momentum" },
-  { key: "volatility_score", label: "Volatility" },
-  { key: "strategy_score", label: "Strategy" },
-  { key: "rr_score", label: "R:R" },
-  { key: "macro_score", label: "Macro" },
-  { key: "sentiment_score", label: "Sentiment" },
-  { key: "historical_score", label: "Historical" },
+const SUB_SCORE_LABELS: { key: string; labelKey: string }[] = [
+  { key: "structure_score", labelKey: "structure" },
+  { key: "momentum_score", labelKey: "momentum" },
+  { key: "volatility_score", labelKey: "volatility" },
+  { key: "strategy_score", labelKey: "strategy" },
+  { key: "rr_score", labelKey: "riskReward" },
+  { key: "macro_score", labelKey: "macro" },
+  { key: "sentiment_score", labelKey: "sentiment" },
+  { key: "historical_score", labelKey: "historical" },
 ];
 
 export default function OpportunityRadar() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [scores, setScores] = useState<OpScore[]>([]);
   const [features, setFeatures] = useState<MarketFeature[]>([]);
   const [loading, setLoading] = useState(true);
@@ -232,12 +234,12 @@ export default function OpportunityRadar() {
               {/* Sub-scores detail */}
               <div className="space-y-2">
                 <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Score Breakdown</h3>
-                {SUB_SCORE_LABELS.map(({ key, label }) => {
+                {SUB_SCORE_LABELS.map(({ key, labelKey }) => {
                   const val = getSubScore(selected, key.replace('_score', ''));
                   return (
                     <div key={key} className="space-y-1">
                       <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground font-mono">{label}</span>
+                        <span className="text-muted-foreground font-mono">{t.radar[labelKey as keyof typeof t.radar] || labelKey}</span>
                         <span className={cn("font-mono font-bold", val >= 65 ? "text-profit" : val >= 45 ? "text-primary" : val >= 30 ? "text-terminal-gold" : "text-loss")}>
                           {val.toFixed(0)}
                         </span>

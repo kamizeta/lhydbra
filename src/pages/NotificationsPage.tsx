@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useI18n } from '@/i18n';
 import { Bell, Check, CheckCheck, Trash2, Filter } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
@@ -17,6 +18,7 @@ const categories = [
 ];
 
 export default function NotificationsPage() {
+  const { t } = useI18n();
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, clearAll } = useNotifications();
   const [filter, setFilter] = useState('all');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
@@ -147,12 +149,12 @@ export default function NotificationsPage() {
       <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar todas las notificaciones?</AlertDialogTitle>
-            <AlertDialogDescription>Se borrarán todas las notificaciones. Esta acción no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogTitle>{t.notifPage.deleteAllTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{t.notifPage.deleteAllDesc}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { clearAll(); setConfirmClear(false); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { clearAll(); setConfirmClear(false); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">{t.notifPage.deleteConfirm}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

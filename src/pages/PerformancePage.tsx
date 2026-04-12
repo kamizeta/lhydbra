@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
+import { useI18n } from "@/i18n";
 
 interface StratPerf {
   strategy_family: string;
@@ -53,6 +54,7 @@ type Tab = "strategy" | "score" | "log";
 
 export default function PerformancePage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [perf, setPerf] = useState<StratPerf[]>([]);
   const [journal, setJournal] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -390,14 +392,14 @@ export default function PerformancePage() {
           <div className="flex gap-3 items-center flex-wrap">
             <select value={filterStrategy} onChange={e => setFilterStrategy(e.target.value)}
               className="px-3 py-1.5 bg-background border border-border rounded-md text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none">
-              <option value="all">All Strategies</option>
+              <option value="all">{t.reports.allStrategies}</option>
               {stratFamilies.map(s => <option key={s} value={s!}>{s}</option>)}
             </select>
             <select value={filterOutcome} onChange={e => setFilterOutcome(e.target.value)}
               className="px-3 py-1.5 bg-background border border-border rounded-md text-xs font-mono focus:ring-1 focus:ring-primary focus:outline-none">
-              <option value="all">All Outcomes</option>
-              <option value="win">Wins</option>
-              <option value="loss">Losses</option>
+              <option value="all">{t.reports.allOutcomes}</option>
+              <option value="win">{t.common.win}</option>
+              <option value="loss">{t.common.loss}</option>
             </select>
             <span className="text-xs text-muted-foreground font-mono">{filteredLog.length} trades</span>
           </div>

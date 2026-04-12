@@ -364,15 +364,15 @@ export default function TradeIdeas() {
       <AlertDialog open={confirmDeleteAll} onOpenChange={setConfirmDeleteAll}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar todas las señales?</AlertDialogTitle>
+            <AlertDialogTitle>{t.signals.deleteAllTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará todas las señales. No se puede deshacer.
+              {t.signals.deleteAllDesc}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t.common.cancel}</AlertDialogCancel>
             <AlertDialogAction onClick={deleteAllSignals} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Eliminar todas
+              {t.signals.deleteAllConfirm}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

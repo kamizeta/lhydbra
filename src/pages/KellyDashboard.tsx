@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, Activity, Target } from "lucide-react";
+import { useI18n } from "@/i18n";
 
 function getBarColor(kellyPct: number): string {
   if (kellyPct >= 8) return "hsl(142, 71%, 45%)";
@@ -21,6 +22,7 @@ function getRiskBadge(kellyPct: number) {
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
+  const { t } = useI18n();
   if (!active || !payload?.length) return null;
   const data = payload[0].payload as KellySymbolStats;
   return (
@@ -28,9 +30,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <p className="font-mono font-bold text-foreground text-sm">{label}</p>
       <div className="mt-1.5 space-y-0.5 text-xs font-mono text-muted-foreground">
         <p>Half-Kelly: <span className="text-primary font-bold">{data.kelly_pct.toFixed(2)}%</span></p>
-        <p>Win Rate: {(data.win_rate * 100).toFixed(1)}%</p>
-        <p>R-Ratio: {data.r_ratio.toFixed(2)}</p>
-        <p>Trades: {data.total_trades}</p>
+        <p>{t.kelly.winPct}: {(data.win_rate * 100).toFixed(1)}%</p>
+        <p>{t.kelly.rRatio}: {data.r_ratio.toFixed(2)}</p>
+        <p>{t.kelly.trades}: {data.total_trades}</p>
       </div>
     </div>
   );

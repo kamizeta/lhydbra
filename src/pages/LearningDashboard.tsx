@@ -7,6 +7,7 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 import MetricCard from "@/components/shared/MetricCard";
 import StatusBadge from "@/components/shared/StatusBadge";
 import { toast } from "sonner";
+import { useI18n } from "@/i18n";
 
 interface ScoreAdjustment {
   id: string;
@@ -42,6 +43,7 @@ interface SignalOutcome {
 
 export default function LearningDashboard() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [adjustments, setAdjustments] = useState<ScoreAdjustment[]>([]);
   const [regimePerf, setRegimePerf] = useState<RegimePerf[]>([]);
   const [outcomes, setOutcomes] = useState<SignalOutcome[]>([]);
@@ -118,14 +120,14 @@ export default function LearningDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Brain className="h-6 w-6 text-primary" /> Learning Dashboard
+            <Brain className="h-6 w-6 text-primary" /> {t.learning.title}
           </h1>
-          <p className="text-sm text-muted-foreground font-mono">Adaptive scoring • Performance feedback • Weight calibration</p>
+          <p className="text-sm text-muted-foreground font-mono">{t.learning.subtitle}</p>
         </div>
         <button onClick={runAdaptation} disabled={adapting}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
           {adapting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          {adapting ? "Adapting..." : "Run Adaptation"}
+          {adapting ? t.common.adapting : t.learning.runAdaptation}
         </button>
       </div>
 
