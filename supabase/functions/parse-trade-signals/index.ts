@@ -60,7 +60,6 @@ serve(async (req) => {
       en: "",
     };
 
-    // Use tool calling for structured extraction
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -137,7 +136,6 @@ serve(async (req) => {
 
     const aiResult = await response.json();
     
-    // Extract from tool call response
     let signals: any[] = [];
     const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.arguments) {
@@ -148,7 +146,6 @@ serve(async (req) => {
         signals = args.signals || [];
       } catch (e) {
         console.error("Failed to parse tool call arguments:", e);
-        // Fallback: try legacy content extraction
         const rawContent = aiResult.choices?.[0]?.message?.content || "[]";
         let jsonStr = rawContent.trim();
         if (jsonStr.startsWith("```")) {
@@ -164,7 +161,7 @@ serve(async (req) => {
       });
     }
 
-    // Enrich signals with opportunity_scores from DB when AI doesn't provide them
+    // Enrich signals with opportunity_scores from DB
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const db = createClient(supabaseUrl, serviceKey);
     const signalSymbols = [...new Set(signals.map((s: any) => s.symbol).filter(Boolean))];
@@ -178,49 +175,59 @@ serve(async (req) => {
       }
     }
 
-    // Insert signals into trade_signals table
+    // Map to unified signals table schema
+    const today = new Date().toISOString().slice(0, 10);
     const rows = signals.map((s: any) => {
       const dbScore = scoreMap[s.symbol];
-      const oppScore = s.opportunity_score ? Number(s.opportunity_score) : (dbScore?.total_score ?? null);
+      const oppScore = s.opportunity_score ? Number(s.opportunity_score) : (dbScore?.total_score ?? 0);
       const breakdown = dbScore ? {
         structure: dbScore.structure_score, momentum: dbScore.momentum_score,
         volatility: dbScore.volatility_score, strategy: dbScore.strategy_score,
         rr: dbScore.rr_score, macro: dbScore.macro_score,
         sentiment: dbScore.sentiment_score, historical: dbScore.historical_score,
-      } : null;
+      } : {};
+
+      const stopDist = Math.abs(Number(s.entry_price) - Number(s.stop_loss));
+      const tpDist = Math.abs(Number(s.take_profit) - Number(s.entry_price));
+      const expectedR = stopDist > 0 ? +(tpDist / stopDist).toFixed(2) : Number(s.risk_reward) || 1.5;
 
       return {
         user_id: user.id,
-        symbol: s.symbol || "UNKNOWN",
-        name: s.name || s.symbol || "Unknown",
-        asset_type: s.asset_type || "stock",
+        asset: s.symbol || "UNKNOWN",
+        asset_class: s.asset_type || "stock",
         direction: s.direction || "long",
-        strategy: s.strategy || "AI Generated",
         strategy_family: s.strategy_family || null,
         entry_price: Number(s.entry_price) || 0,
         stop_loss: Number(s.stop_loss) || 0,
-        take_profit: Number(s.take_profit) || 0,
-        risk_reward: Number(s.risk_reward) || 1.5,
-        position_size: s.position_size ? Number(s.position_size) : null,
-        risk_percent: s.risk_percent ? Number(s.risk_percent) : null,
-        confidence: Math.min(100, Math.max(0, Number(s.confidence) || 50)),
-        reasoning: s.reasoning || null,
-        agent_analysis: s.agent_analysis || null,
+        targets: [{ price: Number(s.take_profit) || 0, label: "TP1" }],
+        expected_r_multiple: expectedR,
+        confidence_score: Math.min(100, Math.max(0, Number(s.confidence) || 50)),
         opportunity_score: oppScore,
         score_breakdown: breakdown,
-        market_regime: s.market_regime || null,
-        status: "pending",
+        reasoning: s.reasoning || null,
+        ai_rationale: s.agent_analysis || null,
+        market_regime: s.market_regime || "undefined",
+        explanation: {
+          name: s.name || s.symbol,
+          strategy: s.strategy || "AI Generated",
+          position_size: s.position_size ? Number(s.position_size) : null,
+          risk_percent: s.risk_percent ? Number(s.risk_percent) : null,
+        },
+        modifiers_applied: {},
+        weight_profile_used: {},
+        signal_key: `${user.id}|${s.symbol}|${s.direction}|1d|${today}`,
+        status: "active",
       };
     });
 
     const { data: inserted, error: insertError } = await supabase
-      .from("trade_signals")
-      .insert(rows)
+      .from("signals")
+      .upsert(rows, { onConflict: "signal_key", ignoreDuplicates: true })
       .select();
 
     if (insertError) {
       console.error("Insert error:", insertError);
-      return new Response(JSON.stringify({ error: "Failed to save trade signals", details: insertError.message }), {
+      return new Response(JSON.stringify({ error: "Failed to save signals", details: insertError.message }), {
         status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
