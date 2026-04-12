@@ -35,12 +35,33 @@ export default function PositionSignalDetail({ signalId, onClose }: Props) {
 
   useEffect(() => {
     supabase
-      .from('trade_signals')
+      .from('signals')
       .select('*')
       .eq('id', signalId)
       .maybeSingle()
       .then(({ data }) => {
-        setSignal(data as TradeSignal | null);
+        if (data) {
+          // Map signals table fields to TradeSignal interface
+          const mapped: TradeSignal = {
+            id: data.id,
+            symbol: data.asset,
+            name: data.strategy_family || data.asset,
+            direction: data.direction,
+            strategy: data.strategy_family || 'hybrid',
+            entry_price: data.entry_price,
+            stop_loss: data.stop_loss,
+            take_profit: Array.isArray(data.targets) && data.targets.length > 0 ? Number(data.targets[0]) : data.entry_price,
+            risk_reward: data.expected_r_multiple,
+            confidence: data.confidence_score,
+            status: data.status,
+            reasoning: data.reasoning,
+            agent_analysis: null,
+            created_at: data.created_at,
+          };
+          setSignal(mapped);
+        } else {
+          setSignal(null);
+        }
         setLoading(false);
       });
   }, [signalId]);

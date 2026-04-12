@@ -178,34 +178,29 @@ serve(async (req) => {
       }
     }
 
-    // Insert signals into trade_signals table
+    // Insert signals into signals table
     const rows = signals.map((s: any) => {
       const dbScore = scoreMap[s.symbol];
-      const oppScore = s.opportunity_score ? Number(s.opportunity_score) : (dbScore?.total_score ?? null);
+      const oppScore = s.opportunity_score ? Number(s.opportunity_score) : (dbScore?.total_score ?? 0);
       const breakdown = dbScore ? {
         structure: dbScore.structure_score, momentum: dbScore.momentum_score,
         volatility: dbScore.volatility_score, strategy: dbScore.strategy_score,
         rr: dbScore.rr_score, macro: dbScore.macro_score,
         sentiment: dbScore.sentiment_score, historical: dbScore.historical_score,
-      } : null;
+      } : {};
 
       return {
         user_id: user.id,
-        symbol: s.symbol || "UNKNOWN",
-        name: s.name || s.symbol || "Unknown",
-        asset_type: s.asset_type || "stock",
+        asset: s.symbol || "UNKNOWN",
+        asset_class: s.asset_type || "stock",
         direction: s.direction || "long",
-        strategy: s.strategy || "AI Generated",
         strategy_family: s.strategy_family || null,
         entry_price: Number(s.entry_price) || 0,
         stop_loss: Number(s.stop_loss) || 0,
-        take_profit: Number(s.take_profit) || 0,
-        risk_reward: Number(s.risk_reward) || 1.5,
-        position_size: s.position_size ? Number(s.position_size) : null,
-        risk_percent: s.risk_percent ? Number(s.risk_percent) : null,
-        confidence: Math.min(100, Math.max(0, Number(s.confidence) || 50)),
-        reasoning: s.reasoning || null,
-        agent_analysis: s.agent_analysis || null,
+        targets: [Number(s.take_profit) || 0],
+        expected_r_multiple: Number(s.risk_reward) || 1.5,
+        confidence_score: Math.min(100, Math.max(0, Number(s.confidence) || 50)),
+        reasoning: [s.reasoning, s.agent_analysis].filter(Boolean).join(" | ") || null,
         opportunity_score: oppScore,
         score_breakdown: breakdown,
         market_regime: s.market_regime || null,
@@ -214,7 +209,7 @@ serve(async (req) => {
     });
 
     const { data: inserted, error: insertError } = await supabase
-      .from("trade_signals")
+      .from("signals")
       .insert(rows)
       .select();
 

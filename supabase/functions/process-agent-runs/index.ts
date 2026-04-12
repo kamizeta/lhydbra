@@ -306,27 +306,22 @@ async function parseAndSaveSignals(apiKey: string, admin: ReturnType<typeof crea
 
   const rows = signals.map((signal) => ({
     user_id: userId,
-    symbol: signal.symbol || "UNKNOWN",
-    name: signal.name || signal.symbol || "Unknown",
-    asset_type: signal.asset_type || "stock",
+    asset: signal.symbol || "UNKNOWN",
+    asset_class: signal.asset_type || "stock",
     direction: signal.direction || "long",
-    strategy: signal.strategy || "AI Generated",
     strategy_family: signal.strategy_family || null,
     entry_price: Number(signal.entry_price) || 0,
     stop_loss: Number(signal.stop_loss) || 0,
-    take_profit: Number(signal.take_profit) || 0,
-    risk_reward: Number(signal.risk_reward) || 1.5,
-    position_size: signal.position_size ? Number(signal.position_size) : null,
-    risk_percent: signal.risk_percent ? Number(signal.risk_percent) : null,
-    confidence: Math.min(100, Math.max(0, Number(signal.confidence) || 50)),
-    reasoning: signal.reasoning || null,
-    agent_analysis: signal.agent_analysis || null,
-    opportunity_score: signal.opportunity_score ? Number(signal.opportunity_score) : null,
+    targets: [Number(signal.take_profit) || 0],
+    expected_r_multiple: Number(signal.risk_reward) || 1.5,
+    confidence_score: Math.min(100, Math.max(0, Number(signal.confidence) || 50)),
+    reasoning: [signal.reasoning, signal.agent_analysis].filter(Boolean).join(" | ") || null,
+    opportunity_score: signal.opportunity_score ? Number(signal.opportunity_score) : 0,
     market_regime: signal.market_regime || null,
     status: "pending",
   }));
 
-  const { error } = await admin.from("trade_signals").insert(rows);
+  const { error } = await admin.from("signals").insert(rows);
   if (error) console.error("process-agent-runs failed to save signals:", error);
 }
 
