@@ -107,6 +107,17 @@ export default function SettingsPage() {
   }, [savedSettings]);
   useEffect(() => { setLocalNotifPrefs(notifPrefs); }, [notifPrefs]);
 
+  // Load system config (kill switch)
+  useEffect(() => {
+    supabase.from('system_config').select('trading_enabled, kill_switch_reason').eq('id', 'global').maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setTradingEnabled(data.trading_enabled);
+          setKillSwitchReason(data.kill_switch_reason);
+        }
+      });
+  }, []);
+
   // Load profile
   useEffect(() => {
     if (!user) return;
