@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { log, tradeLog } from "../_shared/logger.ts";
 
 const ALLOWED_ORIGINS = [
   "https://lhydbra.lovable.app",
@@ -331,6 +332,7 @@ serve(async (req) => {
         orderBody.stop_price = round2(stop_price);
       }
 
+      tradeLog("alpaca_order_submitted", { symbol, side, qty, type, idempotency_key: idempotencyId });
       console.log(`[alpaca-trade] Order payload: ${JSON.stringify(orderBody)}`);
 
       const res = await fetchWithRetry(`${baseUrl}/v2/orders`, {
@@ -341,7 +343,7 @@ serve(async (req) => {
       const data = await res.json();
 
       if (!res.ok) {
-        console.error(`[alpaca-trade] Order error: ${JSON.stringify(data)}`);
+        log("error", "alpaca_order_rejected", { symbol, status: res.status, response: data });
         return jsonRes(req, { error: `Alpaca order error [${res.status}]: ${data.message || JSON.stringify(data)}` }, res.status);
       }
 
@@ -376,6 +378,7 @@ serve(async (req) => {
         await new Promise(r => setTimeout(r, 800));
 
         if (slPrice > 0 && entryPriceNum > 0) {
+          tradeLog("alpaca_fill_confirmed", { symbol, filled_price: finalOrder.filled_avg_price, filled_qty: filledQty });
           console.log(`[alpaca-trade] Fill confirmed for ${symbol}, submitting trailing stop + TP`);
           // Retry up to 3 times
           for (let attempt = 1; attempt <= 3; attempt++) {
@@ -388,6 +391,7 @@ serve(async (req) => {
             if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
           }
           if (!protectionResult?.success) {
+            log("error", "protection_failed_all_attempts", { symbol, error: protectionResult?.error });
             console.error(`[alpaca-trade] ⚠ ALL protection attempts failed for ${symbol}. EXECUTING FAIL-SAFE.`);
 
             // Fail-safe: close position immediately to prevent unprotected exposure
@@ -406,6 +410,7 @@ serve(async (req) => {
               });
 
               if (closeRes.ok) {
+                tradeLog("fail_safe_position_closed", { symbol, qty: filledQty });
                 console.log(`[alpaca-trade] Fail-safe: Position closed successfully for ${symbol}`);
 
                 await supabase.from("audit_log").insert({
@@ -436,6 +441,7 @@ serve(async (req) => {
                 console.error(`[alpaca-trade] Fail-safe close failed [${closeRes.status}]: ${closeErrorText}`);
               }
             } catch (closeErr) {
+              log("error", "fail_safe_close_exception", { symbol, error: closeErr instanceof Error ? closeErr.message : "unknown" });
               console.error(`[alpaca-trade] CRITICAL: Fail-safe close exception:`, closeErr);
             }
 
@@ -622,7 +628,7 @@ serve(async (req) => {
 
     return jsonRes(req, { error: "Invalid action. Use: test_connection, get_positions, place_order, close_position, get_orders, get_order_status" }, 400);
   } catch (e) {
-    console.error("Alpaca trade error:", e);
+    log("error", "alpaca_trade_fatal", { error: e instanceof Error ? e.message : "Unknown error" });
     return jsonRes(req, { error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
 });

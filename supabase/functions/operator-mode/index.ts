@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { log, tradeLog } from "../_shared/logger.ts";
 
 const ALLOWED_ORIGINS = [
   "https://lhydbra.lovable.app",
@@ -671,7 +672,7 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           if (existingOrder) {
-            console.log(`[operator] Order already exists for ${trade.asset}: ${existingOrder.status}`);
+            tradeLog("order_duplicate_skipped", { user_id: user.id, symbol: String(trade.asset), existing_status: existingOrder.status });
             execResults.push({ symbol: trade.asset, success: false, error: `Duplicate order (${existingOrder.status})`, skipped: true });
             continue;
           }
@@ -695,11 +696,12 @@ Deno.serve(async (req) => {
             .single();
 
           if (orderInsertErr) {
-            console.error(`[operator] Order insert failed for ${trade.asset}:`, orderInsertErr.message);
+            log("error", "order_insert_failed", { user_id: user.id, symbol: String(trade.asset), error: orderInsertErr.message });
           }
 
           // ─── Submit to Alpaca ───
           if (newOrder) {
+            tradeLog("order_submitted", { user_id: user.id, symbol: String(trade.asset), qty: trade.quantity, entry: Number(trade.entry_price), direction: String(trade.direction), order_id: newOrder.id });
             await supabase.from("orders").update({ status: "submitted", updated_at: new Date().toISOString() }).eq("id", newOrder.id);
           }
 
@@ -746,11 +748,11 @@ Deno.serve(async (req) => {
 
           // ─── HALT: fail-safe or critical from alpaca-trade ───
           if (orderResult.fail_safe_triggered) {
-            console.error(`[operator-mode] FAIL-SAFE triggered for ${trade.asset}. Halting execution for this user.`);
-            break;
+            tradeLog("fail_safe_triggered", { user_id: user.id, symbol: String(trade.asset) });
+            log("error", "execution_halted", { user_id: user.id, reason: "fail_safe", symbol: String(trade.asset) });
           }
           if (orderResult.critical) {
-            console.error(`[operator-mode] CRITICAL: Unprotected position for ${trade.asset}. Halting ALL execution immediately.`);
+            log("error", "critical_unprotected_position", { user_id: user.id, symbol: String(trade.asset) });
             break;
           }
 
@@ -758,6 +760,7 @@ Deno.serve(async (req) => {
             const expectedEntry = Number(trade.entry_price);
             const filledPrice = parseFloat(orderResult.order.filled_avg_price || "0") || expectedEntry;
             const slippage = Math.abs(filledPrice - expectedEntry) / expectedEntry;
+            tradeLog("order_filled", { user_id: user.id, symbol: String(trade.asset), filled_price: filledPrice, slippage_pct: +(slippage * 100).toFixed(4), direction: String(trade.direction) });
 
             const rawStop = Number(trade.stop_loss);
             let adjustedStop = rawStop;
@@ -823,9 +826,9 @@ Deno.serve(async (req) => {
               }).eq("id", newOrder.id);
             }
           } else if (!orderResult.success && !orderResult.pending) {
-            console.error("Order failed for", trade.asset, ":", orderResult.error);
+            log("error", "order_failed", { user_id: user.id, symbol: String(trade.asset), error: orderResult.error });
           } else if (orderResult.pending) {
-            console.warn("Fill unconfirmed for", trade.asset, "- will reconcile via alpaca-sync");
+            log("warn", "order_fill_unconfirmed", { user_id: user.id, symbol: String(trade.asset) });
           }
         } catch (execErr) {
           execResults.push({ symbol: trade.asset, success: false, error: execErr instanceof Error ? execErr.message : "Execution failed" });
