@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
       const initialCapital = Number(settings.initial_capital) || 0;
       const drawdown = initialCapital > 0 ? ((initialCapital - capital) / initialCapital * 100) : 0;
       const exposurePct = capital > 0 ? (totalExposure / capital * 100) : 0;
-      const dailyRiskUsed = Number(settings.daily_risk_used) || 0;
+      // Use real open risk % (same as dashboard) instead of stale DB field
       const riskPct = capital > 0 ? (totalOpenRisk / capital * 100) : 0;
 
       // Build message
@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
         `• ${openPnlEmoji} Open PnL: $${totalUnrealizedPnl.toFixed(2)}`,
         `• Drawdown: ${drawdown.toFixed(1)}%`,
         `• Exposición: ${exposurePct.toFixed(1)}% ($${totalExposure.toFixed(0)})`,
-        `• Riesgo diario: ${dailyRiskUsed.toFixed(1)}% / ${settings.max_daily_risk}%`,
+        `• Riesgo diario: ${riskPct.toFixed(1)}% / ${settings.max_daily_risk}%`,
         `• Riesgo abierto: ${riskPct.toFixed(1)}% ($${totalOpenRisk.toFixed(0)})`,
       ];
 
@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
 
       // Daily risk status
       lines.push("", "⚙️ *ESTADO DEL SISTEMA*");
-      lines.push(`• Riesgo diario usado: ${Number(settings.daily_risk_used || 0).toFixed(1)}% / ${settings.max_daily_risk}%`);
+      lines.push(`• Riesgo diario usado: ${riskPct.toFixed(1)}% / ${settings.max_daily_risk}%`);
       lines.push(`• Trades hoy: ${settings.trades_today || 0}`);
       lines.push(`• Posiciones: ${openPositions.length} / ${settings.max_positions}`);
 
