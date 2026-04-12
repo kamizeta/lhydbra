@@ -154,7 +154,9 @@ Deno.serve(async (req) => {
               data: { discrepancies: discrepancies.length, kill_switch: true },
             }),
           });
-        } catch {}
+        } catch (notifyErr) {
+          console.warn(`[reconcile] Kill switch notification failed:`, notifyErr);
+        }
       }
 
       if (discrepancies.length > 0) {
