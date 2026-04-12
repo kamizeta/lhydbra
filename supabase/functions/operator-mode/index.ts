@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { log, tradeLog } from "../_shared/logger.ts";
+import { checkAllRiskRules } from "../_shared/risk-engine.ts";
 
 const ALLOWED_ORIGINS = [
   "https://lhydbra.lovable.app",
@@ -697,6 +698,46 @@ Deno.serve(async (req) => {
             tradeLog("order_duplicate_skipped", { user_id: user.id, symbol: String(trade.asset), existing_status: existingOrder.status });
             execResults.push({ symbol: trade.asset, success: false, error: `Duplicate order (${existingOrder.status})`, skipped: true });
             continue;
+          }
+
+          // ─── Centralized Risk Engine check ───
+          const riskCheck = checkAllRiskRules({
+            userId: user.id,
+            symbol: String(trade.asset),
+            direction: String(trade.direction) as "long" | "short",
+            requestedQty: trade.quantity,
+            entryPrice: Number(trade.entry_price),
+            stopLoss: Number(trade.stop_loss),
+            capital: liveCapital,
+            settings: {
+              max_risk_per_trade: Number(settings.risk_per_trade || 1),
+              max_single_asset_pct: Number(settings.max_single_asset || 25),
+              max_leverage: Number(settings.max_leverage || 2),
+              max_open_positions: Number(settings.max_positions || 10),
+              max_daily_loss_pct: sysConfig?.max_daily_loss_pct || 3,
+            },
+            currentState: {
+              openPositions: (existingPositions || []).map((p: any) => ({
+                symbol: String(p.symbol),
+                quantity: Number(p.quantity),
+                avg_entry: Number(p.avg_entry),
+              })),
+              dailyPnl,
+              totalExposure: Object.values(exposureBySymbol).reduce((a: number, b: number) => a + b, 0),
+            },
+          });
+
+          if (!riskCheck.allowed) {
+            tradeLog("risk_rejected", { user_id: user.id, symbol: String(trade.asset), reason: riskCheck.reason });
+            execResults.push({ symbol: String(trade.asset), success: false, error: riskCheck.reason, risk_rejected: true });
+            continue;
+          }
+
+          // Apply adjusted size if risk engine capped it
+          const finalQty = riskCheck.adjustedSize || trade.quantity;
+          if (finalQty !== trade.quantity) {
+            tradeLog("risk_size_adjusted", { user_id: user.id, symbol: String(trade.asset), original: trade.quantity, adjusted: finalQty, reason: riskCheck.reason });
+            trade.quantity = finalQty;
           }
 
           // ─── Create order record with pending status ───
