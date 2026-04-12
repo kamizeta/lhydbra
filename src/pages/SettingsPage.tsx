@@ -585,10 +585,10 @@ export default function SettingsPage() {
           <div className="terminal-border rounded-lg p-5 space-y-4">
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Target className="h-4 w-4 text-primary" />
-              Signal Filters
+              {t.settings.signalFilters}
             </h2>
             <p className="text-xs text-muted-foreground">
-              Minimum thresholds for signal generation and operator mode execution.
+              {t.settings.signalFiltersDesc}
             </p>
             <div className="grid grid-cols-3 gap-4">
               <div>
@@ -648,7 +648,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground font-mono uppercase">Current Capital</label>
+                  <label className="text-xs text-muted-foreground font-mono uppercase">{t.settings.currentCapital}</label>
                   <input
                     type="number"
                     value={settings.current_capital}
@@ -771,7 +771,7 @@ export default function SettingsPage() {
                 onClick={() => setWeights(defaultWeights)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground border border-border rounded-md hover:bg-accent transition-colors"
               >
-                <RotateCcw className="h-3 w-3" /> Reset Defaults
+                <RotateCcw className="h-3 w-3" /> {t.settings.resetDefaults}
               </button>
               <span className={cn(
                 "text-xs font-mono",
@@ -786,17 +786,17 @@ export default function SettingsPage() {
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : 'Save Weights'}
+              {saving ? t.common.saving : t.settings.saveWeights}
             </button>
           </div>
 
           <div className="terminal-border rounded-lg p-5 space-y-5">
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Target className="h-4 w-4 text-warning" />
-              Opportunity Score Weights
+              {t.settings.opportunityScoreWeights}
             </h2>
             <p className="text-xs text-muted-foreground">
-              Personaliza la importancia relativa de cada factor en el cálculo del Opportunity Score (0-100). Los pesos se normalizan automáticamente.
+              {t.settings.opportunityScoreWeightsDesc}
             </p>
 
             <div className="space-y-4">
@@ -901,14 +901,14 @@ export default function SettingsPage() {
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : 'Save Profile'}
+              {saving ? t.common.saving : t.settings.saveProfile}
             </button>
           </div>
 
           <div className="terminal-border rounded-lg p-5 space-y-5">
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <User className="h-4 w-4 text-primary" />
-              Perfil de Usuario
+              {t.settings.userProfile}
             </h2>
 
             {/* Avatar preview & upload */}
@@ -1012,17 +1012,16 @@ export default function SettingsPage() {
               Binance API
             </h2>
             <p className="text-xs text-muted-foreground">
-              Conecta tu cuenta de Binance para ejecutar órdenes de cripto directamente desde LHYDBRA. 
-              Necesitas crear una API Key en <a href="https://www.binance.com/en/my/settings/api-management" target="_blank" rel="noopener noreferrer" className="text-primary underline">Binance API Management</a>.
+              {t.settings.binanceDesc}
             </p>
             <div className="bg-warning/10 border border-warning/30 rounded-md p-3">
               <p className="text-[10px] text-warning font-mono">
-                ⚠️ IMPORTANTE: Usa permisos de solo "Spot Trading" y activa la lista blanca de IP para mayor seguridad. Nunca actives permisos de retiro.
+                {t.settings.binanceSecurityNote}
               </p>
             </div>
             <div className="bg-primary/5 border border-primary/20 rounded-md p-3">
               <p className="text-[10px] text-muted-foreground font-mono">
-                🔐 Las claves se almacenan de forma segura en el vault del servidor. Nunca se guardan en texto plano.
+                {t.settings.binanceVaultNote}
               </p>
             </div>
 
@@ -1039,26 +1038,26 @@ export default function SettingsPage() {
 
             <div>
               <label className="text-xs text-muted-foreground font-mono uppercase">
-                {binanceConfigured ? 'New API Key (leave empty to keep current)' : 'API Key'}
+                {binanceConfigured ? t.settings.binanceNewKeyLabel : t.settings.apiKey}
               </label>
               <input
                 type="text"
                 value={binanceKey}
                 onChange={(e) => setBinanceKey(e.target.value)}
-                placeholder={binanceConfigured ? 'Enter new API Key to update' : 'Tu API Key de Binance'}
+                placeholder={binanceConfigured ? t.settings.binanceNewKeyPlaceholder : t.settings.apiKey}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
             </div>
 
             <div>
               <label className="text-xs text-muted-foreground font-mono uppercase">
-                {binanceConfigured ? 'New API Secret (leave empty to keep current)' : 'API Secret'}
+                {binanceConfigured ? t.settings.binanceNewSecretLabel : t.settings.apiSecret}
               </label>
               <input
                 type="password"
                 value={binanceSecret}
                 onChange={(e) => setBinanceSecret(e.target.value)}
-                placeholder={binanceConfigured ? 'Enter new API Secret to update' : 'Tu API Secret de Binance'}
+                placeholder={binanceConfigured ? t.settings.binanceNewSecretPlaceholder : t.settings.apiSecret}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground font-mono focus:ring-1 focus:ring-primary focus:outline-none"
               />
             </div>
@@ -1066,7 +1065,7 @@ export default function SettingsPage() {
             {!binanceConfigured && (
               <div className="rounded-md bg-accent/50 p-3">
                 <p className="text-[10px] text-muted-foreground font-mono">
-                  Estado: 🔴 No configurada
+                  {t.settings.binanceNotConfigured}
                 </p>
               </div>
             )}
@@ -1089,27 +1088,27 @@ export default function SettingsPage() {
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : 'Guardar'}
+              {saving ? t.common.saving : t.common.save}
             </button>
           </div>
 
           <div className="terminal-border rounded-lg p-5 space-y-4">
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Bell className="h-4 w-4 text-primary" />
-              Preferencias de Notificación
+              {t.settings.notificationPrefs}
             </h2>
             <p className="text-xs text-muted-foreground">
-              Configura qué notificaciones recibir y cuáles deben tener sonido de alerta.
+              {t.settings.notificationPrefsDesc}
             </p>
 
             <div className="space-y-3">
               {([
-                { key: 'sl_tp', label: '🎯 Stop Loss / Take Profit', desc: 'Alerta cuando el precio alcanza tu SL o TP', critical: true },
-                { key: 'risk_alerts', label: '🛡️ Alertas de Riesgo', desc: 'Drawdown máximo, posiciones excedidas, límites de riesgo', critical: true },
-                { key: 'regime_change', label: '📊 Cambio de Régimen', desc: 'Cuando un activo cambia de régimen de mercado' },
-                { key: 'signals', label: '💡 Señales de Trade', desc: 'Nuevas señales generadas por los agentes' },
-                { key: 'pnl_threshold', label: '💰 PnL Significativo', desc: 'Cuando una posición supera el umbral de ganancia/pérdida' },
-                { key: 'agents', label: '🤖 Agentes Completados', desc: 'Cuando finaliza un análisis de agentes' },
+                { key: 'sl_tp', label: t.settings.notifSlTp, desc: t.settings.notifSlTpDesc, critical: true },
+                { key: 'risk_alerts', label: t.settings.notifRisk, desc: t.settings.notifRiskDesc, critical: true },
+                { key: 'regime_change', label: t.settings.notifRegime, desc: t.settings.notifRegimeDesc },
+                { key: 'signals', label: t.settings.notifSignals, desc: t.settings.notifSignalsDesc },
+                { key: 'pnl_threshold', label: t.settings.notifPnl, desc: t.settings.notifPnlDesc },
+                { key: 'agents', label: t.settings.notifAgents, desc: t.settings.notifAgentsDesc },
               ] as { key: string; label: string; desc: string; critical?: boolean }[]).map(({ key, label, desc, critical }) => {
                 const enabledKey = `${key}_enabled` as keyof NotificationPreferences;
                 const soundKey = `${key}_sound` as keyof NotificationPreferences;
@@ -1195,17 +1194,17 @@ export default function SettingsPage() {
               className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving...' : 'Save Alerts'}
+              {saving ? t.common.saving : t.settings.saveAlerts}
             </button>
           </div>
 
           <div className="terminal-border rounded-lg p-5 space-y-5">
             <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
               <Send className="h-4 w-4 text-primary" />
-              External Alerts (Telegram / Email)
+              {t.settings.externalAlerts}
             </h2>
             <p className="text-xs text-muted-foreground">
-              Recibe notificaciones externas cuando se ejecutan trades, se activan stop loss/take profit o se activa cooldown.
+              {t.settings.externalAlertsDesc}
             </p>
 
             <div>
