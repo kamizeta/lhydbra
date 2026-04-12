@@ -176,7 +176,7 @@ export default function Dashboard() {
           )}
         >
           {opLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-          {opLoading ? "Running..." : "Run Operator"}
+          {opLoading ? t.common.running : t.dashboard.runOperator}
         </button>
       </div>
 
@@ -191,21 +191,21 @@ export default function Dashboard() {
 
       {/* ── 3 KPI Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MetricCard label="Portfolio" value={formatCurrency(metrics.portfolioValue)} icon={Briefcase} />
+        <MetricCard label={t.dashboard.portfolioValue} value={formatCurrency(metrics.portfolioValue)} icon={Briefcase} />
         <MetricCard
-          label="Today P&L"
+          label={t.dashboard.todayPnl}
           value={`${(operatorStatus?.today_pnl ?? 0) >= 0 ? "+" : ""}${formatCurrency(operatorStatus?.today_pnl ?? 0)}`}
           changeType={(operatorStatus?.today_pnl ?? 0) >= 0 ? "positive" : "negative"}
           icon={Activity}
         />
         <MetricCard
-          label="Open PnL"
+          label={t.dashboard.openPnl}
           value={`${metrics.unrealizedPnl >= 0 ? "+" : ""}${formatCurrency(metrics.unrealizedPnl)}`}
           changeType={metrics.unrealizedPnl >= 0 ? "positive" : "negative"}
           icon={TrendingUp}
         />
         <MetricCard
-          label="Drawdown"
+          label={t.dashboard.drawdown}
           value={`${metrics.drawdownPct.toFixed(1)}%`}
           changeType={metrics.drawdownPct > 5 ? "negative" : "neutral"}
           icon={Shield}

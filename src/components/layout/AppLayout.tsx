@@ -113,7 +113,7 @@ export default function AppLayout() {
                 onClick={() => setAdvancedOpen(!advancedOpen)}
                 className="flex items-center justify-between w-full text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider mt-2 mb-1 px-1 hover:text-muted-foreground transition-colors"
               >
-                <span>Advanced</span>
+                <span>{t.common.advanced}</span>
                 <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", advancedOpen && "rotate-180")} />
               </button>
             ) : (
