@@ -25,6 +25,8 @@ export default function RiskManagement() {
   const { user } = useAuth();
   const { settings } = useUserSettings();
   const [positions, setPositions] = useState<Position[]>([]);
+  const [weeklyLossPnl, setWeeklyLossPnl] = useState(0);
+  const [correlationMax, setCorrelationMax] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -36,7 +38,34 @@ export default function RiskManagement() {
         .eq('status', 'open');
       if (data) setPositions(data);
     };
+
+    const fetchWeeklyRisk = async () => {
+      const weekStart = new Date();
+      weekStart.setUTCHours(0, 0, 0, 0);
+      weekStart.setUTCDate(weekStart.getUTCDate() - ((weekStart.getUTCDay() + 6) % 7));
+      const { data } = await supabase
+        .from('trade_journal')
+        .select('pnl')
+        .eq('user_id', user.id)
+        .gte('exited_at', weekStart.toISOString());
+      const losses = (data || []).filter(t => (t.pnl || 0) < 0).reduce((s, t) => s + Math.abs(t.pnl || 0), 0);
+      setWeeklyLossPnl(losses);
+    };
+
+    const fetchCorrelation = async () => {
+      const { data } = await supabase
+        .from('correlation_matrix')
+        .select('correlation')
+        .order('correlation', { ascending: false })
+        .limit(1);
+      if (data && data.length > 0) {
+        setCorrelationMax(Math.abs(Number(data[0].correlation)) * 100);
+      }
+    };
+
     fetchPositions();
+    fetchWeeklyRisk();
+    fetchCorrelation();
 
     const channel = supabase
       .channel('risk-positions')
@@ -71,18 +100,22 @@ export default function RiskManagement() {
     ? Math.max(0, ...Object.values(exposureByType).map(v => (v / totalCapital) * 100))
     : 0;
 
+  const initialCapital = settings.initial_capital;
+  const currentDrawdown = initialCapital > 0 ? Math.max(0, ((initialCapital - totalCapital) / initialCapital) * 100) : 0;
+  const weeklyRiskUsedPct = totalCapital > 0 ? (weeklyLossPnl / totalCapital) * 100 : 0;
+
   const rm = {
     totalExposure: Math.min(totalExposurePct, 100),
     maxExposureLimit: 100,
     dailyRiskUsed: parseFloat(dailyRiskUsed.toFixed(1)),
     dailyRiskLimit: settings.max_daily_risk,
-    weeklyRiskUsed: parseFloat(dailyRiskUsed.toFixed(1)),
+    weeklyRiskUsed: parseFloat(weeklyRiskUsedPct.toFixed(1)),
     weeklyRiskLimit: settings.max_weekly_risk,
-    currentDrawdown: 0,
+    currentDrawdown: parseFloat(currentDrawdown.toFixed(1)),
     maxDrawdownLimit: settings.max_drawdown,
     openPositions: openCount,
     maxPositions: settings.max_positions,
-    correlationRisk: 0,
+    correlationRisk: parseFloat(correlationMax.toFixed(1)),
     leverageUsed: totalCapital > 0 ? parseFloat((totalExposureValue / totalCapital).toFixed(2)) : 0,
     maxLeverage: settings.max_leverage,
   };
