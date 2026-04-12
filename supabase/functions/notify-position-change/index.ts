@@ -135,25 +135,30 @@ Deno.serve(async (req) => {
     // Send Telegram message
     const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
     if (!token) {
+      console.error("TELEGRAM_BOT_TOKEN not found in env");
       return new Response(JSON.stringify({ ok: false, reason: "no bot token" }), {
         headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
-    const tgResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    console.log("Sending Telegram message to chat_id:", settings.notify_telegram_chat_id);
+    console.log("Token length:", token.length, "Token starts with:", token.substring(0, 5));
+
+    const tgUrl = `https://api.telegram.org/bot${token}/sendMessage`;
+    const tgBody = {
+      chat_id: settings.notify_telegram_chat_id,
+      text: message,
+      parse_mode: "Markdown",
+    };
+
+    const tgResponse = await fetch(tgUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: settings.notify_telegram_chat_id,
-        text: message,
-        parse_mode: "Markdown",
-      }),
+      body: JSON.stringify(tgBody),
     });
 
-    if (!tgResponse.ok) {
-      const tgError = await tgResponse.text();
-      console.error("Telegram API error:", tgResponse.status, tgError);
-    }
+    const tgResult = await tgResponse.text();
+    console.log("Telegram response status:", tgResponse.status, "body:", tgResult);
 
     // Also persist to notifications table
     const titleMap: Record<string, string> = {
