@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, Activity, Target } from "lucide-react";
+import { useI18n } from "@/i18n";
 
 function getBarColor(kellyPct: number): string {
   if (kellyPct >= 8) return "hsl(142, 71%, 45%)";
