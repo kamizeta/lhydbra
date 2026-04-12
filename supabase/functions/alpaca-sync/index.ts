@@ -753,9 +753,27 @@ serve(async (req) => {
       console.error("Daily performance update error:", perfErr);
     }
 
-    // 6. Fetch account info
+    // 6. Fetch account info and sync equity as current_capital
     const acctRes = await fetch(`${baseUrl}/v2/account`, { headers });
     const account = acctRes.ok ? await acctRes.json() : null;
+
+    if (account) {
+      const alpacaEquity = parseFloat(account.equity || account.portfolio_value || "0");
+      if (alpacaEquity > 0) {
+        const { data: currentSettings } = await supabase
+          .from("user_settings")
+          .select("current_capital")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const storedCapital = Number(currentSettings?.current_capital || 0);
+        // Update if difference > 0.1% to keep dashboard in sync with broker
+        if (storedCapital <= 0 || Math.abs(alpacaEquity - storedCapital) / storedCapital > 0.001) {
+          await supabase.from("user_settings")
+            .update({ current_capital: alpacaEquity, updated_at: new Date().toISOString() })
+            .eq("user_id", userId);
+        }
+      }
+    }
 
     return jsonRes(req, {
       success: true,

@@ -521,7 +521,9 @@ Deno.serve(async (req) => {
       const acctRes = await fetch(`${alpacaBase}/v2/account`, { headers: alpacaHdrs });
       if (acctRes.ok) {
         const acct = await acctRes.json();
-        const alpacaEquity = parseFloat(acct.portfolio_value || acct.equity || "0");
+        // Store equity (= cash + unrealized PnL) as current_capital
+        // Dashboard uses this directly without adding unrealized PnL again
+        const alpacaEquity = parseFloat(acct.equity || acct.portfolio_value || "0");
         if (alpacaEquity > 0) {
           liveCapital = alpacaEquity;
           if (Math.abs(liveCapital - currentCapital) / currentCapital > 0.01) {
