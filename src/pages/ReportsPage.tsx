@@ -9,9 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import MetricCard from "@/components/shared/MetricCard";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n";
 
 export default function ReportsPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date(); d.setDate(1);
     return d.toISOString().split('T')[0];
