@@ -399,6 +399,29 @@ serve(async (req) => {
           pnl,
         }).eq("id", local.id);
 
+        // ── Capital Ledger: record trade_close ──
+        try {
+          // Fetch current capital for balance_after
+          const { data: userCap } = await supabase
+            .from("user_settings")
+            .select("current_capital")
+            .eq("user_id", userId)
+            .maybeSingle();
+          const currentCap = Number(userCap?.current_capital || 0);
+          await supabase.from("capital_ledger").insert({
+            user_id: userId,
+            event_type: "trade_close",
+            symbol: local.symbol,
+            amount: +pnl.toFixed(4),
+            balance_after: +(currentCap + pnl).toFixed(4),
+            reference_id: local.id,
+            reference_type: "position",
+            notes: `Closed ${local.symbol}: PnL $${pnl.toFixed(2)}`,
+          });
+        } catch (ledgerErr) {
+          console.warn("[alpaca-sync] Ledger insert failed:", ledgerErr);
+        }
+
         // ── Post-trade feedback loop ──
         try {
           const isWin = pnl > 0;
