@@ -50,6 +50,19 @@ Deno.serve(async (req) => {
         .eq("user_id", userId)
         .eq("status", "open");
 
+      // Fetch current market prices for open positions
+      const openSymbols = (positions || []).map(p => p.symbol);
+      const priceMap: Record<string, number> = {};
+      if (openSymbols.length > 0) {
+        const { data: prices } = await supabase
+          .from("market_cache")
+          .select("symbol, price")
+          .in("symbol", openSymbols);
+        for (const p of (prices || [])) {
+          priceMap[p.symbol] = Number(p.price);
+        }
+      }
+
       // Fetch today's closed trades
       const todayStart = new Date();
       todayStart.setUTCHours(0, 0, 0, 0);
