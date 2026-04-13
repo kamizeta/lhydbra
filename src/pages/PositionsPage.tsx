@@ -218,11 +218,9 @@ export default function PositionsPage() {
 
   const handlePositionClosed = () => { setClosingPosition(null); loadPositions(); };
 
-  const checkSlTpHit = (pos: Position, currentPrice: number | undefined) => {
-    if (!currentPrice) return { hitSl: false, hitTp: false };
-    const hitSl = pos.stop_loss != null && (pos.direction === 'long' ? currentPrice <= Number(pos.stop_loss) : currentPrice >= Number(pos.stop_loss));
-    const hitTp = pos.take_profit != null && (pos.direction === 'long' ? currentPrice >= Number(pos.take_profit) : currentPrice <= Number(pos.take_profit));
-    return { hitSl, hitTp };
+  const checkSlTpHit = (_pos?: Position, _currentPrice?: number) => {
+    // No mostramos “SL/TP hit” por cruce de precio local; solo con confirmación real del broker.
+    return { hitSl: false, hitTp: false };
   };
 
   const saveSlTp = async () => {

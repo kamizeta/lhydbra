@@ -3,17 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useMarketData } from '@/hooks/useMarketData';
 import { useUserSettings } from '@/hooks/useUserSettings';
-import { toast } from 'sonner';
 
 /**
- * Monitors open positions for SL/TP hits and risk threshold breaches.
- * Creates notifications in the DB (which triggers realtime + sound via useNotifications).
+ * Monitors open positions for risk threshold breaches.
+ * SL/TP execution must be confirmed by broker sync/order state, not inferred from quote touches.
  */
 export function usePositionAlerts() {
   const { user } = useAuth();
   const { data: marketAssets } = useMarketData();
   const { settings } = useUserSettings();
-  const alertedRef = useRef<Set<string>>(new Set());
   const riskAlertedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -35,52 +33,14 @@ export function usePositionAlerts() {
       }
 
       let totalPnl = 0;
-      let totalCapital = 0;
 
       for (const pos of positions) {
         const price = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
         if (!price) continue;
 
         const diff = pos.direction === 'long' ? price - pos.avg_entry : pos.avg_entry - price;
-        const pnl = diff * pos.quantity;
+        const pnl = diff * Math.abs(pos.quantity);
         totalPnl += pnl;
-        totalCapital += pos.quantity * pos.avg_entry;
-
-        // SL/TP check
-        const slKey = `sl_${pos.id}`;
-        const tpKey = `tp_${pos.id}`;
-
-        if (pos.stop_loss != null && !alertedRef.current.has(slKey)) {
-          const hitSl = pos.direction === 'long' ? price <= Number(pos.stop_loss) : price >= Number(pos.stop_loss);
-          if (hitSl) {
-            alertedRef.current.add(slKey);
-            await supabase.from('notifications').insert({
-              user_id: user.id,
-              type: 'critical',
-              title: `⛔ Stop Loss alcanzado: ${pos.symbol}`,
-              message: `${pos.symbol} tocó el Stop Loss en $${Number(pos.stop_loss).toFixed(2)}. Precio actual: $${price.toFixed(2)}. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`,
-              category: 'sl_tp',
-              severity: 'critical',
-              metadata: { position_id: pos.id, symbol: pos.symbol, price, sl: pos.stop_loss },
-            });
-          }
-        }
-
-        if (pos.take_profit != null && !alertedRef.current.has(tpKey)) {
-          const hitTp = pos.direction === 'long' ? price >= Number(pos.take_profit) : price <= Number(pos.take_profit);
-          if (hitTp) {
-            alertedRef.current.add(tpKey);
-            await supabase.from('notifications').insert({
-              user_id: user.id,
-              type: 'critical',
-              title: `🎯 Take Profit alcanzado: ${pos.symbol}`,
-              message: `${pos.symbol} alcanzó el Take Profit en $${Number(pos.take_profit).toFixed(2)}. Precio actual: $${price.toFixed(2)}. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`,
-              category: 'sl_tp',
-              severity: 'critical',
-              metadata: { position_id: pos.id, symbol: pos.symbol, price, tp: pos.take_profit },
-            });
-          }
-        }
       }
 
       // Risk threshold checks
