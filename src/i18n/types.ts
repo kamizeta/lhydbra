@@ -535,4 +535,15 @@ export interface Translations {
     deleteAllDesc: string;
     deleteConfirm: string;
   };
+  auth: {
+    signIn: string;
+    createAccount: string;
+    fullName: string;
+    email: string;
+    password: string;
+    noAccount: string;
+    hasAccount: string;
+    confirmEmail: string;
+    tagline: string;
+  };
 }

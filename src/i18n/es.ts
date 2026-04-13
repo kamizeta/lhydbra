@@ -516,4 +516,15 @@ export const es: Translations = {
     deleteAllDesc: 'Se borrarán todas las notificaciones. Esta acción no se puede deshacer.',
     deleteConfirm: 'Eliminar',
   },
+  auth: {
+    signIn: 'Iniciar Sesión',
+    createAccount: 'Crear Cuenta',
+    fullName: 'Nombre Completo',
+    email: 'Correo Electrónico',
+    password: 'Contraseña',
+    noAccount: '¿No tienes cuenta? Regístrate',
+    hasAccount: '¿Ya tienes cuenta? Inicia sesión',
+    confirmEmail: 'Revisa tu correo para confirmar tu cuenta antes de iniciar sesión.',
+    tagline: 'Inteligencia Equilibrada para la Evolución Financiera',
+  },
 };

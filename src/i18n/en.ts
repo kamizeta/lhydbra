@@ -516,4 +516,15 @@ export const en: Translations = {
     deleteAllDesc: 'All notifications will be deleted. This action cannot be undone.',
     deleteConfirm: 'Delete',
   },
+  auth: {
+    signIn: 'Sign In',
+    createAccount: 'Create Account',
+    fullName: 'Full Name',
+    email: 'Email',
+    password: 'Password',
+    noAccount: "Don't have an account? Sign up",
+    hasAccount: 'Already have an account? Sign in',
+    confirmEmail: 'Check your email to confirm your account before signing in.',
+    tagline: 'Balanced Intelligence for Financial Evolution',
+  },
 };

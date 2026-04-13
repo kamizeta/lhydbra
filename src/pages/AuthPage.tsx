@@ -28,7 +28,7 @@ export default function AuthPage() {
       if (error) {
         setError(error.message);
       } else {
-        setConfirmMessage('Check your email to confirm your account before signing in.');
+        setConfirmMessage(t.auth.confirmEmail);
       }
     }
     setLoading(false);
