@@ -131,10 +131,17 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.replace("Bearer ", "") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const isServiceRole = authHeader === `Bearer ${serviceKey}`;
+    let isServiceRole = token === serviceKey;
 
     const body = await req.json().catch(() => ({}));
+
+    // Fallback for pg_cron: accept cron_secret in body matching the service key
+    if (!isServiceRole && body.cron_secret && body.cron_secret === serviceKey) {
+      isServiceRole = true;
+    }
+
     const { scheduled = false } = body;
 
     // ─── Scheduled run: iterate all full_operator users ───
