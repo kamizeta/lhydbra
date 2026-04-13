@@ -373,6 +373,7 @@ async function gradeSignalWithAI(
   expectedR: number,
   features: Record<string, unknown>,
   alphaContext?: string,
+  timeoutMs = 8000,
 ): Promise<{ grade: string; rationale: string } | null> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) return null; // No key → skip AI filter
@@ -413,7 +414,7 @@ ${JSON.stringify(context, null, 2)}
 Respond with JSON only.`,
         }],
       }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!resp.ok) {
@@ -611,9 +612,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // ─── Expand universe: use ALL symbols with fresh features in DB ───
+    // ─── Expand universe only for broad research, never for operator runs ───
     let querySymbols = targetSymbols;
-    if (targetSymbols.length < 10) {
+    if (!operator_mode && targetSymbols.length < 10) {
       // Fetch all distinct symbols that have features computed
       const { data: allFeatureSymbols } = await supabase
         .from("market_features")
@@ -944,6 +945,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const aiResult = await gradeSignalWithAI(
         symbol, direction, strategyFamily, regime,
         subscores, finalScore, expectedR, enriched, alphaContext,
+        operator_mode ? 2500 : 8000,
       );
 
       let aiGrade: string | null = null;

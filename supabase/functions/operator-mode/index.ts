@@ -174,20 +174,23 @@ Deno.serve(async (req) => {
     // Support user_id_override for scheduled per-user calls
     const { action = "run", paper = true, user_id_override } = body;
 
-    let user: { id: string } | null = null;
+    let userId: string | null = null;
     if (user_id_override) {
       if (!isServiceRole) {
         return jsonRes(req, { error: "Forbidden: user_id_override requires service role" }, 403);
       }
-      user = { id: user_id_override } as typeof user;
+      userId = String(user_id_override);
     } else {
       const userSupabase = createClient(supabaseUrl, anonKey, {
         global: { headers: { Authorization: authHeader } },
       });
-      const { data: { user: authUser }, error: userError } = await userSupabase.auth.getUser();
-      if (userError || !authUser) return jsonRes(req, { error: "Unauthorized" }, 401);
-      user = authUser;
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData, error: claimsError } = await userSupabase.auth.getClaims(token);
+      if (claimsError || !claimsData?.claims?.sub) return jsonRes(req, { error: "Unauthorized" }, 401);
+      userId = String(claimsData.claims.sub);
     }
+
+    const user = { id: userId };
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
