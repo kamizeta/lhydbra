@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS signals_signal_key_unique ON public.signals (signal_key) WHERE signal_key IS NOT NULL;
