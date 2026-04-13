@@ -484,6 +484,7 @@ Deno.serve(async (req) => {
         operator_mode: true,
         symbols: watchlistSymbols,
       }),
+      signal: AbortSignal.timeout(40000), // 40s timeout for signal generation
     });
 
     const signalResult = await signalResponse.json();
