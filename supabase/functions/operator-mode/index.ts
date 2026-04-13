@@ -140,10 +140,7 @@ Deno.serve(async (req) => {
     // Fallback for pg_cron: accept cron_secret in body matching the service key
     if (!isServiceRole && body.cron_secret && body.cron_secret === serviceKey) {
       isServiceRole = true;
-      console.log("[operator-mode] Service role validated via cron_secret");
     }
-
-    console.log(`[operator-mode] Auth check: isServiceRole=${isServiceRole}, tokenLen=${token.length}, envKeyLen=${serviceKey.length}`);
 
     const { scheduled = false } = body;
 
