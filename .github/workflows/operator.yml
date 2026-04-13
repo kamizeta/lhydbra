@@ -16,8 +16,7 @@ jobs:
             -X POST \
             'https://boccgfolfxhkcxflkrqz.supabase.co/functions/v1/operator-mode' \
             -H 'Content-Type: application/json' \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -d '{"scheduled": true}')
           echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
           echo "Response code: $HTTP_CODE"
