@@ -145,7 +145,6 @@ Deno.serve(async (req) => {
 
     console.log(`[operator-mode] Auth check: isServiceRole=${isServiceRole}, tokenLen=${token.length}, envKeyLen=${serviceKey.length}`);
 
-    const body = await req.json().catch(() => ({}));
     const { scheduled = false } = body;
 
     // ─── Scheduled run: iterate all full_operator users ───
