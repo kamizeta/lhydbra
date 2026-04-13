@@ -218,7 +218,7 @@ export default function PositionsPage() {
 
   const handlePositionClosed = () => { setClosingPosition(null); loadPositions(); };
 
-  const checkSlTpHit = () => {
+  const checkSlTpHit = (_pos?: Position, _currentPrice?: number) => {
     // No mostramos “SL/TP hit” por cruce de precio local; solo con confirmación real del broker.
     return { hitSl: false, hitTp: false };
   };
