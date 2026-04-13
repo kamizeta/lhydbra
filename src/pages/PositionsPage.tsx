@@ -68,10 +68,10 @@ export default function PositionsPage() {
     const lookup = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace('/', ''));
     const currentPrice = lookup && !lookup.isMock ? lookup.price : null;
     const qty = Math.abs(pos.quantity);
-    const fallbackPnl = currentPrice != null
+    const livePnl = currentPrice != null
       ? (pos.direction === 'long' ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice) * qty
       : null;
-    const pnl = pos.pnl ?? fallbackPnl;
+    const pnl = livePnl ?? pos.pnl;
     if (pnl == null) return null;
     const pnlPercent = qty > 0 && pos.avg_entry > 0 ? (pnl / (qty * pos.avg_entry)) * 100 : 0;
     return { pnl, pnlPercent, currentPrice, isMock: false };

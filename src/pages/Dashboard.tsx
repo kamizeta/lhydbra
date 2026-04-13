@@ -233,10 +233,10 @@ export default function Dashboard() {
             {positions.slice(0, 5).map((pos) => {
               const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace("/", ""));
               const qty = Math.abs(pos.quantity);
-              const fallbackPnl = currentPrice
+              const livePnl = currentPrice
                 ? (pos.direction === "long" ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice) * qty
-                : 0;
-              const pnl = pos.pnl ?? fallbackPnl;
+                : null;
+              const pnl = livePnl ?? pos.pnl ?? 0;
               const kelly = kellyMap.get(pos.symbol) ?? kellyMap.get(pos.symbol.replace("/", ""));
               return (
                 <div key={pos.id} className="flex items-center justify-between px-4 py-2.5 text-xs">

@@ -47,15 +47,16 @@ export function useDashboardMetrics({
   const unrealizedPnl = useMemo(() => {
     let total = 0;
     for (const pos of positions) {
-      if (pos.pnl != null) {
-        total += pos.pnl;
+      const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace("/", ""));
+      if (currentPrice) {
+        const qty = Math.abs(pos.quantity);
+        const diff = pos.direction === "long" ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice;
+        total += diff * qty;
         continue;
       }
-      const currentPrice = priceMap.get(pos.symbol) || priceMap.get(pos.symbol.replace("/", ""));
-      if (!currentPrice) continue;
-      const qty = Math.abs(pos.quantity);
-      const diff = pos.direction === "long" ? currentPrice - pos.avg_entry : pos.avg_entry - currentPrice;
-      total += diff * qty;
+      if (pos.pnl != null) {
+        total += pos.pnl;
+      }
     }
     return total;
   }, [positions, priceMap]);
