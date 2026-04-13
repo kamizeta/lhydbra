@@ -428,34 +428,38 @@ Deno.serve(async (req) => {
       ? (settings as any).watchlist
       : ["AAPL", "MSFT", "NVDA", "TSLA", "SPY", "QQQ", "BTC/USD", "ETH/USD"];
 
-    // ─── Await data refresh before signal generation ───
+    // ─── Quick data refresh with strict timeouts (data already kept fresh by cron) ───
+    const REFRESH_TIMEOUT = 8000; // 8s max per call
     try {
+      const refreshHeaders = { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` };
       const [syncResult, marketResult, indicatorsResult] = await Promise.allSettled([
         fetch(`${supabaseUrl}/functions/v1/alpaca-sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+          method: "POST", headers: refreshHeaders,
           body: JSON.stringify({ paper, user_id_override: user.id }),
+          signal: AbortSignal.timeout(REFRESH_TIMEOUT),
         }),
         fetch(`${supabaseUrl}/functions/v1/market-data-normalized`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+          method: "POST", headers: refreshHeaders,
           body: JSON.stringify({ symbols: watchlistSymbols, timeframe: "1d" }),
+          signal: AbortSignal.timeout(REFRESH_TIMEOUT),
         }),
         fetch(`${supabaseUrl}/functions/v1/compute-indicators`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+          method: "POST", headers: refreshHeaders,
           body: JSON.stringify({ symbols: watchlistSymbols, timeframe: "1d" }),
+          signal: AbortSignal.timeout(REFRESH_TIMEOUT),
         }),
       ]);
 
-      // Log failures but continue
-      for (const r of [syncResult, marketResult, indicatorsResult]) {
-        if (r.status === 'rejected') console.warn('[operator] Background task failed:', r.reason);
+      for (const [i, r] of [syncResult, marketResult, indicatorsResult].entries()) {
+        if (r.status === 'rejected') {
+          const name = ['alpaca-sync', 'market-data', 'indicators'][i];
+          console.warn(`[operator] ${name} refresh skipped (timeout/error):`, r.reason?.message || r.reason);
+        }
       }
 
       console.log("[operator-mode] Data refresh completed before signal generation");
     } catch (e) {
-      console.warn("[operator-mode] Data refresh error:", e);
+      console.warn("[operator-mode] Data refresh error (non-blocking):", e);
     }
 
     // Calculate remaining capacity before signal generation
