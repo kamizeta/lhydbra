@@ -51,7 +51,7 @@ export default function AuthPage() {
 
         <div className="terminal-border rounded-lg p-6 space-y-4">
           <h2 className="text-lg font-semibold text-foreground text-center">
-            {isLogin ? 'Sign In' : 'Create Account'}
+            {isLogin ? t.auth.signIn : t.auth.createAccount}
           </h2>
 
           {error && (
@@ -64,7 +64,7 @@ export default function AuthPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
-                <label className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Full Name</label>
+                <label className="text-xs text-muted-foreground font-mono uppercase tracking-wider">{t.auth.fullName}</label>
                 <input
                   type="text"
                   value={fullName}
@@ -75,7 +75,7 @@ export default function AuthPage() {
               </div>
             )}
             <div>
-              <label className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Email</label>
+              <label className="text-xs text-muted-foreground font-mono uppercase tracking-wider">{t.auth.email}</label>
               <input
                 type="email"
                 value={email}
@@ -85,7 +85,7 @@ export default function AuthPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Password</label>
+              <label className="text-xs text-muted-foreground font-mono uppercase tracking-wider">{t.auth.password}</label>
               <input
                 type="password"
                 value={password}
@@ -100,7 +100,7 @@ export default function AuthPage() {
               disabled={loading}
               className="w-full py-2.5 bg-primary text-primary-foreground rounded-md font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
-              {loading ? '...' : isLogin ? 'Sign In' : 'Create Account'}
+              {loading ? '...' : isLogin ? t.auth.signIn : t.auth.createAccount}
             </button>
           </form>
 
@@ -113,13 +113,13 @@ export default function AuthPage() {
               }}
               className="text-xs text-primary hover:underline font-mono"
             >
-              {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              {isLogin ? t.auth.noAccount : t.auth.hasAccount}
             </button>
           </div>
         </div>
 
         <p className="text-center text-[10px] text-muted-foreground font-mono mt-6">
-          Balanced Intelligence for Financial Evolution
+          {t.auth.tagline}
         </p>
       </div>
     </div>
