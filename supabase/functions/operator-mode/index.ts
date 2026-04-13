@@ -435,6 +435,24 @@ Deno.serve(async (req) => {
     const REFRESH_TIMEOUT = 8000; // 8s max per call
     try {
       const refreshHeaders = { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` };
+
+      // Step 1: Reconcile positions with broker FIRST (critical for correct leverage calc)
+      try {
+        const reconcileRes = await fetch(`${supabaseUrl}/functions/v1/reconcile-positions`, {
+          method: "POST", headers: refreshHeaders, body: JSON.stringify({}),
+          signal: AbortSignal.timeout(REFRESH_TIMEOUT),
+        });
+        if (reconcileRes.ok) {
+          const reconData = await reconcileRes.json();
+          if (reconData.results?.[0]?.discrepancies_count > 0) {
+            console.log(`[operator-mode] Reconcile fixed ${reconData.results[0].discrepancies_count} position discrepancies`);
+          }
+        }
+      } catch (e) {
+        console.warn("[operator-mode] Reconcile skipped (timeout/error):", e instanceof Error ? e.message : e);
+      }
+
+      // Step 2: Refresh market data in parallel
       const [syncResult, marketResult, indicatorsResult] = await Promise.allSettled([
         fetch(`${supabaseUrl}/functions/v1/alpaca-sync`, {
           method: "POST", headers: refreshHeaders,
