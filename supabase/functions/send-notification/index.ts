@@ -28,7 +28,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: getCorsHeaders(req) });
 
   try {
-    // Auth guard: require a valid Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -39,31 +38,42 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Validate the caller's identity
-    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: authError } = await authClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
-      });
-    }
+    const token = authHeader.replace("Bearer ", "");
+    const isServiceRole = token === serviceRoleKey;
 
     const { user_id, event, data } = await req.json();
 
-    // Enforce: users can only send notifications to themselves
-    // Service role calls pass through getUser as service-level auth
-    if (user_id !== user.id) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
+    // Auth: service_role bypasses getUser(), trusts user_id from body
+    if (!isServiceRole) {
+      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: authError } = await authClient.auth.getUser();
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+      // Enforce: users can only send notifications to themselves
+      if (user_id !== user.id) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (!user_id) {
+      return new Response(JSON.stringify({ error: "user_id is required" }), {
+        status: 400,
         headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
-    const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
     const { data: settings } = await supabase
       .from("user_settings")
       .select("notify_email, notify_telegram_chat_id, notify_on_trade_executed, notify_on_stop_loss, notify_on_take_profit, notify_on_cooldown")
@@ -92,9 +102,9 @@ Deno.serve(async (req) => {
     const results: Record<string, string> = {};
 
     if (settings.notify_telegram_chat_id) {
-      const token = Deno.env.get("TELEGRAM_BOT_TOKEN");
-      if (token) {
-        const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      const tgToken = Deno.env.get("TELEGRAM_BOT_TOKEN");
+      if (tgToken) {
+        const r = await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ chat_id: settings.notify_telegram_chat_id, text: message }),
