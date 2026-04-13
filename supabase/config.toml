@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.alpha-ingestor]
 verify_jwt = false
+
+[functions.job-monitor]
+verify_jwt = false
