@@ -133,20 +133,16 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     const token = authHeader?.replace("Bearer ", "") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    // Check both env var and also validate via admin client as fallback
     let isServiceRole = token === serviceKey;
-    if (!isServiceRole && token.length > 20) {
-      // Fallback: try to create admin client with the token and verify it works
-      try {
-        const testClient = createClient(Deno.env.get("SUPABASE_URL")!, token);
-        const { data } = await testClient.from("goal_profiles").select("user_id").limit(1);
-        // If we can read goal_profiles without RLS restriction, it's a service role key
-        if (data !== null) {
-          isServiceRole = true;
-          console.log("[operator-mode] Service role validated via fallback");
-        }
-      } catch { /* not service role */ }
+
+    const body = await req.json().catch(() => ({}));
+
+    // Fallback for pg_cron: accept cron_secret in body matching the service key
+    if (!isServiceRole && body.cron_secret && body.cron_secret === serviceKey) {
+      isServiceRole = true;
+      console.log("[operator-mode] Service role validated via cron_secret");
     }
+
     console.log(`[operator-mode] Auth check: isServiceRole=${isServiceRole}, tokenLen=${token.length}, envKeyLen=${serviceKey.length}`);
 
     const body = await req.json().catch(() => ({}));
