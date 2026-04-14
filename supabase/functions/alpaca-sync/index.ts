@@ -657,10 +657,11 @@ serve(async (req) => {
       if (openOrdersRes.ok) {
         const openOrders = await openOrdersRes.json() as any[];
 
-        // Build maps: which symbols have active stop/limit orders & their order IDs + prices
+        // Build maps: which symbols have active stop/limit/trailing orders & their order IDs + prices
         const symbolStopOrders = new Map<string, { id: string; price: number }[]>();
         const symbolLimitOrders = new Map<string, { id: string; price: number }[]>();
         const symbolHasOCO = new Set<string>(); // symbols with existing OCO orders
+        const symbolHasTrailing = new Set<string>(); // symbols with trailing stop orders
 
         for (const ord of openOrders) {
           const sym = cleanSymbol(ord.symbol);
@@ -668,6 +669,11 @@ serve(async (req) => {
           // Detect OCO orders (they have order_class = "oco")
           if (ord.order_class === "oco") {
             symbolHasOCO.add(sym);
+          }
+
+          // Detect trailing stops as valid SL protection
+          if (ord.type === "trailing_stop") {
+            symbolHasTrailing.add(sym);
           }
 
           if (ord.type === "stop" || ord.type === "stop_limit") {
@@ -682,6 +688,9 @@ serve(async (req) => {
           if (ord.legs && Array.isArray(ord.legs)) {
             for (const leg of ord.legs) {
               const legSym = cleanSymbol(leg.symbol || ord.symbol);
+              if (leg.type === "trailing_stop") {
+                symbolHasTrailing.add(legSym);
+              }
               if (leg.type === "stop" || leg.type === "stop_limit") {
                 if (!symbolStopOrders.has(legSym)) symbolStopOrders.set(legSym, []);
                 symbolStopOrders.get(legSym)!.push({ id: leg.id, price: parseFloat(leg.stop_price || "0") });
