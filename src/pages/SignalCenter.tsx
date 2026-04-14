@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Zap, Target, BarChart3, Shield, Loader2, Play, TrendingUp, TrendingDown } from "lucide-react";
+import { Zap, Target, BarChart3, Shield, Loader2, Play, TrendingUp, TrendingDown, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -120,6 +120,7 @@ export default function SignalCenter() {
                   <th className="text-center p-3">Score</th>
                   <th className="text-center p-3">Conf</th>
                   <th className="text-center p-3">Status</th>
+                  <th className="text-center p-3">Date</th>
                 </tr>
               </thead>
               <tbody>
@@ -161,10 +162,13 @@ export default function SignalCenter() {
                         {s.status.toUpperCase()}
                       </StatusBadge>
                     </td>
+                    <td className="text-center p-3 text-[10px] font-mono text-muted-foreground whitespace-nowrap">
+                      {new Date(s.created_at).toLocaleDateString()} {new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">
+                  <tr><td colSpan={10} className="p-8 text-center text-muted-foreground">
                     {signals.length === 0
                       ? t.signals.noSignalsYet
                       : t.signals.noSignalsMatch}
@@ -175,11 +179,29 @@ export default function SignalCenter() {
           </div>
         </div>
 
-        {/* Detail Panel */}
-        <div className="terminal-border rounded-lg p-4 max-h-[700px] overflow-y-auto">
+        {/* Detail Panel - Desktop sidebar */}
+        <div className="hidden lg:block terminal-border rounded-lg p-4 max-h-[700px] overflow-y-auto">
           <SignalDetailPanel signal={selected} onSignalSent={() => { refetch(); setSelected(null); }} />
         </div>
       </div>
+
+      {/* Detail Panel - Mobile modal */}
+      {selected && (
+        <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelected(null)}>
+          <div
+            className="bg-card border-t border-border rounded-t-xl p-4 w-full max-h-[85vh] overflow-y-auto animate-slide-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-mono text-muted-foreground uppercase">Signal Detail</span>
+              <button onClick={() => setSelected(null)} className="p-1 text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <SignalDetailPanel signal={selected} onSignalSent={() => { refetch(); setSelected(null); }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
