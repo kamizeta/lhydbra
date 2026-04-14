@@ -37,6 +37,7 @@ type SortDir = 'asc' | 'desc';
 
 export default function PositionsPage() {
   const { user } = useAuth();
+  const { settings } = useUserSettings();
   const { t } = useI18n();
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
