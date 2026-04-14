@@ -864,12 +864,14 @@ Deno.serve(async (req) => {
               const submittedPrice = Number(trade.entry_price);
               const slippagePct = submittedPrice > 0 ? Math.abs(filledPrice - submittedPrice) / submittedPrice : 0;
 
+              const protectionOk = orderResult.protection?.success === true;
               await supabase.from("orders").update({
                 status: orderResult.fail_safe_triggered ? "fail_safe_closed" : "filled",
                 filled_price: filledPrice,
                 slippage_pct: +slippagePct.toFixed(6),
                 broker_order_id: orderResult.order?.id || null,
-                metadata: { fill: orderResult.order },
+                protection_confirmed: protectionOk,
+                metadata: { fill: orderResult.order, protection: orderResult.protection },
                 updated_at: new Date().toISOString(),
               }).eq("id", newOrder.id);
             } else {
