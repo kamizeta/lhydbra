@@ -599,6 +599,24 @@ serve(async (req) => {
           symbol: local.symbol,
           detail: `@ ${filledPrice.toFixed(2)}, PnL: ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}`,
         });
+      } else {
+        // Orphan: position exists locally but NOT in Alpaca and no valid exit order found
+        // Close it as "missing_in_broker" to prevent zombie positions
+        console.warn(`[alpaca-sync] Orphan position ${local.symbol} (${local.direction}) not in broker, no exit order found. Closing as missing_in_broker.`);
+        const entry = Number(local.avg_entry);
+        await supabase.from("positions").update({
+          status: "closed",
+          closed_at: new Date().toISOString(),
+          close_price: entry,
+          pnl: 0,
+          notes: `${(local as any).notes || ""} | Closed by sync: missing in broker, no exit order found`,
+        }).eq("id", local.id);
+
+        changes.push({
+          action: "closed",
+          symbol: local.symbol,
+          detail: `Missing in broker — closed as orphan (PnL: 0)`,
+        });
       }
     }
 
