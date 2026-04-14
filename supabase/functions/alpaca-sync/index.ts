@@ -601,21 +601,17 @@ serve(async (req) => {
         });
       } else {
         // Orphan: position exists locally but NOT in Alpaca and no valid exit order found
-        // Close it as "missing_in_broker" to prevent zombie positions
-        console.warn(`[alpaca-sync] Orphan position ${local.symbol} (${local.direction}) not in broker, no exit order found. Closing as missing_in_broker.`);
-        const entry = Number(local.avg_entry);
+        // Do not assume breakeven/TP. Mark for manual reconciliation and avoid false Telegram alerts.
+        console.warn(`[alpaca-sync] Orphan position ${local.symbol} (${local.direction}) not in broker, no exit order found. Marking as reconciliation_needed.`);
         await supabase.from("positions").update({
-          status: "closed",
-          closed_at: new Date().toISOString(),
-          close_price: entry,
-          pnl: 0,
-          notes: `${(local as any).notes || ""} | Closed by sync: missing in broker, no exit order found`,
+          notes: `${(local as any).notes || ""} | Reconciliation needed: missing in broker, no exit order found`,
+          updated_at: new Date().toISOString(),
         }).eq("id", local.id);
 
         changes.push({
-          action: "closed",
+          action: "updated",
           symbol: local.symbol,
-          detail: `Missing in broker — closed as orphan (PnL: 0)`,
+          detail: `Missing in broker — reconciliation required before close`,
         });
       }
     }

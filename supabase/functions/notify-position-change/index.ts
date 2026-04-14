@@ -88,10 +88,18 @@ Deno.serve(async (req) => {
 
       if (wasClosed) {
         const pnl = Number(record.pnl || 0);
+        const hasRealClose = record.close_price != null && old_record?.close_price !== record.close_price;
+        const isReconciliationClose = String(record.notes || "").includes("Reconciliation needed") || String(record.notes || "").includes("missing in broker");
         const pnlEmoji = pnl >= 0 ? "🟢" : "🔴";
         const rMultiple = record.actual_r_multiple
           ? ` (${Number(record.actual_r_multiple).toFixed(1)}R)`
           : "";
+
+        if (!hasRealClose || isReconciliationClose) {
+          return new Response(JSON.stringify({ ok: false, reason: "skip unresolved close notification" }), {
+            headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+          });
+        }
 
         message = [
           `${pnlEmoji} *Posición cerrada*`,
