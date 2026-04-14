@@ -179,11 +179,29 @@ export default function SignalCenter() {
           </div>
         </div>
 
-        {/* Detail Panel */}
-        <div className="terminal-border rounded-lg p-4 max-h-[700px] overflow-y-auto">
+        {/* Detail Panel - Desktop sidebar */}
+        <div className="hidden lg:block terminal-border rounded-lg p-4 max-h-[700px] overflow-y-auto">
           <SignalDetailPanel signal={selected} onSignalSent={() => { refetch(); setSelected(null); }} />
         </div>
       </div>
+
+      {/* Detail Panel - Mobile modal */}
+      {selected && (
+        <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelected(null)}>
+          <div
+            className="bg-card border-t border-border rounded-t-xl p-4 w-full max-h-[85vh] overflow-y-auto animate-slide-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-mono text-muted-foreground uppercase">Signal Detail</span>
+              <button onClick={() => setSelected(null)} className="p-1 text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <SignalDetailPanel signal={selected} onSignalSent={() => { refetch(); setSelected(null); }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
