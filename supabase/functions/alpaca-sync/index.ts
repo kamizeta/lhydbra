@@ -718,6 +718,25 @@ serve(async (req) => {
           const hasStopOrder = symbolStopOrders.has(sym);
           const hasLimitOrder = symbolLimitOrders.has(sym);
           const hasOCO = symbolHasOCO.has(sym);
+          const hasTrailing = symbolHasTrailing.has(sym);
+
+          // If trailing stop exists, SL is covered by alpaca-trade — only check TP
+          if (hasTrailing) {
+            if (hasTP && !hasLimitOrder) {
+              // TP missing but trailing covers SL — submit TP only
+              const qty = Math.abs(Number(pos.quantity));
+              const closeSide = pos.direction === "long" ? "sell" : "buy";
+              const tp = Number(pos.take_profit);
+              const entry = Number(pos.avg_entry);
+              const tpValid = pos.direction === "long" ? tp > entry + 0.01 : tp < entry - 0.01;
+              if (tpValid) {
+                await submitSingleOrder(baseUrl, alpHdrs, sym, qty, closeSide, "limit", tp, changes, pos.symbol);
+              }
+            } else {
+              console.log(`[SL-Guardian] ✓ ${sym} protected by trailing_stop${hasLimitOrder ? ' + limit' : ''} — skip`);
+            }
+            continue;
+          }
 
           // If OCO already exists, both SL and TP are covered — skip
           // But check if OCO prices match — if not, we need to re-submit
@@ -744,9 +763,11 @@ serve(async (req) => {
             console.log(`[SL-Guardian] Price mismatch ${sym}: DB SL=${dbSL}/TP=${dbTP} vs Broker SL=${brokerSL}/TP=${brokerTP} — re-submitting`);
           }
 
-          const missingStop = hasSL && (!hasStopOrder || hasStopOrder); // always re-evaluate
-          const missingTP = hasTP && (!hasLimitOrder || hasLimitOrder);
+          // Only act if protection is actually missing
+          const missingStop = hasSL && !hasStopOrder;
+          const missingTP = hasTP && !hasLimitOrder;
 
+          if (!missingStop && !missingTP) continue;
           if (!hasSL && !hasTP) continue;
 
           const qty = Math.abs(Number(pos.quantity));
@@ -760,12 +781,12 @@ serve(async (req) => {
 
           if (!slValid && !tpValid) continue;
 
-          // Cancel ALL existing protective orders for this symbol first
+          // Cancel existing protective orders only if we need to re-submit
           const toCancel = [...(symbolStopOrders.get(sym) || []).map(o => o.id), ...(symbolLimitOrders.get(sym) || []).map(o => o.id)];
           for (const ordId of toCancel) {
             try { await fetch(`${baseUrl}/v2/orders/${ordId}`, { method: "DELETE", headers: alpHdrs }); } catch {}
           }
-          if (toCancel.length > 0) await new Promise(r => setTimeout(r, 500));
+          if (toCancel.length > 0) await new Promise(r => setTimeout(r, 1500));
 
           // Use OCO order to submit BOTH SL and TP together (one-cancels-other)
           if (slValid && tpValid) {
