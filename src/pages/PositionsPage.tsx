@@ -190,7 +190,7 @@ export default function PositionsPage() {
     if (!error) { toast.success('Position deleted'); setPositions(prev => prev.filter(p => p.id !== id)); }
   };
 
-  const syncAlpaca = useCallback(async (paper = true) => {
+  const syncAlpaca = useCallback(async (paper = settings.paper_trading) => {
     setSyncing(true);
     setSyncResult(null);
     try {
