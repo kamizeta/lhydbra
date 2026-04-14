@@ -873,11 +873,59 @@ Deno.serve(async (req) => {
                 updated_at: new Date().toISOString(),
               }).eq("id", newOrder.id);
             } else {
-              await supabase.from("orders").update({
-                status: "failed",
-                error_message: orderResult.error || orderResult.reason || "Unknown failure",
-                updated_at: new Date().toISOString(),
-              }).eq("id", newOrder.id);
+              // ─── GHOST ORDER RECOVERY: verify with Alpaca before marking failed ───
+              let ghostRecovered = false;
+              try {
+                const alpacaBase = paper ? "https://paper-api.alpaca.markets" : "https://api.alpaca.markets";
+                const alpacaHdrs = {
+                  "APCA-API-KEY-ID": Deno.env.get("ALPACA_API_KEY_ID")!,
+                  "APCA-API-SECRET-KEY": Deno.env.get("ALPACA_API_SECRET_KEY")!,
+                };
+                const posSymbol = String(trade.asset).replace("/", "");
+                const posCheckRes = await fetch(`${alpacaBase}/v2/positions/${posSymbol}`, {
+                  headers: alpacaHdrs,
+                  signal: AbortSignal.timeout(5000),
+                });
+                if (posCheckRes.ok) {
+                  const alpacaPos = await posCheckRes.json();
+                  const recoveredPrice = parseFloat(alpacaPos.avg_entry_price || "0");
+                  const recoveredQty = Math.abs(parseFloat(alpacaPos.qty || "0"));
+                  if (recoveredPrice > 0 && recoveredQty > 0) {
+                    ghostRecovered = true;
+                    console.warn(`[operator-mode] GHOST ORDER RECOVERED: ${trade.asset} exists in Alpaca (qty=${recoveredQty}, price=${recoveredPrice}) despite failed response. Original error: ${orderResult.error}`);
+                    tradeLog("ghost_order_recovered", { user_id: user.id, symbol: String(trade.asset), qty: recoveredQty, price: recoveredPrice, original_error: orderResult.error });
+
+                    await supabase.from("orders").update({
+                      status: "filled",
+                      filled_price: recoveredPrice,
+                      error_message: null,
+                      metadata: { ghost_order_recovery: true, original_error: orderResult.error || "Unknown failure", recovered_from_alpaca: true },
+                      updated_at: new Date().toISOString(),
+                    }).eq("id", newOrder.id);
+
+                    // Override execResults for this trade
+                    execResults[execResults.length - 1] = {
+                      symbol: trade.asset, success: true,
+                      ghost_recovered: true,
+                      order: { filled_avg_price: String(recoveredPrice), filled_qty: String(recoveredQty), id: alpacaPos.asset_id || null },
+                    };
+
+                    // Inject recovered data into orderResult so position creation below proceeds
+                    orderResult.success = true;
+                    orderResult.order = { filled_avg_price: String(recoveredPrice), filled_qty: String(recoveredQty), id: alpacaPos.asset_id || null };
+                  }
+                }
+              } catch (verifyErr) {
+                console.warn("[operator-mode] Ghost order verification failed:", verifyErr instanceof Error ? verifyErr.message : verifyErr);
+              }
+
+              if (!ghostRecovered) {
+                await supabase.from("orders").update({
+                  status: "failed",
+                  error_message: orderResult.error || orderResult.reason || "Unknown failure",
+                  updated_at: new Date().toISOString(),
+                }).eq("id", newOrder.id);
+              }
             }
           }
 
@@ -947,6 +995,7 @@ Deno.serve(async (req) => {
                 strategy: String(trade.strategy_family || "operator"),
                 strategy_family: String(trade.strategy_family || "operator"),
                 regime_at_entry: String(trade.market_regime || "undefined"),
+                signal_id: trade.id || null,
                 status: "open",
                 notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}${actualQty < trade.quantity ? ` | Partial fill: ${actualQty}/${trade.quantity}` : ""}`,
               }).select("id").single();

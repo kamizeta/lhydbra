@@ -1037,9 +1037,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const finalCandidates = filteredCandidates.slice(0, max_signals);
     const generatedSignals = finalCandidates.map(c => c.signal);
 
-    // Insert into DB
+    // Insert into DB and retrieve with IDs
     if (generatedSignals.length > 0) {
-      const { error: insertError } = await supabase.from("signals").upsert(generatedSignals, { onConflict: 'signal_key', ignoreDuplicates: true });
+      const { data: insertedSignals, error: insertError } = await supabase
+        .from("signals")
+        .upsert(generatedSignals, { onConflict: 'signal_key', ignoreDuplicates: true })
+        .select();
       if (insertError) {
         console.error("[signal-engine] Insert error:", insertError.message);
         // Return signals anyway even if insert fails
@@ -1055,6 +1058,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
           universe_size: featuresData.length,
           sentiment: { fear_greed: fearGreedScore, vix_score: vixScore },
         });
+      }
+      // If we got back inserted rows with IDs, use those instead
+      if (insertedSignals && insertedSignals.length > 0) {
+        // Replace generatedSignals with DB versions that include IDs
+        generatedSignals.length = 0;
+        generatedSignals.push(...insertedSignals);
       }
     }
 
