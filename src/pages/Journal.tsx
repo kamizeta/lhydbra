@@ -51,10 +51,11 @@ export default function Journal() {
     const fetchJournal = async () => {
       const { data } = await supabase
         .from('trade_journal')
-        .select('*')
+        .select('*, positions!left(status)')
         .eq('user_id', user.id)
+        .or('positions.status.is.null,positions.status.eq.closed')
         .order('exited_at', { ascending: false });
-      if (data) setEntries(data as JournalEntry[]);
+      if (data) setEntries(data as unknown as JournalEntry[]);
     };
     fetchJournal();
 
