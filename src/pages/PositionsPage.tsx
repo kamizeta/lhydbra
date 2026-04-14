@@ -225,12 +225,45 @@ export default function PositionsPage() {
 
   const saveSlTp = async () => {
     if (!editingSlTp) return;
+    const pos = positions.find(p => p.id === editingSlTp.id);
     const { error } = await supabase.from('positions').update({
       stop_loss: editingSlTp.sl ? Number(editingSlTp.sl) : null,
       take_profit: editingSlTp.tp ? Number(editingSlTp.tp) : null,
     }).eq('id', editingSlTp.id);
-    if (error) toast.error('Error updating SL/TP');
-    else { toast.success('SL/TP updated'); setEditingSlTp(null); loadPositions(); }
+    if (error) { toast.error('Error updating SL/TP'); return; }
+
+    // Sync to Alpaca: cancel old protective orders and re-submit with new prices
+    if (pos) {
+      try {
+        const newSL = editingSlTp.sl ? Number(editingSlTp.sl) : 0;
+        const newTP = editingSlTp.tp ? Number(editingSlTp.tp) : 0;
+        const { data, error: syncErr } = await supabase.functions.invoke('alpaca-trade', {
+          body: {
+            action: 'sync_protection',
+            paper: true,
+            symbol: pos.symbol.replace('/', ''),
+            direction: pos.direction,
+            quantity: Math.abs(pos.quantity),
+            stop_loss: newSL,
+            take_profit: newTP,
+            avg_entry: pos.avg_entry,
+          },
+        });
+        if (syncErr || data?.error) {
+          console.warn('[saveSlTp] Alpaca sync warning:', data?.error || syncErr?.message);
+          toast.warning('SL/TP guardado en la app pero no se pudo sincronizar con el broker. Se corregirá en el próximo sync.');
+        } else {
+          toast.success('SL/TP actualizado en app y broker');
+        }
+      } catch (e) {
+        console.warn('[saveSlTp] Alpaca sync exception:', e);
+        toast.warning('SL/TP guardado localmente. Se sincronizará con el broker en el próximo ciclo.');
+      }
+    } else {
+      toast.success('SL/TP updated');
+    }
+    setEditingSlTp(null);
+    loadPositions();
   };
 
   // Format price compactly
