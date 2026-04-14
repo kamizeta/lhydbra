@@ -187,18 +187,24 @@ export default function SignalCenter() {
 
       {/* Detail Panel - Mobile modal */}
       {selected && (
-        <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setSelected(null)}>
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-sm" onClick={() => setSelected(null)}>
+          {/* Spacer to push panel down — tapping here closes */}
+          <div className="flex-shrink-0 h-[15vh]" />
+          {/* Scrollable panel */}
           <div
-            className="bg-card border-t border-border rounded-t-xl p-4 w-full max-h-[85vh] overflow-y-auto animate-slide-in"
+            className="bg-card border-t border-border rounded-t-xl p-4 flex-1 overflow-y-auto overscroll-contain touch-pan-y animate-slide-in"
             onClick={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-3 sticky top-0 bg-card pb-2 z-10">
               <span className="text-xs font-mono text-muted-foreground uppercase">Signal Detail</span>
               <button onClick={() => setSelected(null)} className="p-1 text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <SignalDetailPanel signal={selected} onSignalSent={() => { refetch(); setSelected(null); }} />
+            {/* Bottom safe area padding */}
+            <div className="h-8" />
           </div>
         </div>
       )}
