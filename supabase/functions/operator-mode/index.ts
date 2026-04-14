@@ -995,6 +995,7 @@ Deno.serve(async (req) => {
                 strategy: String(trade.strategy_family || "operator"),
                 strategy_family: String(trade.strategy_family || "operator"),
                 regime_at_entry: String(trade.market_regime || "undefined"),
+                signal_id: trade.id || null,
                 status: "open",
                 notes: `Operator auto-exec. Score: ${Number(trade.opportunity_score).toFixed(0)}, R: ${Number(trade.expected_r_multiple).toFixed(1)}${slippageNote}${actualQty < trade.quantity ? ` | Partial fill: ${actualQty}/${trade.quantity}` : ""}`,
               }).select("id").single();
