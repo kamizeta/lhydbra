@@ -1095,61 +1095,8 @@ Deno.serve(async (req) => {
     }
 
     // ─── Telegram summary on every run ───
-    try {
-      const tgToken = Deno.env.get("TELEGRAM_BOT_TOKEN");
-      const { data: tgSettings } = await supabase
-        .from("user_settings")
-        .select("notify_telegram_chat_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (tgToken && tgSettings?.notify_telegram_chat_id) {
-        const { data: openPos } = await supabase
-          .from("positions")
-          .select("symbol, direction, pnl, quantity, avg_entry")
-          .eq("user_id", user.id)
-          .eq("status", "open");
-
-        const openCount = (openPos || []).length;
-        const unrealizedTotal = (openPos || []).reduce((s: number, p: any) => s + (Number(p.pnl) || 0), 0);
-
-        const executedCount = shouldExecute ? execResults.filter((r: any) => r.success).length : 0;
-        const failedCount = shouldExecute ? execResults.filter((r: any) => !r.success).length : 0;
-
-        const tradeLines = executableTrades.slice(0, 5).map((t: any) =>
-          `  • ${t.asset} ${t.direction.toUpperCase()} | Score: ${Number(t.opportunity_score).toFixed(0)} | R: ${Number(t.expected_r_multiple).toFixed(1)}`
-        ).join("\n");
-
-        const nowCOT = new Date().toLocaleString("es-CO", { timeZone: "America/Bogota", hour12: false });
-
-        const summaryMsg = [
-          `📊 *LHYDBRA Operator* — ${nowCOT}`,
-          "",
-          `🔹 Estado: ${shouldExecute ? "Ejecutado" : automationLevel === "full_operator" ? "Auto" : "Manual"}`,
-          `🔹 Señales: ${signals.length} generadas`,
-          `🔹 Trades: ${executedCount} ejecutados${failedCount > 0 ? `, ${failedCount} fallidos` : ""}`,
-          `🔹 Capital: $${currentCapital.toFixed(2)}`,
-          `🔹 PnL hoy: $${dailyPnl.toFixed(2)}`,
-          `🔹 Posiciones abiertas: ${openCount} ($${unrealizedTotal.toFixed(2)} unrealized)`,
-          `🔹 Riesgo diario: ${dailyRiskUsed.toFixed(1)}%/${maxDailyRisk}%`,
-          `🔹 Trades hoy: ${tradesToday + executedCount}/${maxTradesPerDay}`,
-          preflight.length > 0 ? `\n⚠️ *Alertas:*\n${preflight.join("\n")}` : "",
-          tradeLines ? `\n📋 *Señales top:*\n${tradeLines}` : "",
-        ].filter(Boolean).join("\n");
-
-        fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: tgSettings.notify_telegram_chat_id,
-            text: summaryMsg,
-            parse_mode: "Markdown",
-          }),
-        }).catch(e => console.warn("[operator-mode] Telegram summary failed:", e));
-      }
-    } catch (tgErr) {
-      console.warn("[operator-mode] Telegram summary error:", tgErr);
-    }
+    // Telegram summary DISABLED by user request (2026-04-14)
+    // Re-enable by uncommenting the block below if needed.
 
     return jsonRes(req, {
       status: shouldExecute ? "executed" : "ready_for_approval",
