@@ -380,18 +380,26 @@ serve(async (req) => {
     }
 
     // 5. Check if local positions were closed on Alpaca
-    const closedSymbols = new Map<string, AlpacaOrder>();
+    // Build per-symbol list of ALL filled orders (not a Map that overwrites)
+    const filledOrdersBySymbol = new Map<string, AlpacaOrder[]>();
     for (const order of closedOrders) {
       if (order.status === "filled" && order.filled_qty && parseFloat(order.filled_qty) > 0) {
-        closedSymbols.set(cleanSymbol(order.symbol), order);
+        const key = cleanSymbol(order.symbol);
+        if (!filledOrdersBySymbol.has(key)) filledOrdersBySymbol.set(key, []);
+        filledOrdersBySymbol.get(key)!.push(order);
       }
     }
 
     for (const [cleanSym, local] of localBySymbol) {
       if (alpacaSymbols.has(cleanSym) || alpacaSymbols.has(local.symbol)) continue;
 
-      // Position exists locally but not on Alpaca → check if it was closed
-      const closingOrder = closedSymbols.get(cleanSym);
+      // Position exists locally but not on Alpaca → find the exit order
+      // Exit order must have side OPPOSITE to the position direction
+      const exitSide = local.direction === "long" ? "sell" : "buy";
+      const candidateOrders = (filledOrdersBySymbol.get(cleanSym) || [])
+        .filter(o => o.side === exitSide)
+        .sort((a, b) => new Date(b.filled_at).getTime() - new Date(a.filled_at).getTime());
+      const closingOrder = candidateOrders.length > 0 ? candidateOrders[0] : null;
       if (closingOrder) {
         const filledPrice = parseFloat(closingOrder.filled_avg_price || "0");
         const qty = Number(local.quantity);

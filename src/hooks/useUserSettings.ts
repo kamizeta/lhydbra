@@ -28,6 +28,8 @@ export interface UserSettings {
   min_score: number;
   min_r: number;
   min_confidence: number;
+  // Broker environment
+  paper_trading: boolean;
 }
 
 const defaultSettings: UserSettings = {
@@ -55,6 +57,7 @@ const defaultSettings: UserSettings = {
   min_score: 60,
   min_r: 1.5,
   min_confidence: 55,
+  paper_trading: true,
 };
 
 function parseSettings(data: Record<string, unknown>): UserSettings {
@@ -82,6 +85,7 @@ function parseSettings(data: Record<string, unknown>): UserSettings {
     min_score: data.min_score != null && !isNaN(Number(data.min_score)) ? Number(data.min_score) : 60,
     min_r: data.min_r != null && !isNaN(Number(data.min_r)) ? Number(data.min_r) : 1.5,
     min_confidence: data.min_confidence != null && !isNaN(Number(data.min_confidence)) ? Number(data.min_confidence) : 55,
+    paper_trading: data.paper_trading !== false, // default to paper
   };
 }
 
