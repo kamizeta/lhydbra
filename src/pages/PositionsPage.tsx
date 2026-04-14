@@ -213,7 +213,7 @@ export default function PositionsPage() {
 
   useEffect(() => {
     if (user && !loading) {
-      const timer = setTimeout(() => void syncAlpaca(true), 2000);
+      const timer = setTimeout(() => void syncAlpaca(), 2000);
       return () => clearTimeout(timer);
     }
   }, [user, loading, syncAlpaca]);
@@ -293,7 +293,7 @@ export default function PositionsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => syncAlpaca(true)} disabled={syncing}
+          <button onClick={() => syncAlpaca()} disabled={syncing}
             className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border rounded-md text-[10px] md:text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50">
             {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
             <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>
