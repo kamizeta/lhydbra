@@ -240,7 +240,7 @@ export default function PositionsPage() {
         const { data, error: syncErr } = await supabase.functions.invoke('alpaca-trade', {
           body: {
             action: 'sync_protection',
-            paper: true,
+            paper: settings.paper_trading,
             symbol: pos.symbol.replace('/', ''),
             direction: pos.direction,
             quantity: Math.abs(pos.quantity),
