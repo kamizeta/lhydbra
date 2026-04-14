@@ -120,6 +120,7 @@ export default function SignalCenter() {
                   <th className="text-center p-3">Score</th>
                   <th className="text-center p-3">Conf</th>
                   <th className="text-center p-3">Status</th>
+                  <th className="text-center p-3">Date</th>
                 </tr>
               </thead>
               <tbody>
@@ -161,10 +162,13 @@ export default function SignalCenter() {
                         {s.status.toUpperCase()}
                       </StatusBadge>
                     </td>
+                    <td className="text-center p-3 text-[10px] font-mono text-muted-foreground whitespace-nowrap">
+                      {new Date(s.created_at).toLocaleDateString()} {new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">
+                  <tr><td colSpan={10} className="p-8 text-center text-muted-foreground">
                     {signals.length === 0
                       ? t.signals.noSignalsYet
                       : t.signals.noSignalsMatch}
