@@ -68,8 +68,10 @@ export default function PerformancePage() {
     Promise.all([
       supabase.from("strategy_performance").select("*").eq("user_id", user.id),
       supabase.from("trade_journal")
-        .select("symbol, direction, pnl, r_multiple, strategy_family, market_regime, opportunity_score, exited_at, entry_price, exit_price, exit_reasoning")
-        .eq("user_id", user.id).order("exited_at", { ascending: false }).limit(200),
+        .select("symbol, direction, pnl, r_multiple, strategy_family, market_regime, opportunity_score, exited_at, entry_price, exit_price, exit_reasoning, positions!left(status)")
+        .eq("user_id", user.id)
+        .or("positions.status.is.null,positions.status.eq.closed")
+        .order("exited_at", { ascending: false }).limit(200),
     ]).then(([perfRes, journalRes]) => {
       if (perfRes.data) setPerf(perfRes.data as StratPerf[]);
       if (journalRes.data) setJournal(journalRes.data as JournalEntry[]);
