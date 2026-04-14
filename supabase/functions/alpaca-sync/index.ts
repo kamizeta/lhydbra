@@ -331,10 +331,12 @@ serve(async (req) => {
         let sigTP: number | null = null;
         let sigStrategy: string | null = null;
         let sigRegime: string | null = null;
+        let recoveredSignalId: string | null = null;
         try {
+          // 1. Try matching active/approved signal first
           const { data: matchSig } = await supabase
             .from("signals")
-            .select("stop_loss, targets, strategy_family, market_regime")
+            .select("id, stop_loss, targets, strategy_family, market_regime")
             .eq("user_id", userId)
             .eq("asset", sym)
             .in("status", ["active", "approved"])
@@ -342,11 +344,32 @@ serve(async (req) => {
             .limit(1)
             .maybeSingle();
           if (matchSig) {
+            recoveredSignalId = matchSig.id;
             sigSL = Number(matchSig.stop_loss) || null;
-            const targets = matchSig.targets as number[] | null;
-            sigTP = targets && targets.length > 0 ? Number(targets[0]) : null;
+            const targets = matchSig.targets as any[];
+            sigTP = targets && targets.length > 0 ? Number(typeof targets[0] === 'object' ? targets[0].price : targets[0]) : null;
             sigStrategy = matchSig.strategy_family;
             sigRegime = matchSig.market_regime;
+          }
+
+          // 2. Fallback: recover SL/TP from recent failed orders (ghost order recovery)
+          if (!sigSL && !sigTP) {
+            const { data: failedOrder } = await supabase
+              .from("orders")
+              .select("stop_loss, take_profit, signal_id, direction, metadata")
+              .eq("user_id", userId)
+              .eq("symbol", sym)
+              .eq("status", "failed")
+              .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (failedOrder) {
+              sigSL = Number(failedOrder.stop_loss) || null;
+              sigTP = Number(failedOrder.take_profit) || null;
+              recoveredSignalId = failedOrder.signal_id || null;
+              console.log(`[alpaca-sync] Recovered SL/TP from failed order for ${sym}: SL=${sigSL}, TP=${sigTP}`);
+            }
           }
         } catch {}
 
@@ -372,6 +395,7 @@ serve(async (req) => {
           strategy: sigStrategy || "alpaca-sync",
           strategy_family: sigStrategy,
           regime_at_entry: sigRegime,
+          signal_id: recoveredSignalId,
           notes: `Synced from Alpaca ${paper ? "(Paper)" : "(Live)"}${sigSL ? ` | SL: ${sigSL}` : ""}${sigTP ? ` | TP: ${sigTP}` : ""}`,
         });
 
