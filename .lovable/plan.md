@@ -1,49 +1,55 @@
 
 
-## Diagnóstico: Por qué QQQ y MSFT no se cerraron en la app
+## Diagnóstico: Por qué SL/TP falla intermitentemente
 
-### Causa raíz encontrada
+### Problema encontrado
 
-La lógica de cierre en `alpaca-sync` (líneas 382-395) tiene **dos fallos críticos**:
+Hay **dos sistemas compitiendo** para colocar órdenes de protección, sin coordinación:
 
-1. **No valida el `side` de la orden**: Construye `closedSymbols` con TODAS las órdenes filled (entrada y salida). Si la orden de entrada más reciente sobreescribe la de salida en el Map, el sistema encuentra una orden pero no reconoce que fue un cierre.
+1. **`alpaca-trade`** (al ejecutar): Coloca un **trailing stop** + TP inmediatamente después del fill (línea 388-400)
+2. **`alpaca-sync` SL-Guardian** (cada 5 min): Intenta colocar un **OCO** (stop fijo + limit) para toda posición abierta
 
-2. **El Map sobreescribe con la última orden**: Si hay múltiples órdenes filled del mismo símbolo en 24h (por ejemplo, una de entrada y una de salida), solo guarda la última. Si la de entrada es posterior, se pierde la de salida.
+El caso de TSLA muestra exactamente el conflicto:
+- `alpaca-trade` colocó un trailing stop exitosamente al fill
+- 5 minutos después, SL-Guardian intenta colocar un OCO pero Alpaca rechaza con `"insufficient qty available for order (requested: 65, available: 0)"` porque los 65 shares ya están reservados por el trailing stop existente
+- SL-Guardian busca órdenes tipo `stop` y `limit`, pero **no detecta órdenes tipo `trailing_stop`** — por eso cree que no hay protección
 
-3. **Si no encuentra una `closingOrder`**, la posición simplemente se queda como "open" **para siempre**, sin ningún fallback. La posición no existe en Alpaca pero la app la ignora.
+Adicionalmente, el Guardian cancela cualquier orden que encuentre y reenvía (línea 754-758), lo que puede causar ventanas sin protección.
 
 ### Plan de corrección
 
-#### 1. Validar side de la orden de cierre (`alpaca-sync`)
-- Al construir `closedSymbols`, filtrar solo órdenes cuyo `side` sea opuesto a la dirección local de la posición
-- Priorizar la orden filled más reciente que sea de salida
+#### 1. SL-Guardian: Detectar trailing stops como protección válida
+- Agregar `trailing_stop` al mapeo de órdenes existentes en el Guardian
+- Si ya existe un `trailing_stop` para un símbolo, considerar la protección como activa y NO re-enviar
 
-#### 2. Fallback para posiciones huérfanas
-- Si una posición local **no existe en Alpaca** y tampoco tiene una `closingOrder` válida, cerrarla con `close_price = avg_entry` y `pnl = 0` como "missing_in_broker"
-- Esto evita posiciones zombi que nunca se cierran
+#### 2. SL-Guardian: Agregar flag `protection_confirmed` 
+- Después de que `alpaca-trade` coloque protección exitosamente, marcar `protection_confirmed = true` en la tabla `orders`
+- El Guardian debe verificar este flag antes de intentar re-enviar — si la orden ya tiene protección confirmada y hay órdenes activas en Alpaca, skip
 
-#### 3. Unificar entorno paper/live desde user_settings
-- Aunque hoy estás en paper y el hardcode coincide, preparar el sistema para cuando operes en live
-- Leer `paper_trading` de `user_settings` en `PositionsPage.tsx`, `useDashboardData.ts` y `Dashboard.tsx`
+#### 3. SL-Guardian: No cancelar + re-crear si los precios coinciden
+- Actualmente las líneas 738-739 siempre evalúan como true (`!hasStopOrder || hasStopOrder` = siempre true), lo que significa que el Guardian **siempre** cancela y re-envía, incluso si ya todo está bien
+- Fix: Solo actuar si realmente falta protección o hay mismatch de precios
 
-#### 4. Cerrar QQQ y MSFT manualmente ahora
-- Marcar las posiciones como cerradas en la DB con datos reales de Alpaca
+#### 4. Ventana de protección: Agregar wait después de cancel
+- Aumentar el delay post-cancel de 500ms a 1500ms para que Alpaca libere la qty antes de re-enviar
 
 ### Archivos a modificar
-- `supabase/functions/alpaca-sync/index.ts` — Lógica de cierre + fallback
-- `src/pages/PositionsPage.tsx` — Usar `paper_trading` de settings
-- `src/hooks/useDashboardData.ts` — Usar `paper_trading` de settings
+- `supabase/functions/alpaca-sync/index.ts` — SL-Guardian: detectar trailing_stop, corregir lógica de re-evaluación, aumentar delay
+- `supabase/functions/alpaca-trade/index.ts` — Marcar `protection_confirmed` en orders después de colocar protección exitosa
 
 ### Detalle técnico
 
 ```text
 Antes (buggy):
-  closedOrders → Map por símbolo (sobreescribe, sin filtrar side)
-  Si posición no en Alpaca Y no hay closingOrder → no hace nada (zombi)
+  alpaca-trade: coloca trailing_stop + TP al fill
+  SL-Guardian: no reconoce trailing_stop → cree que falta SL
+  SL-Guardian: cancela + re-envía OCO → falla por qty held
+  Líneas 738-739: missingStop = hasSL && (!hasStopOrder || hasStopOrder) → siempre true
 
 Después (fix):
-  closedOrders → filtrar por side opuesto a dirección local
-  Si posición no en Alpaca Y no hay closingOrder → cerrar como "missing_in_broker"
-  Todas las llamadas paper/live → leer de user_settings
+  alpaca-trade: coloca trailing_stop + TP → marca protection_confirmed
+  SL-Guardian: detecta trailing_stop como protección válida → skip
+  SL-Guardian: solo actúa si realmente falta protección
+  Delay post-cancel: 500ms → 1500ms
 ```
 
