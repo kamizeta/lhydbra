@@ -395,6 +395,7 @@ serve(async (req) => {
           strategy: sigStrategy || "alpaca-sync",
           strategy_family: sigStrategy,
           regime_at_entry: sigRegime,
+          signal_id: recoveredSignalId,
           notes: `Synced from Alpaca ${paper ? "(Paper)" : "(Live)"}${sigSL ? ` | SL: ${sigSL}` : ""}${sigTP ? ` | TP: ${sigTP}` : ""}`,
         });
 
