@@ -538,7 +538,77 @@ serve(async (req) => {
 
     // ─── ACTION: close_position ───
     if (action === "close_position") {
-      // (close_position code follows below)
+      const { symbol, qty } = body;
+      if (!symbol) return jsonRes(req, { error: "Missing: symbol" }, 400);
+
+      // Cancel any open protective orders for this symbol first
+      try {
+        const openOrdersRes = await fetch(`${baseUrl}/v2/orders?status=open&limit=200`, { headers });
+        if (openOrdersRes.ok) {
+          const openOrders = await openOrdersRes.json() as any[];
+          const cleanSym = String(symbol).replace("/", "").toUpperCase();
+          for (const ord of openOrders) {
+            if (ord.symbol === cleanSym && (ord.type === "stop" || ord.type === "limit" || ord.type === "trailing_stop" || ord.order_class === "oco")) {
+              try { await fetch(`${baseUrl}/v2/orders/${ord.id}`, { method: "DELETE", headers }); } catch (cancelErr) { console.error(`[alpaca-trade] Failed to cancel order ${ord.id}:`, cancelErr); }
+            }
+          }
+        }
+      } catch (cancelBlockErr) { console.error(`[alpaca-trade] Error cancelling protective orders:`, cancelBlockErr); }
+
+      const absQty = qty ? Math.abs(Number(qty)) : null;
+      const url = absQty
+        ? `${baseUrl}/v2/positions/${encodeURIComponent(symbol)}?qty=${absQty}`
+        : `${baseUrl}/v2/positions/${encodeURIComponent(symbol)}`;
+
+      const res = await fetchWithRetry(url, { method: "DELETE", headers });
+      const data = await res.json();
+
+      if (!res.ok) {
+        return jsonRes(req, { error: `Alpaca close error [${res.status}]: ${data.message || JSON.stringify(data)}` }, res.status);
+      }
+
+      // Update local position record
+      try {
+        const fillPrice = parseFloat(data.filled_avg_price || "0");
+        if (fillPrice > 0) {
+          const { data: localPos } = await supabase
+            .from("positions")
+            .select("id, direction, quantity, avg_entry")
+            .eq("user_id", userId)
+            .eq("symbol", symbol)
+            .eq("status", "open")
+            .maybeSingle();
+
+          if (localPos) {
+            const diff = localPos.direction === "long"
+              ? fillPrice - Number(localPos.avg_entry)
+              : Number(localPos.avg_entry) - fillPrice;
+            const pnl = diff * Number(localPos.quantity);
+
+            await supabase.from("positions").update({
+              status: "closed",
+              close_price: fillPrice,
+              pnl,
+              closed_at: data.filled_at || new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }).eq("id", localPos.id);
+          }
+        }
+      } catch (syncErr) {
+        console.error("Local position sync failed:", syncErr);
+      }
+
+      await supabase.from("audit_log").insert({
+        user_id: userId,
+        action: "position_closed",
+        entity: "order",
+        entity_id: String(data.id),
+        new_values: { symbol, qty: qty || "full", status: data.status, filled_avg_price: data.filled_avg_price },
+      } as Record<string, unknown>).then(({ error: auditErr }) => {
+        if (auditErr) console.error("[audit_log] insert error:", auditErr.message);
+      });
+
+      return jsonRes(req, { success: true, order: data });
     }
 
     // ─── ACTION: sync_protection ───
