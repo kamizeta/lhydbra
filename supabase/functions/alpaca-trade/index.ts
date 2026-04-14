@@ -611,6 +611,84 @@ serve(async (req) => {
       return jsonRes(req, { success: true, order: data });
     }
 
+    // ─── ACTION: sync_protection ───
+    if (action === "sync_protection") {
+      const { symbol, direction, quantity, stop_loss: newSL, take_profit: newTP, avg_entry } = body;
+      if (!symbol) return jsonRes(req, { error: "Missing: symbol" }, 400);
+
+      const cleanSym = String(symbol).replace("/", "").toUpperCase();
+      const qty = Math.abs(Number(quantity));
+      const closeSide = direction === "long" ? "sell" : "buy";
+      const sl = Number(newSL);
+      const tp = Number(newTP);
+      const entry = Number(avg_entry);
+
+      // 1. Cancel ALL existing protective orders for this symbol
+      try {
+        const openOrdersRes = await fetch(`${baseUrl}/v2/orders?status=open&limit=200`, { headers });
+        if (openOrdersRes.ok) {
+          const openOrders = await openOrdersRes.json() as any[];
+          for (const ord of openOrders) {
+            if (ord.symbol === cleanSym && (ord.type === "stop" || ord.type === "limit" || ord.type === "trailing_stop" || ord.order_class === "oco")) {
+              try { await fetch(`${baseUrl}/v2/orders/${ord.id}`, { method: "DELETE", headers }); } catch {}
+            }
+          }
+        }
+      } catch (e) { console.warn(`[sync_protection] Error cancelling old orders:`, e); }
+
+      await new Promise(r => setTimeout(r, 500));
+
+      // 2. Submit new protective orders
+      const slValid = sl > 0 && (direction === "long" ? sl < entry - 0.01 : sl > entry + 0.01);
+      const tpValid = tp > 0 && (direction === "long" ? tp > entry + 0.01 : tp < entry - 0.01);
+
+      let slOk = false, tpOk = false;
+      let errors: string[] = [];
+
+      // Try OCO if both valid
+      if (slValid && tpValid) {
+        const ocoBody = {
+          symbol: cleanSym, qty: String(qty), side: closeSide,
+          type: "limit", time_in_force: "gtc", order_class: "oco",
+          take_profit: { limit_price: String(Math.round(tp * 100) / 100) },
+          stop_loss: { stop_price: String(Math.round(sl * 100) / 100) },
+        };
+        const ocoRes = await fetch(`${baseUrl}/v2/orders`, { method: "POST", headers, body: JSON.stringify(ocoBody) });
+        if (ocoRes.ok) {
+          slOk = true; tpOk = true;
+          console.log(`[sync_protection] ✓ OCO for ${cleanSym}: SL@${sl} + TP@${tp}`);
+        } else {
+          const errText = await ocoRes.text();
+          console.warn(`[sync_protection] OCO failed ${cleanSym}: ${errText}`);
+          errors.push(`OCO: ${errText}`);
+        }
+      }
+
+      // Fallback: individual orders
+      if (!slOk && slValid) {
+        const slRes = await fetch(`${baseUrl}/v2/orders`, {
+          method: "POST", headers,
+          body: JSON.stringify({ symbol: cleanSym, qty: String(qty), side: closeSide, type: "stop", time_in_force: "gtc", stop_price: String(Math.round(sl * 100) / 100) }),
+        });
+        if (slRes.ok) { slOk = true; console.log(`[sync_protection] ✓ SL for ${cleanSym} @ ${sl}`); }
+        else { const e = await slRes.text(); errors.push(`SL: ${e}`); console.warn(`[sync_protection] SL failed: ${e}`); }
+      }
+      if (!tpOk && tpValid) {
+        const tpRes = await fetch(`${baseUrl}/v2/orders`, {
+          method: "POST", headers,
+          body: JSON.stringify({ symbol: cleanSym, qty: String(qty), side: closeSide, type: "limit", time_in_force: "gtc", limit_price: String(Math.round(tp * 100) / 100) }),
+        });
+        if (tpRes.ok) { tpOk = true; console.log(`[sync_protection] ✓ TP for ${cleanSym} @ ${tp}`); }
+        else { const e = await tpRes.text(); errors.push(`TP: ${e}`); console.warn(`[sync_protection] TP failed: ${e}`); }
+      }
+
+      return jsonRes(req, {
+        success: slOk || tpOk,
+        sl_synced: slOk, tp_synced: tpOk,
+        errors: errors.length > 0 ? errors : undefined,
+      });
+    }
+
     // ─── ACTION: get_orders ───
     if (action === "get_orders") {
       const { status: orderStatus = "all", limit = 50 } = body;
@@ -634,7 +712,7 @@ serve(async (req) => {
       return jsonRes(req, { success: true, order: data });
     }
 
-    return jsonRes(req, { error: "Invalid action. Use: test_connection, get_positions, place_order, close_position, get_orders, get_order_status" }, 400);
+    return jsonRes(req, { error: "Invalid action. Use: test_connection, get_positions, place_order, close_position, sync_protection, get_orders, get_order_status" }, 400);
   } catch (e) {
     log("error", "alpaca_trade_fatal", { error: e instanceof Error ? e.message : "Unknown error" });
     return jsonRes(req, { error: e instanceof Error ? e.message : "Unknown error" }, 500);

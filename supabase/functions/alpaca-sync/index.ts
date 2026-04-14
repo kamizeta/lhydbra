@@ -611,9 +611,9 @@ serve(async (req) => {
       if (openOrdersRes.ok) {
         const openOrders = await openOrdersRes.json() as any[];
 
-        // Build maps: which symbols have active stop/limit orders & their order IDs
-        const symbolStopOrders = new Map<string, string[]>(); // sym → order IDs
-        const symbolLimitOrders = new Map<string, string[]>();
+        // Build maps: which symbols have active stop/limit orders & their order IDs + prices
+        const symbolStopOrders = new Map<string, { id: string; price: number }[]>();
+        const symbolLimitOrders = new Map<string, { id: string; price: number }[]>();
         const symbolHasOCO = new Set<string>(); // symbols with existing OCO orders
 
         for (const ord of openOrders) {
@@ -626,11 +626,11 @@ serve(async (req) => {
 
           if (ord.type === "stop" || ord.type === "stop_limit") {
             if (!symbolStopOrders.has(sym)) symbolStopOrders.set(sym, []);
-            symbolStopOrders.get(sym)!.push(ord.id);
+            symbolStopOrders.get(sym)!.push({ id: ord.id, price: parseFloat(ord.stop_price || "0") });
           }
           if (ord.type === "limit") {
             if (!symbolLimitOrders.has(sym)) symbolLimitOrders.set(sym, []);
-            symbolLimitOrders.get(sym)!.push(ord.id);
+            symbolLimitOrders.get(sym)!.push({ id: ord.id, price: parseFloat(ord.limit_price || "0") });
           }
           // Bracket legs
           if (ord.legs && Array.isArray(ord.legs)) {
@@ -638,11 +638,11 @@ serve(async (req) => {
               const legSym = cleanSymbol(leg.symbol || ord.symbol);
               if (leg.type === "stop" || leg.type === "stop_limit") {
                 if (!symbolStopOrders.has(legSym)) symbolStopOrders.set(legSym, []);
-                symbolStopOrders.get(legSym)!.push(leg.id);
+                symbolStopOrders.get(legSym)!.push({ id: leg.id, price: parseFloat(leg.stop_price || "0") });
               }
               if (leg.type === "limit") {
                 if (!symbolLimitOrders.has(legSym)) symbolLimitOrders.set(legSym, []);
-                symbolLimitOrders.get(legSym)!.push(leg.id);
+                symbolLimitOrders.get(legSym)!.push({ id: leg.id, price: parseFloat(leg.limit_price || "0") });
               }
             }
           }
@@ -665,15 +665,34 @@ serve(async (req) => {
           const hasOCO = symbolHasOCO.has(sym);
 
           // If OCO already exists, both SL and TP are covered — skip
-          if (hasOCO) continue;
+          // But check if OCO prices match — if not, we need to re-submit
+          if (hasOCO && hasStopOrder && hasLimitOrder) {
+            const stopEntries = symbolStopOrders.get(sym) || [];
+            const limitEntries = symbolLimitOrders.get(sym) || [];
+            const dbSL = Math.round(Number(pos.stop_loss) * 100) / 100;
+            const dbTP = Math.round(Number(pos.take_profit) * 100) / 100;
+            const brokerSL = stopEntries.length > 0 ? Math.round(stopEntries[0].price * 100) / 100 : 0;
+            const brokerTP = limitEntries.length > 0 ? Math.round(limitEntries[0].price * 100) / 100 : 0;
+            if (Math.abs(dbSL - brokerSL) < 0.02 && Math.abs(dbTP - brokerTP) < 0.02) continue;
+            console.log(`[SL-Guardian] Price mismatch ${sym}: DB SL=${dbSL}/TP=${dbTP} vs Broker SL=${brokerSL}/TP=${brokerTP} — re-submitting`);
+          }
 
-          // If both individual orders exist, skip
-          if (hasStopOrder && hasLimitOrder) continue;
+          // If both individual orders exist, check prices match
+          if (hasStopOrder && hasLimitOrder && !hasOCO) {
+            const stopEntries = symbolStopOrders.get(sym) || [];
+            const limitEntries = symbolLimitOrders.get(sym) || [];
+            const dbSL = Math.round(Number(pos.stop_loss) * 100) / 100;
+            const dbTP = Math.round(Number(pos.take_profit) * 100) / 100;
+            const brokerSL = stopEntries.length > 0 ? Math.round(stopEntries[0].price * 100) / 100 : 0;
+            const brokerTP = limitEntries.length > 0 ? Math.round(limitEntries[0].price * 100) / 100 : 0;
+            if (Math.abs(dbSL - brokerSL) < 0.02 && Math.abs(dbTP - brokerTP) < 0.02) continue;
+            console.log(`[SL-Guardian] Price mismatch ${sym}: DB SL=${dbSL}/TP=${dbTP} vs Broker SL=${brokerSL}/TP=${brokerTP} — re-submitting`);
+          }
 
-          const missingStop = hasSL && !hasStopOrder;
-          const missingTP = hasTP && !hasLimitOrder;
+          const missingStop = hasSL && (!hasStopOrder || hasStopOrder); // always re-evaluate
+          const missingTP = hasTP && (!hasLimitOrder || hasLimitOrder);
 
-          if (!missingStop && !missingTP) continue;
+          if (!hasSL && !hasTP) continue;
 
           const qty = Math.abs(Number(pos.quantity));
           const closeSide = pos.direction === "long" ? "sell" : "buy";
@@ -687,7 +706,7 @@ serve(async (req) => {
           if (!slValid && !tpValid) continue;
 
           // Cancel ALL existing protective orders for this symbol first
-          const toCancel = [...(symbolStopOrders.get(sym) || []), ...(symbolLimitOrders.get(sym) || [])];
+          const toCancel = [...(symbolStopOrders.get(sym) || []).map(o => o.id), ...(symbolLimitOrders.get(sym) || []).map(o => o.id)];
           for (const ordId of toCancel) {
             try { await fetch(`${baseUrl}/v2/orders/${ordId}`, { method: "DELETE", headers: alpHdrs }); } catch {}
           }
