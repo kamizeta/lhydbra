@@ -402,7 +402,7 @@ serve(async (req) => {
       const closingOrder = candidateOrders.length > 0 ? candidateOrders[0] : null;
       if (closingOrder) {
         const filledPrice = parseFloat(closingOrder.filled_avg_price || "0");
-        const qty = Number(local.quantity);
+        const qty = Math.abs(Number(local.quantity));
         const entry = Number(local.avg_entry);
         const direction = local.direction;
         const diff = direction === "long" ? filledPrice - entry : entry - filledPrice;
