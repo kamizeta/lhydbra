@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Trash2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Lightbulb, DollarSign, PieChart, Pencil, Check, RefreshCw, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserSettings } from '@/hooks/useUserSettings';
 import { useI18n } from '@/i18n';
 import { useMarketData } from '@/hooks/useMarketData';
 import { toast } from 'sonner';
@@ -36,6 +37,7 @@ type SortDir = 'asc' | 'desc';
 
 export default function PositionsPage() {
   const { user } = useAuth();
+  const { settings } = useUserSettings();
   const { t } = useI18n();
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(true);
@@ -188,7 +190,7 @@ export default function PositionsPage() {
     if (!error) { toast.success('Position deleted'); setPositions(prev => prev.filter(p => p.id !== id)); }
   };
 
-  const syncAlpaca = useCallback(async (paper = true) => {
+  const syncAlpaca = useCallback(async (paper = settings.paper_trading) => {
     setSyncing(true);
     setSyncResult(null);
     try {
@@ -207,11 +209,11 @@ export default function PositionsPage() {
       }
     } catch { toast.error('Error sync Alpaca'); }
     setSyncing(false);
-  }, [loadPositions]);
+  }, [loadPositions, settings.paper_trading]);
 
   useEffect(() => {
     if (user && !loading) {
-      const timer = setTimeout(() => void syncAlpaca(true), 2000);
+      const timer = setTimeout(() => void syncAlpaca(), 2000);
       return () => clearTimeout(timer);
     }
   }, [user, loading, syncAlpaca]);
@@ -240,7 +242,7 @@ export default function PositionsPage() {
         const { data, error: syncErr } = await supabase.functions.invoke('alpaca-trade', {
           body: {
             action: 'sync_protection',
-            paper: true,
+            paper: settings.paper_trading,
             symbol: pos.symbol.replace('/', ''),
             direction: pos.direction,
             quantity: Math.abs(pos.quantity),
@@ -291,7 +293,7 @@ export default function PositionsPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => syncAlpaca(true)} disabled={syncing}
+          <button onClick={() => syncAlpaca()} disabled={syncing}
             className="flex items-center gap-1.5 px-2.5 py-1.5 border border-border rounded-md text-[10px] md:text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50">
             {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
             <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>

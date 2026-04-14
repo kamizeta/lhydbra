@@ -68,7 +68,7 @@ export default function Dashboard() {
     activeSignals, signalsLoading,
     dataFreshness,
     refetchSignals,
-  } = useDashboardData(user?.id);
+  } = useDashboardData(user?.id, settings.paper_trading);
 
   // ── Price map ──
   const priceMap = useMemo(() => {
@@ -94,7 +94,7 @@ export default function Dashboard() {
     } else {
       toast.success(t.operator.operatorCycleComplete);
       try {
-        await supabase.functions.invoke("alpaca-sync", { body: { paper: true } });
+        await supabase.functions.invoke("alpaca-sync", { body: { paper: settings.paper_trading } });
         toast.success("Positions synced with Alpaca");
       } catch {
         toast.info("Run manual sync if positions don't update");

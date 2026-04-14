@@ -380,18 +380,26 @@ serve(async (req) => {
     }
 
     // 5. Check if local positions were closed on Alpaca
-    const closedSymbols = new Map<string, AlpacaOrder>();
+    // Build per-symbol list of ALL filled orders (not a Map that overwrites)
+    const filledOrdersBySymbol = new Map<string, AlpacaOrder[]>();
     for (const order of closedOrders) {
       if (order.status === "filled" && order.filled_qty && parseFloat(order.filled_qty) > 0) {
-        closedSymbols.set(cleanSymbol(order.symbol), order);
+        const key = cleanSymbol(order.symbol);
+        if (!filledOrdersBySymbol.has(key)) filledOrdersBySymbol.set(key, []);
+        filledOrdersBySymbol.get(key)!.push(order);
       }
     }
 
     for (const [cleanSym, local] of localBySymbol) {
       if (alpacaSymbols.has(cleanSym) || alpacaSymbols.has(local.symbol)) continue;
 
-      // Position exists locally but not on Alpaca → check if it was closed
-      const closingOrder = closedSymbols.get(cleanSym);
+      // Position exists locally but not on Alpaca → find the exit order
+      // Exit order must have side OPPOSITE to the position direction
+      const exitSide = local.direction === "long" ? "sell" : "buy";
+      const candidateOrders = (filledOrdersBySymbol.get(cleanSym) || [])
+        .filter(o => o.side === exitSide)
+        .sort((a, b) => new Date(b.filled_at).getTime() - new Date(a.filled_at).getTime());
+      const closingOrder = candidateOrders.length > 0 ? candidateOrders[0] : null;
       if (closingOrder) {
         const filledPrice = parseFloat(closingOrder.filled_avg_price || "0");
         const qty = Number(local.quantity);
@@ -590,6 +598,24 @@ serve(async (req) => {
           action: "closed",
           symbol: local.symbol,
           detail: `@ ${filledPrice.toFixed(2)}, PnL: ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}`,
+        });
+      } else {
+        // Orphan: position exists locally but NOT in Alpaca and no valid exit order found
+        // Close it as "missing_in_broker" to prevent zombie positions
+        console.warn(`[alpaca-sync] Orphan position ${local.symbol} (${local.direction}) not in broker, no exit order found. Closing as missing_in_broker.`);
+        const entry = Number(local.avg_entry);
+        await supabase.from("positions").update({
+          status: "closed",
+          closed_at: new Date().toISOString(),
+          close_price: entry,
+          pnl: 0,
+          notes: `${(local as any).notes || ""} | Closed by sync: missing in broker, no exit order found`,
+        }).eq("id", local.id);
+
+        changes.push({
+          action: "closed",
+          symbol: local.symbol,
+          detail: `Missing in broker — closed as orphan (PnL: 0)`,
         });
       }
     }

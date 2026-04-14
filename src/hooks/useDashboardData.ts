@@ -34,7 +34,7 @@ export interface JournalStats {
 const POS_SELECT = "id, symbol, direction, quantity, avg_entry, stop_loss, take_profit, strategy, pnl, opened_at";
 
 // ── Hook ──
-export function useDashboardData(userId: string | undefined) {
+export function useDashboardData(userId: string | undefined, paper = true) {
   const qc = useQueryClient();
   const enabled = !!userId;
 
@@ -131,7 +131,7 @@ export function useDashboardData(userId: string | undefined) {
   // 6. Alpaca sync on mount — fire-and-forget, then invalidate positions
   useEffect(() => {
     if (!userId) return;
-    supabase.functions.invoke("alpaca-sync", { body: { paper: true } }).then(({ error }) => {
+    supabase.functions.invoke("alpaca-sync", { body: { paper } }).then(({ error }) => {
       if (!error) {
         qc.invalidateQueries({ queryKey: ["dashboard", "positions", userId] });
       }
