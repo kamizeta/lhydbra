@@ -209,7 +209,7 @@ export default function PositionsPage() {
       }
     } catch { toast.error('Error sync Alpaca'); }
     setSyncing(false);
-  }, [loadPositions]);
+  }, [loadPositions, settings.paper_trading]);
 
   useEffect(() => {
     if (user && !loading) {
