@@ -1,48 +1,49 @@
 
 
-## Diagnóstico: R-Multiple faltante en el Journal
+## Problema: Señales no se persisten en la base de datos
 
-### Causa raíz
+### Diagnóstico
 
-El trigger `handle_position_closed` calcula R-Multiple así:
-```sql
-v_stop_distance := ABS(NEW.avg_entry - NEW.stop_loss);
-IF v_stop_distance > 0 THEN
-  v_r_multiple := COALESCE(NEW.pnl, 0) / (v_stop_distance * NEW.quantity);
-END IF;
+Las órdenes de hoy (TSLA SHORT, GOOGL SHORT) tienen `signal_id = NULL` en la tabla `orders`, y **no existen señales de hoy en la tabla `signals`**.
+
+**Causa raíz**: El `signal-engine` genera `signal_key` como `userId|TSLA|short|1d|2026-04-15`. Si ya existía una señal anterior con el mismo key (ej. del primer TSLA SHORT a las 14:53), el upsert con `ignoreDuplicates: true` **descarta silenciosamente** la segunda señal (la de las 17:30). El resultado del insert devuelve un array vacío, y `operator-mode` procede con objetos en memoria **sin `id`** de base de datos.
+
+```text
+Flujo actual:
+  signal-engine genera TSLA SHORT → signal_key = "...|TSLA|short|...|2026-04-15"
+  1er intento (14:53): INSERT OK → signal persiste con ID
+  Posición se abre, cierra con pérdida
+  2do intento (17:30): UPSERT ignoreDuplicates → SILENTLY SKIPPED
+  operator-mode recibe signal sin ID → orders.signal_id = NULL
+  Signal Center: no hay registro → usuario no ve reasoning/score
 ```
-
-**Problema**: Para UBER y ORCL, `stop_loss = avg_entry` en la tabla `positions` (resultado del bug de ghost orders), así que `v_stop_distance = 0` y R queda NULL.
-
-**Datos verificados**:
-| Symbol | avg_entry | stop_loss (positions) | stop_loss (signals) |
-|--------|-----------|----------------------|---------------------|
-| UBER   | 71.9556   | 71.9556 ❌ (= entry) | 71.9075 ✅          |
-| ORCL   | 139.1006  | 139.1006 ❌ (= entry)| 144.3925 ✅         |
 
 ### Plan de corrección
 
-#### 1. Mejorar trigger `handle_position_closed` con fallback a señal
-Cuando `stop_loss = avg_entry` (inválido), buscar el `stop_loss` original de la tabla `signals` usando `NEW.signal_id`. Esto garantiza que el R se calcule siempre que exista una señal vinculada.
+#### 1. Hacer `signal_key` único por ejecución (no por día)
+Cambiar la composición del `signal_key` para incluir un timestamp o secuencia, permitiendo múltiples señales del mismo símbolo+dirección en el mismo día.
 
-```sql
--- Pseudo-lógica del fix:
-IF NEW.stop_loss IS NULL OR NEW.stop_loss = NEW.avg_entry THEN
-  -- Fallback: usar stop_loss de la señal original
-  SELECT s.stop_loss INTO v_signal_sl FROM signals s WHERE s.id = NEW.signal_id;
-  v_stop_distance := ABS(NEW.avg_entry - v_signal_sl);
-ELSE
-  v_stop_distance := ABS(NEW.avg_entry - NEW.stop_loss);
-END IF;
+**Archivo**: `supabase/functions/signal-engine/index.ts` (~línea 1007)
+```
+// Antes:
+signal_key: `${user_id}|${symbol}|${direction}|1d|${date}`
+
+// Después:  
+signal_key: `${user_id}|${symbol}|${direction}|1d|${isoTimestamp}`
 ```
 
-#### 2. Usar `ABS(quantity)` en el cálculo de R
-Actualmente usa `NEW.quantity` directamente, pero para shorts la qty es negativa (-65 para TSLA), lo que invierte el signo del R. Fix: usar `ABS(NEW.quantity)`.
+Esto permite que cada ejecución del operator cree una señal nueva, aunque sea el mismo símbolo y dirección.
 
-#### 3. Backfill R-multiples faltantes
-Ejecutar un UPDATE para recalcular R en journal entries existentes donde `r_multiple IS NULL` pero hay datos suficientes (signal_id con stop_loss válido).
+#### 2. Validar que `trade.id` exista antes de ejecutar
+En `operator-mode`, después de recibir señales del `signal-engine`, verificar que cada señal tenga un `id` válido (UUID de la DB). Si no lo tiene, es porque el insert falló silenciosamente → loggear error y no ejecutar sin señal vinculada.
+
+**Archivo**: `supabase/functions/operator-mode/index.ts` (~línea 710)
+- Añadir check: si `trade.id` no es un UUID válido, loggear y skipear.
+- Alternativa: si `ignoreDuplicates` retorna vacío, hacer un SELECT para obtener la señal existente y usar su `id`.
+
+#### 3. Guardar memoria del fix
 
 ### Archivos a modificar
-- **Migration SQL**: Recrear trigger `handle_position_closed` con fallback + ABS(qty)
-- **Migration SQL**: Backfill R-multiples en `trade_journal` y `positions.actual_r_multiple`
+- `supabase/functions/signal-engine/index.ts` — signal_key con timestamp
+- `supabase/functions/operator-mode/index.ts` — validar signal ID antes de ejecutar
 
