@@ -1,55 +1,48 @@
 
 
-## Diagnóstico: Por qué SL/TP falla intermitentemente
+## Diagnóstico: R-Multiple faltante en el Journal
 
-### Problema encontrado
+### Causa raíz
 
-Hay **dos sistemas compitiendo** para colocar órdenes de protección, sin coordinación:
+El trigger `handle_position_closed` calcula R-Multiple así:
+```sql
+v_stop_distance := ABS(NEW.avg_entry - NEW.stop_loss);
+IF v_stop_distance > 0 THEN
+  v_r_multiple := COALESCE(NEW.pnl, 0) / (v_stop_distance * NEW.quantity);
+END IF;
+```
 
-1. **`alpaca-trade`** (al ejecutar): Coloca un **trailing stop** + TP inmediatamente después del fill (línea 388-400)
-2. **`alpaca-sync` SL-Guardian** (cada 5 min): Intenta colocar un **OCO** (stop fijo + limit) para toda posición abierta
+**Problema**: Para UBER y ORCL, `stop_loss = avg_entry` en la tabla `positions` (resultado del bug de ghost orders), así que `v_stop_distance = 0` y R queda NULL.
 
-El caso de TSLA muestra exactamente el conflicto:
-- `alpaca-trade` colocó un trailing stop exitosamente al fill
-- 5 minutos después, SL-Guardian intenta colocar un OCO pero Alpaca rechaza con `"insufficient qty available for order (requested: 65, available: 0)"` porque los 65 shares ya están reservados por el trailing stop existente
-- SL-Guardian busca órdenes tipo `stop` y `limit`, pero **no detecta órdenes tipo `trailing_stop`** — por eso cree que no hay protección
-
-Adicionalmente, el Guardian cancela cualquier orden que encuentre y reenvía (línea 754-758), lo que puede causar ventanas sin protección.
+**Datos verificados**:
+| Symbol | avg_entry | stop_loss (positions) | stop_loss (signals) |
+|--------|-----------|----------------------|---------------------|
+| UBER   | 71.9556   | 71.9556 ❌ (= entry) | 71.9075 ✅          |
+| ORCL   | 139.1006  | 139.1006 ❌ (= entry)| 144.3925 ✅         |
 
 ### Plan de corrección
 
-#### 1. SL-Guardian: Detectar trailing stops como protección válida
-- Agregar `trailing_stop` al mapeo de órdenes existentes en el Guardian
-- Si ya existe un `trailing_stop` para un símbolo, considerar la protección como activa y NO re-enviar
+#### 1. Mejorar trigger `handle_position_closed` con fallback a señal
+Cuando `stop_loss = avg_entry` (inválido), buscar el `stop_loss` original de la tabla `signals` usando `NEW.signal_id`. Esto garantiza que el R se calcule siempre que exista una señal vinculada.
 
-#### 2. SL-Guardian: Agregar flag `protection_confirmed` 
-- Después de que `alpaca-trade` coloque protección exitosamente, marcar `protection_confirmed = true` en la tabla `orders`
-- El Guardian debe verificar este flag antes de intentar re-enviar — si la orden ya tiene protección confirmada y hay órdenes activas en Alpaca, skip
+```sql
+-- Pseudo-lógica del fix:
+IF NEW.stop_loss IS NULL OR NEW.stop_loss = NEW.avg_entry THEN
+  -- Fallback: usar stop_loss de la señal original
+  SELECT s.stop_loss INTO v_signal_sl FROM signals s WHERE s.id = NEW.signal_id;
+  v_stop_distance := ABS(NEW.avg_entry - v_signal_sl);
+ELSE
+  v_stop_distance := ABS(NEW.avg_entry - NEW.stop_loss);
+END IF;
+```
 
-#### 3. SL-Guardian: No cancelar + re-crear si los precios coinciden
-- Actualmente las líneas 738-739 siempre evalúan como true (`!hasStopOrder || hasStopOrder` = siempre true), lo que significa que el Guardian **siempre** cancela y re-envía, incluso si ya todo está bien
-- Fix: Solo actuar si realmente falta protección o hay mismatch de precios
+#### 2. Usar `ABS(quantity)` en el cálculo de R
+Actualmente usa `NEW.quantity` directamente, pero para shorts la qty es negativa (-65 para TSLA), lo que invierte el signo del R. Fix: usar `ABS(NEW.quantity)`.
 
-#### 4. Ventana de protección: Agregar wait después de cancel
-- Aumentar el delay post-cancel de 500ms a 1500ms para que Alpaca libere la qty antes de re-enviar
+#### 3. Backfill R-multiples faltantes
+Ejecutar un UPDATE para recalcular R en journal entries existentes donde `r_multiple IS NULL` pero hay datos suficientes (signal_id con stop_loss válido).
 
 ### Archivos a modificar
-- `supabase/functions/alpaca-sync/index.ts` — SL-Guardian: detectar trailing_stop, corregir lógica de re-evaluación, aumentar delay
-- `supabase/functions/alpaca-trade/index.ts` — Marcar `protection_confirmed` en orders después de colocar protección exitosa
-
-### Detalle técnico
-
-```text
-Antes (buggy):
-  alpaca-trade: coloca trailing_stop + TP al fill
-  SL-Guardian: no reconoce trailing_stop → cree que falta SL
-  SL-Guardian: cancela + re-envía OCO → falla por qty held
-  Líneas 738-739: missingStop = hasSL && (!hasStopOrder || hasStopOrder) → siempre true
-
-Después (fix):
-  alpaca-trade: coloca trailing_stop + TP → marca protection_confirmed
-  SL-Guardian: detecta trailing_stop como protección válida → skip
-  SL-Guardian: solo actúa si realmente falta protección
-  Delay post-cancel: 500ms → 1500ms
-```
+- **Migration SQL**: Recrear trigger `handle_position_closed` con fallback + ABS(qty)
+- **Migration SQL**: Backfill R-multiples en `trade_journal` y `positions.actual_r_multiple`
 
