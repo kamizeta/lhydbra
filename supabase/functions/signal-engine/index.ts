@@ -1086,6 +1086,5 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const message = err instanceof Error ? err.message : "Unknown error";
     log("error", "signal_engine_fatal", { error: message });
     return jsonRes(req, { error: message, signals: [], count: 0, rejected: 0 }, 500);
-    return jsonRes(req, { error: message, signals: [], count: 0, rejected: 0 }, 500);
   }
 });
