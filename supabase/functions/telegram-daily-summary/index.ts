@@ -191,10 +191,16 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Daily risk status
+      // Daily risk status — count trades from actual data
+      const tradesOpenedToday = openPositions.filter(p => {
+        const opened = new Date(p.opened_at);
+        return opened >= todayStart;
+      }).length;
+      const actualTradesToday = tradesOpenedToday + closedTrades.length;
+
       lines.push("", "⚙️ *ESTADO DEL SISTEMA*");
       lines.push(`• Riesgo diario usado: ${riskPct.toFixed(1)}% / ${settings.max_daily_risk}%`);
-      lines.push(`• Trades hoy: ${settings.trades_today || 0}`);
+      lines.push(`• Trades hoy: ${actualTradesToday}`);
       lines.push(`• Posiciones: ${openPositions.length} / ${settings.max_positions}`);
 
       if (isMorning) {
