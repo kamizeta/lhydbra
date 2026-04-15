@@ -1004,7 +1004,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         status: "active",
         ai_grade: aiGrade,
         ai_rationale: aiRationale,
-        signal_key: `${user_id}|${symbol}|${direction}|1d|${new Date().toISOString().slice(0, 10)}`,
+        signal_key: `${user_id}|${symbol}|${direction}|1d|${new Date().toISOString()}`,
       };
 
       candidates.push({ signal, finalScore, confidenceScore });
@@ -1085,7 +1085,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     log("error", "signal_engine_fatal", { error: message });
-    return jsonRes(req, { error: message, signals: [], count: 0, rejected: 0 }, 500);
     return jsonRes(req, { error: message, signals: [], count: 0, rejected: 0 }, 500);
   }
 });

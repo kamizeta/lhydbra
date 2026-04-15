@@ -709,6 +709,14 @@ Deno.serve(async (req) => {
     if (shouldExecute && action === "run") {
       for (const trade of executableTrades) {
         try {
+          // ─── Validate signal has a persisted DB id ───
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (!trade.id || !uuidRegex.test(String(trade.id))) {
+            tradeLog("signal_id_missing", { user_id: user.id, symbol: String(trade.asset), trade_id: trade.id, reason: "Signal was not persisted to DB (possible dedup). Skipping execution." });
+            execResults.push({ symbol: String(trade.asset), success: false, error: "Signal not persisted (no DB id)", skipped: true });
+            continue;
+          }
+
           // ─── Feature flag guards ───
           const isCrypto = ['crypto'].includes(String(trade.asset_class || ''));
           if (String(trade.direction) === 'short' && flagMap.short_selling === false) {
