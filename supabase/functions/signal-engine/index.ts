@@ -1004,7 +1004,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         status: "active",
         ai_grade: aiGrade,
         ai_rationale: aiRationale,
-        signal_key: `${user_id}|${symbol}|${direction}|1d|${new Date().toISOString().slice(0, 10)}`,
+        signal_key: `${user_id}|${symbol}|${direction}|1d|${new Date().toISOString()}`,
       };
 
       candidates.push({ signal, finalScore, confidenceScore });
