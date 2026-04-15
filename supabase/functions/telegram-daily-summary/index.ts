@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       // Fetch open positions
       const { data: positions } = await supabase
         .from("positions")
-        .select("symbol, direction, quantity, avg_entry, stop_loss, take_profit, pnl, strategy, asset_type")
+        .select("symbol, direction, quantity, avg_entry, stop_loss, take_profit, pnl, strategy, asset_type, opened_at")
         .eq("user_id", userId)
         .eq("status", "open");
 
