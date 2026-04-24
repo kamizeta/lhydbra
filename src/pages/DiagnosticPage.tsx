@@ -31,12 +31,16 @@ function DiagPanel({ label, result, loading, onRun }: { label: string; result: T
   );
 }
 
-function OperatorRunPanel({ result, loading, onRun }: { result: TestResult | null; loading: boolean; onRun: () => void }) {
+function OperatorRunPanel({ result, loading, onRun, onResetCooldown, resetResult, resetLoading }: {
+  result: TestResult | null; loading: boolean; onRun: () => void;
+  onResetCooldown: () => void; resetResult: TestResult | null; resetLoading: boolean;
+}) {
   const data = result?.data;
   const status = data?.status;
   const hasError = result?.error || data?.error;
+  const isBlocked = status === "blocked";
 
-  const borderClass = hasError || status === "blocked"
+  const borderClass = hasError || isBlocked
     ? "border-destructive"
     : status === "ready_for_approval"
     ? "border-yellow-500"
@@ -48,16 +52,30 @@ function OperatorRunPanel({ result, loading, onRun }: { result: TestResult | nul
     else if (status === "executed") summary = `✅ Trades executed: ${data?.trades?.length ?? 0}`;
     else if (status === "no_opportunities") summary = "⚠️ No opportunities found";
     else if (status === "ready_for_approval") summary = "🟡 Signals ready but auto-execute is off";
-    else if (status === "blocked") summary = `🔴 Blocked: ${(data?.reasons ?? []).join(", ")}`;
+    else if (isBlocked) summary = `🔴 Blocked: ${(data?.reasons ?? []).join(", ")}`;
     else summary = `Status: ${status ?? "unknown"}`;
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <Button onClick={onRun} disabled={loading} variant="outline" size="sm" className="font-mono text-xs w-full">
-        {loading ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : null}
-        Run Operator (action: run)
-      </Button>
+      <div className="flex gap-2">
+        <Button onClick={onRun} disabled={loading} variant="outline" size="sm" className="font-mono text-xs flex-1">
+          {loading ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : null}
+          Run Operator (action: run)
+        </Button>
+        <Button onClick={onResetCooldown} disabled={resetLoading} variant="destructive" size="sm" className="font-mono text-xs whitespace-nowrap">
+          {resetLoading ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : null}
+          Reset Cooldown
+        </Button>
+      </div>
+      {resetResult && (
+        <div className={cn("border rounded-md p-3 bg-card", resetResult.error ? "border-destructive" : "border-yellow-500")}>
+          <p className="text-[10px] font-mono text-muted-foreground mb-1">{resetResult.ms}ms</p>
+          <pre className="text-[11px] font-mono text-foreground whitespace-pre-wrap break-all">
+            {JSON.stringify(resetResult.data ?? resetResult.error, null, 2)}
+          </pre>
+        </div>
+      )}
       {result && (
         <div className={cn("border rounded-md p-3 overflow-auto max-h-96 bg-card", borderClass)}>
           <p className="text-[10px] font-mono text-muted-foreground mb-1">{result.ms}ms</p>
@@ -106,6 +124,9 @@ export default function DiagnosticPage() {
           result={results["operatorRun"] ?? null}
           loading={!!loading["operatorRun"]}
           onRun={() => run("operatorRun", () => supabase.functions.invoke("operator-mode", { body: { action: "run", paper: true } }))}
+          onResetCooldown={() => run("cooldownReset", () => supabase.functions.invoke("operator-mode", { body: { action: "reset_cooldown" } }))}
+          resetResult={results["cooldownReset"] ?? null}
+          resetLoading={!!loading["cooldownReset"]}
         />
       </div>
     </div>

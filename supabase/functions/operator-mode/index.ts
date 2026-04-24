@@ -227,6 +227,16 @@ Deno.serve(async (req) => {
     const { data: sysConfig } = await supabase.from("system_config").select("*").eq("id", "global").maybeSingle();
     const tradingEnabled = sysConfig ? Boolean(sysConfig.trading_enabled) : true;
 
+    // ─── ACTION: reset_cooldown ───
+    if (action === "reset_cooldown") {
+      const { error: resetErr } = await supabase
+        .from("user_settings")
+        .update({ consecutive_losses: 0, trades_today: 0, daily_risk_used: 0 })
+        .eq("user_id", user.id);
+      if (resetErr) return jsonRes(req, { error: resetErr.message }, 500);
+      return jsonRes(req, { status: "cooldown_reset", message: "Consecutive losses reset to 0. Operator is unblocked." });
+    }
+
     // ─── FEATURE FLAGS ───
     const { data: flagRows } = await supabase.from("feature_flags").select("id, enabled");
     const flagMap: Record<string, boolean> = {};
